@@ -5,36 +5,36 @@ struct VOut {
   @location(0) local: vec2f,
   @location(1) @interpolate(flat) dims: vec4f,  // width, length, light gain, absorb gain
   @location(2) @interpolate(flat) col: vec3f,
-  @location(3) srcY: f32,
-  @location(4) @interpolate(flat) clipY: f32,
+  @location(3) along: f32,                      // distance above the landing point, along the fall direction
 };
 
+// Notes travel along a fall direction: U points from the landing point back toward where notes come from.
 @vertex
 fn vs(@builtin(vertex_index) vi: u32,
-      @location(0) a0: vec4f,   // cx, top y, bottom y, clip y (the saber line)
-      @location(1) a1: vec4f,   // width, gain, absorb gain, -
-      @location(2) a2: vec4f) -> VOut {
+      @location(0) a0: vec4f,   // landing x, landing y, bottom (distance along U), top (distance along U)
+      @location(1) a1: vec4f,   // width, gain, absorb gain, U.x
+      @location(2) a2: vec4f) -> VOut {  // colour, U.y
   let w = a1.x;
   let pad = 1.3 * w;
+  let U = vec2f(a1.w, a2.w);
+  let N = vec2f(-U.y, U.x);
   let c = corner(vi);
-  let x0 = a0.x - w * 0.5 - pad;
-  let x1 = a0.x + w * 0.5 + pad;
-  let y0 = a0.y - pad;
-  let y1 = min(a0.z + pad, a0.w);
-  let p = vec2f(mix(x0, x1, c.x), mix(y0, y1, c.y));
+  let x = mix(-w * 0.5 - pad, w * 0.5 + pad, c.x);
+  let s0 = max(a0.z - pad, 0.0);           // never below the saber
+  let s = mix(a0.w + pad, s0, c.y);
+  let p = a0.xy + U * s + N * x;
   var o: VOut;
   o.pos = toClip(p);
-  o.local = vec2f(p.x - a0.x, p.y - (a0.y + a0.z) * 0.5);
-  o.dims = vec4f(w, a0.z - a0.y, a1.y, a1.z);
+  o.local = vec2f(x, (a0.z + a0.w) * 0.5 - s);
+  o.dims = vec4f(w, a0.w - a0.z, a1.y, a1.z);
   o.col = a2.xyz;
-  o.srcY = p.y;
-  o.clipY = a0.w;
+  o.along = s;
   return o;
 }
 
 @fragment
 fn fs(i: VOut) -> @location(0) vec4f {
-  if (i.srcY > i.clipY) { discard; }
+  if (i.along < 0.0) { discard; }
   let w = i.dims.x;
   let L = max(i.dims.y, w);
   let px = i.local.x;

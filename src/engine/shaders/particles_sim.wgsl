@@ -7,7 +7,7 @@ struct Emitter {
   seed: f32, kind: f32, pad0: f32, pad1: f32,
 };
 struct Particle { pos: vec2f, b: f32, star: f32, col: vec4f };
-struct Params { time: f32, nEmit: u32, perEmit: u32, pad: u32 };
+struct Params { time: f32, nEmit: u32, perEmit: u32, pad: u32, up: vec2f, pad2: vec2f };
 
 @group(0) @binding(0) var<uniform> PP: Params;
 @group(0) @binding(1) var<storage, read> emitters: array<Emitter>;
@@ -107,8 +107,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   while (pt < t) {
     let dt = min(1.0 / 40.0, t - pt);
     let f = flowVel(pos, pt);
-    vel.x += (f.x * 0.55 - vel.x) * 2.2 * dt;
-    vel.y += (f.y * 0.8 - 42.0 - vel.y) * 2.2 * dt;
+    // drift with the air current and rise back along the notes' lane
+    let goal = vec2f(f.x * 0.55, f.y * 0.8) + PP.up * 42.0;
+    vel += (goal - vel) * 2.2 * dt;
     pos += vel * dt;
     pt += dt;
   }

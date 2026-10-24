@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_LAYERS, Layers, Renderer } from './engine/renderer';
+import { autoNoteAngle, MAX_TILT } from './engine/direction';
 import { CalibratedProject, testNotes } from './engine/calibration';
 import { VersionAndUpdates } from './updater';
 import CalibrateCanvas from './ui/CalibrateCanvas';
@@ -309,6 +310,33 @@ export default function App() {
               <option value={0.5}>Half</option>
               <option value={1}>Full</option>
             </select>
+            {project && (() => {
+              const auto = autoNoteAngle(project);
+              const set = project.look?.noteAngle;
+              const angle = typeof set === 'number' ? set : auto;
+              const setAngle = (v: number | null) => setProject({ ...project, look: { ...project.look, noteAngle: v } });
+              return (
+                <>
+                  <span className="section-label">Note angle</span>
+                  <div className="angle">
+                    <svg width="34" height="34" viewBox="-17 -17 34 34" aria-hidden="true">
+                      <circle r="15" fill="none" stroke="#2c333c" />
+                      <g transform={`rotate(${angle})`}>
+                        <line x1="0" y1="-12" x2="0" y2="7" stroke="#2FD3B5" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M-4.5 4 L0 10 L4.5 4" fill="none" stroke="#2FD3B5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </g>
+                    </svg>
+                    <input type="range" min={-MAX_TILT} max={MAX_TILT} step={1} value={angle} onChange={(e) => setAngle(Number(e.target.value))} aria-label="Note angle" />
+                    <span className="deg">{angle}°</span>
+                  </div>
+                  <p className="help">
+                    {typeof set === 'number'
+                      ? <>Set by you. <button type="button" className="link inline" onClick={() => setAngle(null)}>Back to automatic ({auto}°)</button></>
+                      : auto === 0 ? 'Automatic: straight down suits this camera angle.' : 'Automatic: tilted so every key keeps its own lane.'}
+                  </p>
+                </>
+              );
+            })()}
             {project && (
               <>
                 <span className="section-label">Notes</span>

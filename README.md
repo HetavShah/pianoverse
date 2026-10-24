@@ -116,7 +116,7 @@ A few ideas that make it work:
 2. Click **Choose files…** and pick `samples/interstellar-take1.mp4` and `samples/interstellar-take1.pvproj.json` together (or drop them on the window).
 3. Press **Space** to play.
 
-**Your own video:** choose just the video and click **Set up this video**. Drag the four handles onto the corners of the keys, pick **Moved** and **Track keyboard** if the camera wasn't fixed, then switch to **Preview**. Until MIDI import lands, a sweep across every key shows where notes will fall. **Save project…** keeps the setup for next time.
+**Your own video:** choose just the video and click **Set up this video**. Drag the four handles onto the corners of the keys, pick **Moved** and **Track keyboard** if the camera wasn't fixed, then switch to **Preview**. If the keyboard runs steeply across the frame, notes tilt automatically so every key keeps its own lane; the **Note angle** slider sets it by hand. Until MIDI import lands, a sweep across every key shows where notes will fall. **Save project…** keeps the setup for next time.
 
 | Key | Action |
 | --- | --- |

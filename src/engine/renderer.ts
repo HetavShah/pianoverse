@@ -1,5 +1,6 @@
 // WebGPU renderer: video frame + glass notes + saber + key glow + impact sprites + particle plumes + bloom.
 import commonSrc from './shaders/common.wgsl?raw';
+import { fallUp } from './direction';
 import glassSrc from './shaders/glass.wgsl?raw';
 import keysSrc from './shaders/keys.wgsl?raw';
 import spritesSrc from './shaders/sprites.wgsl?raw';
@@ -51,6 +52,8 @@ export class Renderer {
   private notes: Note[] = [];
   private kb = new Keyboard(36, 0, 0);
   private whiteKeys = 36;
+  /** unit vector from a landing point back toward where notes come from (screen space) */
+  private up: [number, number] = [0, -1];
   private srcW = 1080;
   private srcH = 1920;
   private scale = 0.5;
@@ -129,7 +132,7 @@ export class Renderer {
     this.saberUni = buf(48, U.UNIFORM | U.COPY_DST);
     this.saberMap = buf(64 * 8, U.STORAGE | U.COPY_DST);
     this.heatBuf = buf(40 * 16, U.STORAGE | U.COPY_DST);
-    this.simUni = buf(16, U.UNIFORM | U.COPY_DST);
+    this.simUni = buf(32, U.UNIFORM | U.COPY_DST);
     this.emitBuf = buf(MAX_EMIT * 64, U.STORAGE | U.COPY_DST);
     this.flowBuf = buf(20 * 16, U.STORAGE | U.COPY_DST);
     this.partBuf = buf(MAX_EMIT * PER_EMIT * 32, U.STORAGE);
@@ -209,6 +212,7 @@ export class Renderer {
     this.whiteKeys = proj.keyboard.whiteKeys;
     this.kb = new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b);
     this.notes = prepareNotes(proj.notes, proj.keyboard.lowestNote, proj.keyboard.keys);
+    this.up = fallUp(proj);
     this.buildEmitters();
     this.resize();
   }
@@ -307,6 +311,7 @@ export class Renderer {
     let bass = 0;
     const L = this.layers;
     const kb = this.kb;
+    const U = this.up;
 
     const keyQuad = (p: number, c: RGB) => {
       if (keys.length / 42 >= MAX_KEYS) return;
@@ -337,19 +342,23 @@ export class Renderer {
       const dd = n.s - t;
       const w = Math.max(24, tg.unit * 1.05) * (0.9 + 0.2 * vn);
       const len = Math.min(300, Math.max(w * 1.4, (n.e - n.s) * FALL * 0.8 - 8));
-      const yb = tg.y - dd * FALL;
-      const yt = yb - len;
-      if (L.notes && yt < tg.y && yb > -40 && dd < (tg.y + 400) / FALL && glass.length / 12 < MAX_GLASS) {
-        const fade = Math.min(1, Math.max(0, (yb + 60) / 220));
-        glass.push(tg.x, yt, yb, tg.y, w, fade * (0.85 + 0.3 * vn), fade, 0, col[0], col[1], col[2], 0);
+      // distances measured from the landing point back along the fall direction
+      const sB = dd * FALL;
+      const sT = sB + len;
+      const sMax = exitDist(tg.x, tg.y, U, this.srcW, this.srcH);
+      const at = (d: number): [number, number] => [tg.x + U[0] * d, tg.y + U[1] * d];
+      if (L.notes && sT > 0 && sB < sMax + 40 && glass.length / 12 < MAX_GLASS) {
+        const fade = Math.min(1, Math.max(0, (sMax - sB + 60) / 220));
+        glass.push(tg.x, tg.y, sB, sT, w, fade * (0.85 + 0.3 * vn), fade, U[0], col[0], col[1], col[2], U[1]);
         visible++;
-        if (yb >= tg.y && L.impact) dot(tg.x, tg.y, tg.unit * 0.3, scaleC(lighten(col, 0.6), 0.5));
+        if (sB <= 0 && L.impact) dot(tg.x, tg.y, tg.unit * 0.3, scaleC(lighten(col, 0.6), 0.5));
       }
       if (dd > 0) {
         const near = 1 - Math.min(1, dd / 0.5);
         if (near > 0) {
           if (L.keys) keyQuad(n.p, scaleC(col, 0.45 * near * near));
-          if (L.impact) light(tg.x, yb, tg.unit * 3, col, 0.35 * near);
+          const [lx, ly] = at(sB);
+          if (L.impact) light(lx, ly, tg.unit * 3, col, 0.35 * near);
         }
       } else if (t <= n.e || dd >= -SPLASH) {
         const tt = -dd;
@@ -357,7 +366,8 @@ export class Renderer {
         const glow = Math.max(Math.exp(-tt * 6), held ? 0.3 + 0.05 * Math.sin(t * 7 + n.p) : 0);
         if (L.keys) keyQuad(n.p, scaleC(lighten(col, 0.45), glow));
         if (L.impact) {
-          light(tg.x, tg.y - tg.unit * 0.6, tg.unit * (4 + 2 * vn), col, (0.55 + 0.5 * vn) * Math.exp(-tt * 3.5) + (held ? 0.12 : 0));
+          const [lx, ly] = at(tg.unit * 0.6);
+          light(lx, ly, tg.unit * (4 + 2 * vn), col, (0.55 + 0.5 * vn) * Math.exp(-tt * 3.5) + (held ? 0.12 : 0));
           if (tt < 0.35) {
             const e = Math.exp(-tt * 11) * (0.75 + 0.45 * vn);
             dot(tg.x, tg.y, tg.unit * 0.45, scaleC(lighten(col, 0.5), 0.8 * e));
@@ -406,6 +416,7 @@ export class Renderer {
     }
     q.writeBuffer(this.simUni, 0, new Uint32Array([0, nEmit, PER_EMIT, 0]));
     q.writeBuffer(this.simUni, 0, new Float32Array([t]));
+    q.writeBuffer(this.simUni, 16, new Float32Array([0, -1, 0, 0])); // glitter rises straight up the screen
 
     const enc = d.createCommandEncoder();
     if (nEmit) {
@@ -630,4 +641,14 @@ export class Renderer {
     while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] <= v) lo = m + 1; else hi = m; }
     return lo;
   }
+}
+
+/** Distance from (x, y) along direction u to the edge of the frame. */
+function exitDist(x: number, y: number, u: [number, number], w: number, h: number): number {
+  let d = Infinity;
+  if (u[0] > 1e-6) d = Math.min(d, (w - x) / u[0]);
+  if (u[0] < -1e-6) d = Math.min(d, -x / u[0]);
+  if (u[1] > 1e-6) d = Math.min(d, (h - y) / u[1]);
+  if (u[1] < -1e-6) d = Math.min(d, -y / u[1]);
+  return Math.max(0, isFinite(d) ? d : 0);
 }

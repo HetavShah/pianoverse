@@ -10,6 +10,8 @@ export interface ProjectFile {
   keyboard: { keys: number; lowestNote: number; whiteKeys: number; edge: { a: number; b: number } };
   tracking: { space: 'video-pixels'; frames: number[][] }; // 8 values per frame, h33 = 1
   notes: RawNote[];
+  /** appearance settings saved with the project */
+  look?: { noteAngle?: number | null };
 }
 
 export type RGB = [number, number, number]; // 0..1
