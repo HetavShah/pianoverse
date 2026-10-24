@@ -41,7 +41,7 @@ fn fs(i: VOut) -> @location(0) vec4f {
   let py = i.local.y;
   let bx = w * 0.5;
   let by = L * 0.5;
-  let r = w * 0.26;
+  let r = min(w * 0.26 * F.noteRound, w * 0.49);
   let qx = abs(px) - (bx - r);
   let qy = abs(py) - (by - r);
   let d = length(max(vec2f(qx, qy), vec2f(0.0))) + min(max(qx, qy), 0.0) - r;
@@ -69,12 +69,12 @@ fn fs(i: VOut) -> @location(0) vec4f {
   let gy = py + by - r * 0.75;
   let glint = exp(-(gx * gx + gy * gy) / sq(rimT * 1.3));
   let col = i.col;
-  let rgb = rim * lighten(col, 0.6) * 1.15 * rimLit
-          + rim2 * lighten(col, 0.35) * 0.55
+  let rgb = (rim * lighten(col, 0.6) * 1.15 * rimLit
+          + rim2 * lighten(col, 0.35) * 0.55) * F.noteRim
           + bevel * lighten(col, 0.3) * 0.75
-          + body * col
-          + sheen * lighten(col, 0.5)
-          + halo * col
-          + vec3f(glint * 0.9);
-  return vec4f(rgb * i.dims.z, inside * 0.42 * i.dims.w);
+          + (body * col
+          + sheen * lighten(col, 0.5)) * F.noteFill
+          + halo * col * F.noteGlow
+          + vec3f(glint * 0.9) * F.noteRim;
+  return vec4f(rgb * i.dims.z * F.noteBright, inside * 0.42 * i.dims.w);
 }

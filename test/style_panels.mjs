@@ -1,0 +1,45 @@
+// Style panels: change settings, check they reach the project, save a preset, apply presets.
+import { chromium } from 'playwright';
+import { mkdirSync } from 'node:fs';
+const OUT = 'test/out/panels'; mkdirSync(OUT, { recursive: true });
+const CLIP = process.env.CLIP ?? '/home/claude/sample15a.webm';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'] });
+const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
+page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+await page.addInitScript(() => { window.__pvHeadless = true; });
+await page.goto('http://localhost:4173/'); await page.waitForTimeout(800);
+await page.setInputFiles('.row-actions input[type=file]', 'samples/interstellar-take1.pvproj.json');
+await page.waitForTimeout(600);
+await page.setInputFiles('.file-card .actions input[type=file]', CLIP);
+await page.waitForTimeout(1500);
+await page.click('.stepper >> text=Style');
+await page.waitForTimeout(800);
+const look = () => page.evaluate(() => window.pianoverseProject.look ?? {});
+const setRange = (label, v) => page.$eval(`input[aria-label="${label}"]`, (el, v) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, String(v)); el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+await page.screenshot({ path: `${OUT}/1-notes-panel.png` });
+await setRange('Glow', 2.2); await setRange('Width', 1.3);
+console.log('notes changed:', JSON.stringify(await look()));
+console.log('reset arrows shown:', await page.$$eval('.reset', (e) => e.length), '| preset says changed:', await page.$eval('.preset-bar', (e) => e.textContent.includes('Changed')));
+await page.click('.layer-row >> text=Particles'); await page.waitForTimeout(200);
+await setRange('Amount', 2); await setRange('Gravity', 0.5);
+await page.screenshot({ path: `${OUT}/2-particles-panel.png` });
+await page.click('.layer-row >> text=Colours'); await page.waitForTimeout(200);
+await page.click('.pal >> text=Left / right hand'); await page.waitForTimeout(200);
+await page.screenshot({ path: `${OUT}/3-colours-panel.png` });
+console.log('palette:', (await look()).palette);
+// save as a preset
+await page.click('text=Save as new preset');
+await page.fill('.preset-actions input[type=text]', 'Pink and gold');
+await page.click('.preset-actions >> text=Save');
+await page.waitForTimeout(400);
+console.log('preset select now:', await page.$eval('select[aria-label="Preset"]', (s) => s.options[s.selectedIndex].text), '| options:', await page.$$eval('select[aria-label="Preset"] option', (o) => o.map((x) => x.text)));
+// switch back to the built-in preset, then to ours
+await page.selectOption('select[aria-label="Preset"]', 'interstellar-teal'); await page.waitForTimeout(300);
+console.log('after Interstellar Teal:', JSON.stringify(await look()));
+const ours = await page.$eval('select[aria-label="Preset"]', (s) => [...s.options].find((o) => o.text.startsWith('Pink')).value);
+await page.selectOption('select[aria-label="Preset"]', ours); await page.waitForTimeout(300);
+const l2 = await look();
+console.log('after our preset: palette', l2.palette, 'noteGlow', l2.noteGlow, 'partAmount', l2.partAmount, 'partGravity', l2.partGravity);
+await page.click('.layer-row >> text=Notes'); await page.waitForTimeout(200);
+await page.screenshot({ path: `${OUT}/4-own-preset.png` });
+await b.close();

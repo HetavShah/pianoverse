@@ -61,3 +61,18 @@ pub fn delete_project(app: AppHandle, id: String) -> Result<(), String> {
 pub fn file_exists(path: String) -> bool {
     std::path::Path::new(&path).is_file()
 }
+
+/// Saved looks (presets) and which one new projects start with: one small JSON file.
+#[tauri::command]
+pub fn load_presets(app: AppHandle) -> Result<String, String> {
+    let f = root(&app)?.parent().unwrap().join("presets.json");
+    Ok(std::fs::read_to_string(f).unwrap_or_else(|_| "{}".into()))
+}
+
+#[tauri::command]
+pub fn save_presets(app: AppHandle, json: String) -> Result<(), String> {
+    let f = root(&app)?.parent().unwrap().join("presets.json");
+    let tmp = f.with_extension("json.part");
+    std::fs::write(&tmp, json).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &f).map_err(|e| e.to_string())
+}

@@ -1,23 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { autoNoteAngle, MAX_TILT } from '../../engine/direction';
 import type { Layers } from '../../engine/renderer';
+import { applyPreset, LayerId, Look, LOOK_SCHEMA, matchesPreset, PALETTES, resolveLook } from '../../engine/look';
+import LookControls from '../LookControls';
+import PresetBar from '../PresetBar';
 import StyleTimeline from '../StyleTimeline';
 import type { WS } from '../workspace';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 
-const LAYERS: { id: keyof Layers; label: string; kind: string; icon: string }[] = [
-  { id: 'notes', label: 'Notes', kind: 'Glass', icon: 'M9 3h6v18H9z' },
-  { id: 'saber', label: 'Saber', kind: 'Plasma', icon: 'M3 14h18M6 11c2-2 4-2 6 0s4 2 6 0' },
-  { id: 'impact', label: 'Impact', kind: 'Flash', icon: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6' },
-  { id: 'particles', label: 'Particles', kind: 'Plumes', icon: 'M7 17a1 1 0 1 0 0 .1M12 9a1 1 0 1 0 0 .1M16 14a1 1 0 1 0 0 .1M10 5a1 1 0 1 0 0 .1M17 6a1 1 0 1 0 0 .1' },
-  { id: 'keys', label: 'Key glow', kind: 'Relight', icon: 'M4 6h16v12H4zM9 6v7M15 6v7' },
-  { id: 'bloom', label: 'Bloom', kind: 'Soft', icon: 'M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10M12 2v2M12 20v2M2 12h2M20 12h2' },
+type Panel = { id: LayerId; label: string; kind: (l: Look) => string; icon: string; toggle?: keyof Layers };
+const PANELS: Panel[] = [
+  { id: 'colors', label: 'Colours', kind: (l) => PALETTES.find((p) => p.id === l.palette)?.label.split(' ')[0] ?? '', icon: 'M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-1-.8-1.4-.8-2.4 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.7-4-8.4-9-8.4zM7.5 11a1 1 0 1 0 0 .1M10 7a1 1 0 1 0 0 .1M15 7.5a1 1 0 1 0 0 .1' },
+  { id: 'notes', label: 'Notes', kind: () => 'Glass', icon: 'M9 3h6v18H9z', toggle: 'notes' },
+  { id: 'saber', label: 'Saber', kind: () => 'Plasma', icon: 'M3 14h18M6 11c2-2 4-2 6 0s4 2 6 0', toggle: 'saber' },
+  { id: 'impact', label: 'Impact', kind: () => 'Flash', icon: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6', toggle: 'impact' },
+  { id: 'particles', label: 'Particles', kind: () => 'Plumes', icon: 'M7 17a1 1 0 1 0 0 .1M12 9a1 1 0 1 0 0 .1M16 14a1 1 0 1 0 0 .1M10 5a1 1 0 1 0 0 .1M17 6a1 1 0 1 0 0 .1', toggle: 'particles' },
+  { id: 'lighting', label: 'Lighting', kind: () => 'Relight', icon: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z', toggle: 'keys' },
+  { id: 'background', label: 'Background', kind: () => 'Footage', icon: 'M3 5h18v14H3zM3 15l5-4 4 3 3-2 6 5' },
+  { id: 'finish', label: 'Glow and film', kind: () => 'Bloom', icon: 'M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10M12 2v2M12 20v2M2 12h2M20 12h2', toggle: 'bloom' },
 ];
 
 export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; attachPreview: (c: HTMLCanvasElement | null) => void; fps: number; stats: string }) {
   const { project } = ws;
-  const [sel, setSel] = useState<keyof Layers>('notes');
+  const [sel, setSel] = useState<LayerId>('notes');
   const [original, setOriginal] = useState(false);
   const [guides, setGuides] = useState(false);
   const [flash, setFlash] = useState<{ n: number; play: boolean }>({ n: 0, play: false });
@@ -34,26 +40,35 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
 
   if (!project) return null;
   const noNotes = project.notes.length === 0;
-  const layer = LAYERS.find((l) => l.id === sel)!;
+  const layer = PANELS.find((l) => l.id === sel)!;
+  const look = resolveLook(project.look);
+  const preset = ws.presets.find((p) => p.id === project.presetId) ?? ws.presets.find((p) => p.id === 'interstellar-teal')!;
+  const base = resolveLook(applyPreset(project.look, preset));
+  const setLook = (patch: Partial<Look>) => ws.setProject({ ...project, look: { ...project.look, ...patch } });
+  const setKey = (k: keyof Look, v: unknown) => setLook({ [k]: v } as Partial<Look>);
+  const layerKeys = LOOK_SCHEMA[sel].flatMap((sec) => sec.controls.map((c) => c.key));
+  const layerChanged = layerKeys.some((k) => look[k] !== base[k]);
   const autoAngle = autoNoteAngle(project);
   const setAngle = project.look?.noteAngle;
   const angle = typeof setAngle === 'number' ? setAngle : autoAngle;
-  const setNoteAngle = (a: number | null) => ws.setProject({ ...project, look: { ...project.look, noteAngle: a } });
+  const setNoteAngle = (a: number | null) => setLook({ noteAngle: a });
   const tall = project.video.height > project.video.width;
 
   return (
     <div className="style-page">
       <nav className="style-layers" aria-label="Layers">
         <span className="section-label">Layers</span>
-        {LAYERS.map((l) => (
-          <div key={l.id} className={'layer-row' + (sel === l.id ? ' on' : '') + (ws.layers[l.id] ? '' : ' off')} onClick={() => setSel(l.id)}>
+        {PANELS.map((l) => (
+          <div key={l.id} className={'layer-row' + (sel === l.id ? ' on' : '') + (l.toggle && !ws.layers[l.toggle] ? ' off' : '')} onClick={() => setSel(l.id)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d={l.icon} /></svg>
             <span className="name">{l.label}</span>
-            <span className="kind">{l.kind}</span>
-            <input type="checkbox" checked={ws.layers[l.id]} onClick={(e) => e.stopPropagation()} onChange={(e) => ws.setLayers({ ...ws.layers, [l.id]: e.target.checked })} aria-label={`Show ${l.label}`} />
+            <span className="kind">{l.kind(look)}</span>
+            {l.toggle ? (
+              <input type="checkbox" checked={ws.layers[l.toggle]} onClick={(e) => e.stopPropagation()} onChange={(e) => ws.setLayers({ ...ws.layers, [l.toggle!]: e.target.checked })} aria-label={`Show ${l.label}`} />
+            ) : <span className="cb-space" />}
           </div>
         ))}
-        <div className="hint">Space play/pause · ← → step a frame · P stats</div>
+        <PresetBar ws={ws} preset={preset} modified={!matchesPreset(project.look, preset)} />
       </nav>
 
       <main className="style-center">
@@ -122,10 +137,10 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
       </main>
 
       <aside className="style-side">
-        <div className="row"><h2>{layer.label}</h2><label className="check-inline">On <input type="checkbox" checked={ws.layers[sel]} onChange={(e) => ws.setLayers({ ...ws.layers, [sel]: e.target.checked })} /></label></div>
+        <div className="row"><h2>{layer.label}</h2>{layer.toggle && <label className="check-inline">On <input type="checkbox" checked={ws.layers[layer.toggle]} onChange={(e) => ws.setLayers({ ...ws.layers, [layer.toggle!]: e.target.checked })} /></label>}</div>
         {sel === 'notes' && (
           <>
-            <span className="section-label">Direction</span>
+            <div className="ctl-section"><span className="section-label">Direction</span>
             <div className="angle">
               <svg width="34" height="34" viewBox="-17 -17 34 34" aria-hidden="true">
                 <circle r="15" fill="none" stroke="#2c333c" />
@@ -148,9 +163,15 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
                 <input type="checkbox" checked={ws.sweep} onChange={(e) => ws.setSweep(e.target.checked)} />
               </label>
             )}
+            </div>
           </>
         )}
-        <p className="help soon">Colours, sizes, speed and the rest of the {layer.label.toLowerCase()} settings arrive with style panels and presets (Milestone 4).</p>
+        <LookControls layer={sel} look={look} base={base} set={setKey} />
+        {layerChanged && (
+          <button type="button" className="btn small ghost" onClick={() => setLook(Object.fromEntries(layerKeys.map((k) => [k, base[k]])) as Partial<Look>)}>
+            Reset {layer.label.toLowerCase()} to “{preset.name}”
+          </button>
+        )}
       </aside>
 
       <StyleTimeline

@@ -6,6 +6,16 @@ struct Frame {
   time: f32,
   bass: f32,
   grain: f32,
+  // look (see look.ts; 1 = the original approved look)
+  noteBright: f32, noteGlow: f32, noteFill: f32, noteRim: f32,
+  noteRound: f32, lpad0: f32, lpad1: f32, lpad2: f32,
+  saberBright: f32, saberThick: f32, saberFlicker: f32, saberReact: f32,
+  saberTint: f32, lpad3: f32, lpad4: f32, lpad5: f32,
+  saberBase: vec4f,
+  partSize: f32, partHaze: f32, lpad6: f32, lpad7: f32,
+  bloom: f32, fringe: f32, grainAmt: f32, darken: f32,
+  contrast: f32, saturation: f32, vignette: f32, relight: f32,
+  bassPulse: f32, lpad8: f32, lpad9: f32, lpad10: f32,
 };
 @group(0) @binding(0) var<uniform> F: Frame;
 

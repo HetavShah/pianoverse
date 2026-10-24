@@ -9,6 +9,8 @@ import { useNotes } from './ui/useNotes';
 import { ago, fileExists, loadFromStore, makeThumb, newId, saveToStore } from './ui/projectStore';
 import { Step, STEPS, VideoIssue, WS } from './ui/workspace';
 import Home from './ui/Home';
+import { loadPresets } from './ui/presetStore';
+import { applyPreset, BUILT_IN_PRESETS, Preset } from './engine/look';
 import ImportStep from './ui/steps/ImportStep';
 import NotesStep from './ui/steps/NotesStep';
 import CalibrateStep from './ui/steps/CalibrateStep';
@@ -49,6 +51,10 @@ export default function App() {
   const loopRef = useRef(loop);
   loopRef.current = loop;
   const [homeKey, setHomeKey] = useState(0);
+  const [presets, setPresets] = useState<Preset[]>(BUILT_IN_PRESETS);
+  const [defaultPresetId, setDefaultPresetId] = useState(BUILT_IN_PRESETS[0].id);
+  const refreshPresets = useCallback(async () => { const r = await loadPresets(); setPresets(r.presets); setDefaultPresetId(r.defaultId); }, []);
+  useEffect(() => { refreshPresets(); }, [refreshPresets]);
   const frameTimes = useRef<number[]>([]);
   const wantNewProject = useRef(false);
   const editCopyOf = useRef<string | null>(null);
@@ -322,7 +328,9 @@ export default function App() {
       wantNewProject.current = false;
       const base = video.name.replace(/\.[^.]+$/, '') || 'Untitled';
       const p = newProject(base, video.name, v.videoWidth, v.videoHeight, v.duration || 0);
-      setProjectState({ ...p, id: newId(), video: { ...p.video, ...paths, duration: v.duration } });
+      // new projects start with the default preset
+      const preset = presets.find((x) => x.id === defaultPresetId) ?? presets[0];
+      setProjectState({ ...p, id: newId(), video: { ...p.video, ...paths, duration: v.duration }, look: applyPreset(undefined, preset), presetId: preset.id });
     } else if (project && (project.video.file !== video.name || project.video.width !== v.videoWidth || (paths.path && project.video.path !== paths.path) || (paths.editPath && project.video.editPath !== paths.editPath))) {
       // the project's video was replaced or found again
       setProjectState({ ...project, video: { ...project.video, file: video.name, width: v.videoWidth, height: v.videoHeight, duration: v.duration, ...(paths.path ? paths : {}) } });
@@ -355,7 +363,7 @@ export default function App() {
     project, setProject, video, videoEl: videoRef, videoIssue, convert,
     time, duration, playing, togglePlay, seek, frameTick,
     calib, notes: notesApi, renderer: rendererRef.current, layers, setLayers, scale, setScale, sweep, setSweep,
-    pick, onFiles, loop, setLoop, goStep, goHome,
+    pick, onFiles, loop, setLoop, presets, defaultPresetId, refreshPresets, goStep, goHome,
   };
 
   const ready = !!project && !!video && !videoIssue;

@@ -63,10 +63,13 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   let srcPx = uv * F.srcSize;
   // footage: darker, contrasty, vignetted
   let src = textureSampleLevel(srcTex, samp, uv, 0.0).rgb;
-  let x = clamp((src - vec3f(0.07)) / 0.93, vec3f(0.0), vec3f(1.0));
-  var base = pow(x, vec3f(1.45)) * 0.92;
-  let vig = 1.0 - 0.5 * (sq((srcPx.x - 0.56 * F.srcSize.x) / (0.8 * F.srcSize.x)) + sq((srcPx.y - 0.5 * F.srcSize.y) / (0.62 * F.srcSize.y)));
-  base *= clamp(vig, 0.18, 1.0);
+  let lift = 0.07 * F.contrast;
+  let x = clamp((src - vec3f(lift)) / (1.0 - lift), vec3f(0.0), vec3f(1.0));
+  var base = pow(x, vec3f(1.0 + 0.45 * F.darken)) * (1.0 - 0.08 * F.darken);
+  let luma = dot(base, vec3f(0.2126, 0.7152, 0.0722));
+  base = max(mix(vec3f(luma), base, F.saturation), vec3f(0.0));
+  let vig = 1.0 - 0.5 * F.vignette * (sq((srcPx.x - 0.56 * F.srcSize.x) / (0.8 * F.srcSize.x)) + sq((srcPx.y - 0.5 * F.srcSize.y) / (0.62 * F.srcSize.y)));
+  base *= clamp(vig, max(1.0 - 0.82 * F.vignette, 0.0), 1.0);
 
   let L = textureSampleLevel(lightTex, samp, uv, 0.0);
   base *= 1.0 - clamp(L.a, 0.0, 0.8);
@@ -82,19 +85,19 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
     let dist = (e - 1.0) * a.z;
     rl += c.rgb * a.w / (1.0 + exp(dist / 22.0));
   }
-  base *= (vec3f(1.0) + min(rl, vec3f(1.0)) * 2.4) * (1.0 + 0.07 * F.bass);
+  base *= (vec3f(1.0) + min(rl, vec3f(1.0)) * 2.4 * F.relight) * (1.0 + 0.07 * F.bassPulse * F.bass);
 
   // light layer + bloom, with a hint of colour fringing
-  let px = vec2f(0.8 * F.scale) / F.rtSize;   // fringe of ~0.8 video px at any preview size
+  let px = vec2f(0.8 * F.scale * F.fringe) / F.rtSize;   // fringe of ~0.8 video px at any preview size
   var light = L.rgb;
   light.r = textureSampleLevel(lightTex, samp, uv - vec2f(px.x, 0.0), 0.0).r;
   light.b = textureSampleLevel(lightTex, samp, uv + vec2f(px.x, 0.0), 0.0).b;
-  light += textureSampleLevel(bloom1, samp, uv, 0.0).rgb * 0.45 + textureSampleLevel(bloom2, samp, uv, 0.0).rgb * 0.4;
+  light += (textureSampleLevel(bloom1, samp, uv, 0.0).rgb * 0.45 + textureSampleLevel(bloom2, samp, uv, 0.0).rgb * 0.4) * F.bloom;
   let Lc = 0.98 * (vec3f(1.0) - exp(-light * 1.545));   // soft knee: light never burns the hands out
   var out = base + Lc * (vec3f(1.0) - base * 0.55);
 
   let l = clamp(dot(out, vec3f(0.333)), 0.0, 1.0);
   let gn = hashU(vec2u(i.pos.xy), u32(F.grain)) - 0.5;
-  out += vec3f(gn * 2.0 * 9.0 / 255.0 * l * (1.0 - l));
+  out += vec3f(gn * 2.0 * 9.0 / 255.0 * l * (1.0 - l) * F.grainAmt);
   return vec4f(clamp(out, vec3f(0.0), vec3f(1.0)), 1.0);
 }

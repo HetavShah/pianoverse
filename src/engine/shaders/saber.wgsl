@@ -55,16 +55,16 @@ fn fs(@builtin(position) fp: vec4f) -> @location(0) vec4f {
   let h0 = u32(floor(hx));
   let h1 = min(h0 + 1u, 39u);
   let hv = mix(heat[h0], heat[h1], fract(hx));
-  let hk = min(hv.w, 2.5);
+  let hk = min(hv.w * F.saberReact, 2.5);
   var hc = vec3f(150.0, 255.0, 222.0) / 255.0;
   if (hv.w > 0.05) { hc = hv.xyz / hv.w; }
-  let base = vec3f(140.0, 245.0, 225.0) / 255.0;
-  let colc = mix(base, lighten(hc, 0.25), clamp(hk, 0.0, 1.0));
+  let base = F.saberBase.rgb;
+  let colc = mix(base, lighten(hc, 0.25), clamp(hk, 0.0, 1.0) * F.saberTint);
 
   let t = S.time;
   let swell = (0.55 + 0.45 * sin(pcol * 1.1 + t * 1.9)) * (0.6 + 0.4 * sin(pcol * 0.37 - t * 1.2 + 1.3));
-  let h = (7.0 + 9.0 * swell + 26.0 * sqrt(hk)) * sc;
-  let I = (0.6 + 0.25 * S.bass + 0.9 * hk) * endf;
+  let h = max((7.0 + 9.0 * swell + 26.0 * sqrt(hk)) * sc * F.saberFlicker, 0.01);
+  let I = (0.6 + 0.25 * S.bass + 0.9 * hk) * endf * F.saberBright;
 
   let vline = S.A.y + (S.B.y - S.A.y) * s;
   let dy = vline - src.y;            // > 0 above the line
@@ -81,10 +81,10 @@ fn fs(@builtin(position) fp: vec4f) -> @location(0) vec4f {
     plume = exp(-above / h) * pow(max((turb - 0.30 * pow(above / h, 0.7)) * 1.9, 0.0), 1.6);
     haze = exp(-above / (h * 0.45));
   }
-  let coreW = max(1.15, 0.9 / F.scale);
+  let coreW = max(1.15, 0.9 / F.scale) * F.saberThick;
   let core = exp(-sq(dy / coreW));
-  let inner = exp(-sq(dy / max(3.2, 1.2 / F.scale)));
-  let outer = exp(-abs(dy) / 9.0);
+  let inner = exp(-sq(dy / (max(3.2, 1.2 / F.scale) * F.saberThick)));
+  let outer = exp(-abs(dy) / (9.0 * F.saberThick));
 
   let rgb = (vec3f(core * 1.25)
            + inner * lighten(colc, 0.55) * 0.75

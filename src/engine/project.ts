@@ -1,4 +1,5 @@
 // Project data model + keyboard geometry (ported from the approved Python pipeline).
+import { noteColor } from './look';
 
 export interface RawNote { s: number; e: number; p: number; v: number }
 
@@ -19,7 +20,9 @@ export interface ProjectFile {
   tracking: { space: 'video-pixels'; frames: number[][] }; // 8 values per frame, h33 = 1
   notes: RawNote[];
   /** appearance settings saved with the project */
-  look?: { noteAngle?: number | null };
+  look?: Partial<import('./look').Look>;
+  /** the preset the look started from */
+  presetId?: string;
   /** where the notes came from and how they are lined up with the video */
   noteSource?: import('./notes').NoteSource;
 }
@@ -66,7 +69,7 @@ export function lighten(c: RGB, k: number): RGB {
   return [c[0] + (1 - c[0]) * k, c[1] + (1 - c[1]) * k, c[2] + (1 - c[2]) * k];
 }
 
-export function prepareNotes(raw: RawNote[], lowest: number, keys: number): Note[] {
+export function prepareNotes(raw: RawNote[], lowest: number, keys: number, look?: import('./look').Look): Note[] {
   const sorted = [...raw].sort((a, b) => a.s - b.s);
   const last = new Map<number, number>();
   const out: Note[] = [];
@@ -78,7 +81,7 @@ export function prepareNotes(raw: RawNote[], lowest: number, keys: number): Note
     out.push({
       idx: out.length, s: n.s, e: n.e, p: n.p, v: n.v,
       vn: Math.min(1, Math.max(0, (n.v - 0.3) / 0.3)),
-      col: pal(n.p),
+      col: look ? noteColor(look, n.p) : pal(n.p),
     });
   }
   return out;

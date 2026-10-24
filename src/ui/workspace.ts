@@ -48,6 +48,9 @@ export interface WS {
   /** loop playback: a selected section (seconds) or, without one, the whole video */
   loop: { on: boolean; range: [number, number] | null };
   setLoop: (l: { on: boolean; range: [number, number] | null }) => void;
+  presets: import('../engine/look').Preset[];
+  defaultPresetId: string;
+  refreshPresets: () => Promise<void>;
   goStep: (s: Step) => void;
   goHome: () => void;
 }

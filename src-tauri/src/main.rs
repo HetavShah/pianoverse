@@ -26,7 +26,9 @@ fn main() {
             projects::save_project,
             projects::load_project,
             projects::delete_project,
-            projects::file_exists
+            projects::file_exists,
+            projects::load_presets,
+            projects::save_presets
         ])
         .run(tauri::generate_context!())
         .expect("error while running Pianoverse");

@@ -1,6 +1,7 @@
 // WebGPU renderer: video frame + glass notes + saber + key glow + impact sprites + particle plumes + bloom.
 import commonSrc from './shaders/common.wgsl?raw';
 import { fallUp } from './direction';
+import { DEFAULT_LOOK, Look, resolveLook, saberBase } from './look';
 import glassSrc from './shaders/glass.wgsl?raw';
 import keysSrc from './shaders/keys.wgsl?raw';
 import spritesSrc from './shaders/sprites.wgsl?raw';
@@ -23,8 +24,6 @@ export interface Layers {
 
 export const DEFAULT_LAYERS: Layers = { notes: true, keys: true, impact: true, saber: true, particles: true, bloom: true };
 
-const FALL = 680;          // note fall speed, video px per second
-const SPLASH = 1.3;        // how long impact effects last after a note starts
 const PER_EMIT = 1024;     // particle slots per emitter
 const MAX_EMIT = 512;
 const MAX_GLASS = 512;
@@ -54,6 +53,7 @@ export class Renderer {
   private whiteKeys = 36;
   /** unit vector from a landing point back toward where notes come from (screen space) */
   private up: [number, number] = [0, -1];
+  private look: Look = { ...DEFAULT_LOOK };
   private srcW = 1080;
   private srcH = 1920;
   private scale = 0.5;
@@ -125,14 +125,14 @@ export class Renderer {
     const buf = (size: number, usage: number) => d.createBuffer({ size, usage });
     const U = GPUBufferUsage;
     this.sampler = d.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
-    this.frameBuf = buf(32, U.UNIFORM | U.COPY_DST);
+    this.frameBuf = buf(192, U.UNIFORM | U.COPY_DST);
     this.glassBuf = buf(MAX_GLASS * 48, U.VERTEX | U.COPY_DST);
     this.keysBuf = buf(MAX_KEYS * 6 * 28, U.VERTEX | U.COPY_DST);
     this.spriteBuf = buf(MAX_SPRITES * 48, U.VERTEX | U.COPY_DST);
     this.saberUni = buf(48, U.UNIFORM | U.COPY_DST);
     this.saberMap = buf(64 * 8, U.STORAGE | U.COPY_DST);
     this.heatBuf = buf(40 * 16, U.STORAGE | U.COPY_DST);
-    this.simUni = buf(32, U.UNIFORM | U.COPY_DST);
+    this.simUni = buf(64, U.UNIFORM | U.COPY_DST);
     this.emitBuf = buf(MAX_EMIT * 64, U.STORAGE | U.COPY_DST);
     this.flowBuf = buf(20 * 16, U.STORAGE | U.COPY_DST);
     this.partBuf = buf(MAX_EMIT * PER_EMIT * 32, U.STORAGE);
@@ -211,10 +211,12 @@ export class Renderer {
     this.srcH = proj.video.height;
     this.whiteKeys = proj.keyboard.whiteKeys;
     this.kb = new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b);
-    this.notes = prepareNotes(proj.notes, proj.keyboard.lowestNote, proj.keyboard.keys);
+    this.look = resolveLook(proj.look);
+    this.notes = prepareNotes(proj.notes, proj.keyboard.lowestNote, proj.keyboard.keys, this.look);
     this.up = fallUp(proj);
     this.buildEmitters();
-    this.resize();
+    if (Math.round(this.srcW * this.scale) !== this.rtW || Math.round(this.srcH * this.scale) !== this.rtH) this.resize();
+    else this.writePost();
   }
 
   /** Draw into a different canvas (the preview canvas belongs to whichever screen is showing). */
@@ -227,6 +229,21 @@ export class Renderer {
     this.context = ctx;
     canvas.width = this.rtW;
     canvas.height = this.rtH;
+  }
+
+  private writePost() {
+    if (!this.b1a) return;
+    const w1 = this.b1a.width, h1 = this.b1a.height, w2 = this.b2a.width, h2 = this.b2a.height;
+    const q = this.device.queue;
+    const post = (i: number, v: number[]) => q.writeBuffer(this.postUni[i], 0, new Float32Array(v));
+    // texel(2) dir(2) sigma factor clampIn nLights
+    post(0, [1 / this.rtW, 1 / this.rtH, 0, 0, 1, 2, 1, 0]);                  // light -> b1
+    const bw = this.look.bloomWide;
+    post(1, [1 / w1, 1 / h1, 1, 0, 5 * this.scale * bw, 1, 0, 0]);            // b1 blur H
+    post(2, [1 / w1, 1 / h1, 0, 1, 5 * this.scale * bw, 1, 0, 0]);            // b1 blur V
+    post(3, [1 / w1, 1 / h1, 0, 0, 1, 3, 0, 0]);                              // b1 -> b2
+    post(4, [1 / w2, 1 / h2, 1, 0, 7 * this.scale * bw, 1, 0, 0]);            // b2 blur H
+    post(5, [1 / w2, 1 / h2, 0, 1, 7 * this.scale * bw, 1, 0, 0]);            // b2 blur V
   }
 
   setScale(scale: number) {
@@ -252,15 +269,7 @@ export class Renderer {
     const w2 = Math.ceil(w1 / 3), h2 = Math.ceil(h1 / 3);
     this.b1a = tex(w1, h1); this.b1b = tex(w1, h1);
     this.b2a = tex(w2, h2); this.b2b = tex(w2, h2);
-    const q = this.device.queue;
-    const post = (i: number, v: number[]) => q.writeBuffer(this.postUni[i], 0, new Float32Array(v));
-    // texel(2) dir(2) sigma factor clampIn nLights
-    post(0, [1 / this.rtW, 1 / this.rtH, 0, 0, 1, 2, 1, 0]);                  // light -> b1
-    post(1, [1 / w1, 1 / h1, 1, 0, 5 * this.scale, 1, 0, 0]);                 // b1 blur H
-    post(2, [1 / w1, 1 / h1, 0, 1, 5 * this.scale, 1, 0, 0]);                 // b1 blur V
-    post(3, [1 / w1, 1 / h1, 0, 0, 1, 3, 0, 0]);                              // b1 -> b2
-    post(4, [1 / w2, 1 / h2, 1, 0, 7 * this.scale, 1, 0, 0]);                 // b2 blur H
-    post(5, [1 / w2, 1 / h2, 0, 1, 7 * this.scale, 1, 0, 0]);                 // b2 blur V
+    this.writePost();
     this.groups = {};
   }
 
@@ -282,20 +291,24 @@ export class Renderer {
   private buildEmitters() {
     if (!this.proj) return;
     const kb = new Keyboard(this.kb.lowest, this.kb.edgeA, this.kb.edgeB);
+    const lk = this.look;
     const rows: { start: number; end: number; data: number[] }[] = [];
     for (const n of this.notes) {
       kb.H = trackingMatrix(this.proj, Math.round(n.s * this.proj.video.fps));
       const tg = kb.target(n.p);
       const rnd = mulberry32(n.idx * 7919 + 101);
-      const streams = 1 + (rnd() < 0.35 + 0.4 * n.vn ? 1 : 0);
+      const vv = lk.partVelocity ? n.vn : 0.5; // "louder notes, bigger plumes" off: every note average
+      const streams = 1 + (rnd() < 0.35 + 0.4 * vv ? 1 : 0);
       for (let j = 0; j < streams; j++) {
         const a = gauss(rnd, -Math.PI / 2, 0.32);
-        const sp = (170 + 100 * rnd()) * (0.8 + 0.5 * n.vn);
-        const life = (0.9 + 0.7 * rnd()) * (0.8 + 0.5 * n.vn);
-        const rate = (330 + 190 * rnd()) * (0.6 + 0.8 * n.vn);
-        rows.push({ start: n.s, end: n.s + life + 2.6, data: [n.s, life, rate, 0, tg.x, tg.y, Math.cos(a) * sp, Math.sin(a) * sp, ...n.col, n.vn, n.idx * 16 + j, 0, 0, 0] });
+        const sp = (170 + 100 * rnd()) * (0.8 + 0.5 * vv) * lk.partRise;
+        const life = (0.9 + 0.7 * rnd()) * (0.8 + 0.5 * vv) * lk.partLife;
+        const rate = (330 + 190 * rnd()) * (0.6 + 0.8 * vv) * lk.partAmount;
+        if (rate <= 0) continue;
+        rows.push({ start: n.s, end: n.s + life + 2.6 * lk.partLife, data: [n.s, life, rate, 0, tg.x, tg.y, Math.cos(a) * sp, Math.sin(a) * sp, ...n.col, vv, n.idx * 16 + j, 0, 0, 0] });
       }
-      rows.push({ start: n.s, end: n.s + 1.4, data: [n.s, 0, 0, Math.floor(24 + 30 * n.vn), tg.x, tg.y, 0, 0, ...n.col, n.vn, n.idx * 16 + 8, 1, 0, 0] });
+      const burst = Math.floor((24 + 30 * vv) * lk.partAmount);
+      if (burst > 0) rows.push({ start: n.s, end: n.s + 1.4 * lk.partLife, data: [n.s, 0, 0, burst, tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 8, 1, 0, 0] });
     }
     rows.sort((a, b) => a.start - b.start);
     this.emit = new Float32Array(rows.length * 16);
@@ -324,6 +337,8 @@ export class Renderer {
     const L = this.layers;
     const kb = this.kb;
     const U = this.up;
+    const lk = this.look;
+    const FALL = lk.noteSpeed;
 
     const keyQuad = (p: number, c: RGB) => {
       if (keys.length / 42 >= MAX_KEYS) return;
@@ -352,38 +367,38 @@ export class Renderer {
       const col = n.col;
       const vn = n.vn;
       const dd = n.s - t;
-      const w = Math.max(24, tg.unit * 1.05) * (0.9 + 0.2 * vn);
-      const len = Math.min(300, Math.max(w * 1.4, (n.e - n.s) * FALL * 0.8 - 8));
+      const w = Math.max(24, tg.unit * 1.05) * (lk.noteVelocity === 1 ? 0.9 + 0.2 * vn : 1 + (0.2 * vn - 0.1) * lk.noteVelocity) * lk.noteWidth;
+      const len = Math.min(300 * (FALL / 680), Math.max(w * 1.4, (n.e - n.s) * FALL * 0.8 - 8));
       // distances measured from the landing point back along the fall direction
       const sB = dd * FALL;
       const sT = sB + len;
       const sMax = exitDist(tg.x, tg.y, U, this.srcW, this.srcH);
       const at = (d: number): [number, number] => [tg.x + U[0] * d, tg.y + U[1] * d];
       if (L.notes && sT > 0 && sB < sMax + 40 && glass.length / 12 < MAX_GLASS) {
-        const fade = Math.min(1, Math.max(0, (sMax - sB + 60) / 220));
-        glass.push(tg.x, tg.y, sB, sT, w, fade * (0.85 + 0.3 * vn), fade, U[0], col[0], col[1], col[2], U[1]);
+        const fade = lk.noteFade > 0 ? Math.min(1, Math.max(0, (sMax - sB + 60) / (220 * lk.noteFade))) : 1;
+        glass.push(tg.x, tg.y, sB, sT, w, fade * (0.85 + 0.3 * vn * lk.noteVelocity), fade, U[0], col[0], col[1], col[2], U[1]);
         visible++;
-        if (sB <= 0 && L.impact) dot(tg.x, tg.y, tg.unit * 0.3, scaleC(lighten(col, 0.6), 0.5));
+        if (sB <= 0 && L.impact) dot(tg.x, tg.y, tg.unit * 0.3 * lk.flashSize, scaleC(lighten(col, 0.6), 0.5 * lk.flashBright));
       }
       if (dd > 0) {
-        const near = 1 - Math.min(1, dd / 0.5);
+        const near = lk.keyAnticipate > 0 ? 1 - Math.min(1, dd / lk.keyAnticipate) : 0;
         if (near > 0) {
-          if (L.keys) keyQuad(n.p, scaleC(col, 0.45 * near * near));
+          if (L.keys) keyQuad(n.p, scaleC(col, 0.45 * near * near * lk.keyBright));
           const [lx, ly] = at(sB);
-          if (L.impact) light(lx, ly, tg.unit * 3, col, 0.35 * near);
+          if (L.impact) light(lx, ly, tg.unit * 3 * lk.relightRadius, col, 0.35 * near);
         }
-      } else if (t <= n.e || dd >= -SPLASH) {
+      } else if (t <= n.e || dd >= -lk.impactTime) {
         const tt = -dd;
         const held = t <= n.e;
-        const glow = Math.max(Math.exp(-tt * 6), held ? 0.3 + 0.05 * Math.sin(t * 7 + n.p) : 0);
-        if (L.keys) keyQuad(n.p, scaleC(lighten(col, 0.45), glow));
+        const glow = Math.max(Math.exp(-tt * 6), held ? (0.3 + 0.05 * Math.sin(t * 7 + n.p)) * lk.keyHeld : 0);
+        if (L.keys) keyQuad(n.p, scaleC(lighten(col, 0.45), glow * lk.keyBright));
         if (L.impact) {
           const [lx, ly] = at(tg.unit * 0.6);
-          light(lx, ly, tg.unit * (4 + 2 * vn), col, (0.55 + 0.5 * vn) * Math.exp(-tt * 3.5) + (held ? 0.12 : 0));
-          if (tt < 0.35) {
-            const e = Math.exp(-tt * 11) * (0.75 + 0.45 * vn);
-            dot(tg.x, tg.y, tg.unit * 0.45, scaleC(lighten(col, 0.5), 0.8 * e));
-            streak(tg.x, tg.y, tg.along, tg.unit * 1.8, 1.2, scaleC(lighten(col, 0.4), 0.4 * e));
+          light(lx, ly, tg.unit * (4 + 2 * vn) * lk.relightRadius, col, (0.55 + 0.5 * vn) * Math.exp(-tt * 3.5) + (held ? 0.12 : 0));
+          if (tt < 0.35 * (lk.impactTime / 1.3)) {
+            const e = Math.exp(-tt * 11 * (1.3 / lk.impactTime)) * (0.75 + 0.45 * vn);
+            dot(tg.x, tg.y, tg.unit * 0.45 * lk.flashSize, scaleC(lighten(col, 0.5), 0.8 * e * lk.flashBright));
+            if (lk.streakLen > 0) streak(tg.x, tg.y, tg.along, tg.unit * 1.8 * lk.streakLen, 1.2, scaleC(lighten(col, 0.4), 0.4 * e * lk.streakBright));
           }
         }
       }
@@ -403,7 +418,16 @@ export class Renderer {
     bass = Math.min(1, bass);
 
     // frame uniforms
-    q.writeBuffer(this.frameBuf, 0, new Float32Array([this.srcW, this.srcH, this.rtW, this.rtH, this.scale, t, bass, Math.floor(t * 24)]));
+    const sb = saberBase(lk);
+    q.writeBuffer(this.frameBuf, 0, new Float32Array([
+      this.srcW, this.srcH, this.rtW, this.rtH, this.scale, t, bass, Math.floor(t * 24),
+      lk.noteBright, lk.noteGlow, lk.noteFill, lk.noteRim, lk.noteRound, 0, 0, 0,
+      lk.saberBright, lk.saberThick, lk.saberFlicker, lk.saberReact, lk.saberTint, 0, 0, 0,
+      sb[0], sb[1], sb[2], 0,
+      lk.partSize, lk.partHaze, 0, 0,
+      lk.bloom, lk.fringe, lk.grain, lk.bgDarken, lk.bgContrast, lk.bgSaturation, lk.bgVignette, lk.relight,
+      lk.bassPulse, 0, 0, 0,
+    ]));
     if (glass.length) q.writeBuffer(this.glassBuf, 0, new Float32Array(glass));
     if (keys.length) q.writeBuffer(this.keysBuf, 0, new Float32Array(keys));
     if (sprites.length) q.writeBuffer(this.spriteBuf, 0, new Float32Array(sprites));
@@ -428,7 +452,10 @@ export class Renderer {
     }
     q.writeBuffer(this.simUni, 0, new Uint32Array([0, nEmit, PER_EMIT, 0]));
     q.writeBuffer(this.simUni, 0, new Float32Array([t]));
-    q.writeBuffer(this.simUni, 16, new Float32Array([0, -1, 0, 0])); // glitter rises straight up the screen
+    q.writeBuffer(this.simUni, 16, new Float32Array([
+      0, -1, 0, 0, // glitter rises straight up the screen
+      lk.partSwirl, lk.partWind, lk.partGravity, lk.partLife, lk.partRise, lk.partTwinkle, lk.partStars, lk.partColor,
+    ]));
 
     const enc = d.createCommandEncoder();
     if (nEmit) {
@@ -628,7 +655,8 @@ export class Renderer {
       uMax = Math.max(uMax, map[i * 2 + 1]);
     }
     const scMax = uMax / 30;
-    const box = [Math.min(A[0], B[0]) - 4, Math.min(A[1], B[1]) - 140 * scMax - 10, Math.max(A[0], B[0]) + 4, Math.max(A[1], B[1]) + 30];
+    const tall = Math.max(1, this.look.saberFlicker) * Math.max(1, this.look.saberThick);
+    const box = [Math.min(A[0], B[0]) - 4, Math.min(A[1], B[1]) - 140 * scMax * tall - 10, Math.max(A[0], B[0]) + 4, Math.max(A[1], B[1]) + 30 * Math.max(1, this.look.saberThick)];
     const q = this.device.queue;
     q.writeBuffer(this.saberUni, 0, new Float32Array([A[0], A[1], B[0], B[1], ...box, bass, t, nK, 0]));
     q.writeBuffer(this.saberMap, 0, map);
