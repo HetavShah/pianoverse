@@ -1,0 +1,40 @@
+name: Build Windows installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: build-${{ github.run_number }}
+          releaseName: 'Pianoverse build ${{ github.run_number }} (v__VERSION__)'
+          releaseBody: |
+            Download **Pianoverse_*_x64-setup.exe** below and run it.
+            Then click **Open video…** and **Open project data…** and pick the two files in `F:\Pianoverse\samples`.
+          releaseDraft: false
+          prerelease: true

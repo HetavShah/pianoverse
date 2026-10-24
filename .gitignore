@@ -1,0 +1,10 @@
+node_modules
+dist
+src-tauri/target
+src-tauri/gen
+samples/*.mp4
+test/out
+*.log
+test/out*
+test/*.png
+test/debug.mjs
