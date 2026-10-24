@@ -51,8 +51,10 @@ pub fn build_args(o: &ExportOpts, audio_codec: Option<&str>, part: &str) -> Vec<
     }
     let (w, h) = (o.out_width, o.out_height);
     let pix = if o.codec == "prores" { "yuva444p10le" } else { "yuv420p" };
+    // the bars around a fitted frame: see-through in the effects file, black in a normal video
+    let bars = if o.codec == "prores" { "black@0" } else { "black" };
     let place = if o.fit == "fit" {
-        format!("scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black")
+        format!("scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color={bars}")
     } else {
         format!("scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos,crop={w}:{h}")
     };
