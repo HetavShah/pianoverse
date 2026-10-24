@@ -37,6 +37,7 @@ export function calibrationFromTracking(proj: CalibratedProject, time: number): 
     refTime: time,
     corners: cornersOf([...frames[f], 1], proj.keyboard.whiteKeys),
     cameraMoves: frames.length > 1,
+    cornersSet: true,
     raw: frames.length > 1 ? raw : undefined,
     quality: frames.length > 1 ? frames.map(() => 1) : undefined,
     fixes: [],
@@ -87,7 +88,7 @@ export function useCalibration(opts: {
       fixes.sort((a, b) => a.t - b.t);
       commit({ ...cal, fixes });
     } else {
-      commit({ ...cal, corners: q, refTime: time });
+      commit({ ...cal, corners: q, refTime: time, cornersSet: true });
     }
   }, [cal, tracked, time, fps, commit]);
 

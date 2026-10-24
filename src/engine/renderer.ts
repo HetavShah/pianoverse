@@ -217,6 +217,18 @@ export class Renderer {
     this.resize();
   }
 
+  /** Draw into a different canvas (the preview canvas belongs to whichever screen is showing). */
+  attach(canvas: HTMLCanvasElement) {
+    if (canvas === this.canvas) return;
+    const ctx = canvas.getContext('webgpu');
+    if (!ctx) throw new Error('Could not create a WebGPU canvas.');
+    ctx.configure({ device: this.device, format: this.format, alphaMode: 'opaque' });
+    this.canvas = canvas;
+    this.context = ctx;
+    canvas.width = this.rtW;
+    canvas.height = this.rtH;
+  }
+
   setScale(scale: number) {
     this.scale = scale;
     this.resize();

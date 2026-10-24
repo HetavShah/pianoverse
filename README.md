@@ -46,7 +46,7 @@
 
 ## Five steps from video to visualizer
 
-> Design prototype of the v1 app. The engine already works; these screens are being built next.
+> The app follows this design. Steps 1–3 and the Style preview are built; the detailed style controls (Milestone 4) and Export (Milestone 5) are next.
 
 <table>
   <tr>
@@ -113,10 +113,12 @@ A few ideas that make it work:
 ## Try it
 
 1. Download the latest **`Pianoverse_…_x64-setup.exe`** from [Releases](https://github.com/HetavShah/pianoverse/releases/latest) and install it. From then on Pianoverse updates itself: when a new build is out, click **Install and restart** in the top bar.
-2. Click **Choose files…** and pick `samples/interstellar-take1.mp4` and `samples/interstellar-take1.pvproj.json` together (or drop them on the window).
-3. Press **Space** to play.
+2. Click **New project** and choose your performance video (phone videos in HEVC are converted once, on the graphics card). Add the MIDI file recorded with it, or skip it.
+3. **Notes and sync**: the MIDI lines itself up with the video's sound; check it by ear with **Play click on each note**. No MIDI? **Detect from audio**.
+4. **Calibrate**: drag the four handles onto the corners of the keys, set the saber line, and track the clip if the camera moved.
+5. **Style**: play it back with every effect. Projects save themselves and appear on the Projects screen.
 
-**Your own video:** choose just the video and click **Set up this video**. Drag the four handles onto the corners of the keys, pick **Moved** and **Track keyboard** if the camera wasn't fixed, then switch to **Preview**. If the keyboard runs steeply across the frame, notes tilt automatically so every key keeps its own lane; the **Note angle** slider sets it by hand. Then open the **Notes** tab: **Import MIDI file…** (it lines itself up with the video's sound) or **Detect notes from audio** if you have no MIDI. **Save project…** keeps everything for next time.
+To try the sample: start a new project with `samples/interstellar-take1.mp4`, or open `samples/interstellar-take1.pvproj.json` with **Open project file…** and choose the video when asked.
 
 | Key | Action |
 | --- | --- |

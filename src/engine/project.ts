@@ -6,7 +6,15 @@ export interface ProjectFile {
   format: 'pianoverse-project';
   version: number;
   name: string;
-  video: { file: string; width: number; height: number; fps: number; frames: number };
+  video: {
+    file: string; width: number; height: number; fps: number; frames: number;
+    /** where the video is on this computer, and its H.264 editing copy if one was made */
+    path?: string; editPath?: string; duration?: number; codec?: string; bytes?: number;
+  };
+  /** recent-projects identity and the five-step flow's progress */
+  id?: string;
+  camera?: 'angled' | 'topdown';
+  progress?: { calibrated?: boolean };
   keyboard: { keys: number; lowestNote: number; whiteKeys: number; edge: { a: number; b: number } };
   tracking: { space: 'video-pixels'; frames: number[][] }; // 8 values per frame, h33 = 1
   notes: RawNote[];

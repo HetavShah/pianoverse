@@ -1,56 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_LAYERS, Layers, Renderer } from './engine/renderer';
-import { autoNoteAngle, MAX_TILT } from './engine/direction';
 import { CalibratedProject, testNotes } from './engine/calibration';
-import { VersionAndUpdates } from './updater';
-import CalibrateCanvas from './ui/CalibrateCanvas';
-import CalibratePanel, { QualityStrip } from './ui/CalibratePanel';
+import { UpdatePill, updateStatusText, useUpdater } from './updater';
 import { calibrationFromTracking, newProject, useCalibration } from './ui/useCalibration';
 import { saveProject } from './ui/saveProject';
-import { ConvertProgress, convertVideo, inTauri, onNativeDrop, openFiles, Picked, PickedVideo, PickKind, pickNative } from './ui/media';
-import NotesPanel from './ui/NotesPanel';
-import SyncTimeline from './ui/SyncTimeline';
-import PickButton from './ui/PickButton';
-import { sourceOf, useNotes } from './ui/useNotes';
-
-type VideoIssue =
-  | { kind: 'unsupported' }
-  | { kind: 'converting'; progress: ConvertProgress | null }
-  | { kind: 'error'; message: string };
-
-
-const LAYER_LABELS: [keyof Layers, string][] = [
-  ['notes', 'Notes'],
-  ['saber', 'Saber'],
-  ['particles', 'Particles'],
-  ['impact', 'Impact and light'],
-  ['keys', 'Key glow'],
-  ['bloom', 'Bloom'],
-];
-
-type Mode = 'calibrate' | 'notes' | 'preview';
-
-function fmt(t: number) {
-  if (!isFinite(t)) return '0:00.0';
-  const m = Math.floor(t / 60);
-  const s = t - m * 60;
-  return `${m}:${s.toFixed(1).padStart(4, '0')}`;
-}
+import { convertVideo, inTauri, onNativeDrop, openFiles, openPaths, Picked, PickedMidi, PickedVideo, PickKind, pickNative } from './ui/media';
+import { useNotes } from './ui/useNotes';
+import { ago, fileExists, loadFromStore, makeThumb, newId, saveToStore } from './ui/projectStore';
+import { Step, STEPS, VideoIssue, WS } from './ui/workspace';
+import Home from './ui/Home';
+import ImportStep from './ui/steps/ImportStep';
+import NotesStep from './ui/steps/NotesStep';
+import CalibrateStep from './ui/steps/CalibrateStep';
+import StyleStep from './ui/steps/StyleStep';
 
 type RVFCVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
 };
 
+const Logo = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="none" stroke="#2FD3B5" strokeWidth="1.8" /><path d="M8 6.5v7M12 5v9M16 7.5v6" stroke="#2FD3B5" strokeWidth="1.8" strokeLinecap="round" /><path d="M5.5 17.5h13" stroke="#E8EAED" strokeWidth="1.8" strokeLinecap="round" /></svg>
+);
+
 export default function App() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<RVFCVideo>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const [gpuError, setGpuError] = useState<string | null>(null);
   const [gpuName, setGpuName] = useState('');
-  const [project, setProject] = useState<CalibratedProject | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoName, setVideoName] = useState('');
-  const [mode, setMode] = useState<Mode>('preview');
+  const [route, setRoute] = useState<'home' | 'project'>('home');
+  const [step, setStep] = useState<Step>('import');
+  const [project, setProjectState] = useState<CalibratedProject | null>(null);
+  const [video, setVideo] = useState<PickedVideo | null>(null);
+  const [videoIssue, setVideoIssue] = useState<VideoIssue | null>(null);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -61,22 +42,31 @@ export default function App() {
   const [fps, setFps] = useState(0);
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState('');
-  const [saveMsg, setSaveMsg] = useState('');
+  const [saved, setSaved] = useState<{ state: 'idle' | 'saving' | 'saved' | 'error'; at: number }>({ state: 'idle', at: 0 });
+  const [, setClock] = useState(0);
+  const [menu, setMenu] = useState(false);
+  const [homeKey, setHomeKey] = useState(0);
   const frameTimes = useRef<number[]>([]);
   const wantNewProject = useRef(false);
-  const [videoSrc, setVideoSrc] = useState<PickedVideo | null>(null);
-  const [videoIssue, setVideoIssue] = useState<VideoIssue | null>(null);
+  const editCopyOf = useRef<string | null>(null);
+  const pendingMidi = useRef<PickedMidi | null>(null);
+  const lastThumb = useRef<string | undefined>(undefined);
+  const stepRef = useRef<Step>('import');
+  const updater = useUpdater();
+  stepRef.current = step;
+  const videoUrl = video && !videoIssue ? video.url : video?.url ?? null;
 
+  const setProject = useCallback((p: CalibratedProject) => setProjectState(p), []);
   const calib = useCalibration({ project, setProject, time, videoUrl });
   const notesApi = useNotes({ project, setProject, videoUrl });
   // test hook: lets automated checks read the current project
   useEffect(() => { (window as unknown as { pianoverseProject: unknown }).pianoverseProject = project; }, [project]);
 
-  // GPU setup
+  // GPU: one renderer for the app; the Style screen lends it a canvas
   useEffect(() => {
     let cancelled = false;
-    if (!canvasRef.current || rendererRef.current) return;
-    Renderer.create(canvasRef.current)
+    if (rendererRef.current) return;
+    Renderer.create(document.createElement('canvas'))
       .then((r) => {
         if (cancelled) return;
         rendererRef.current = r;
@@ -95,6 +85,7 @@ export default function App() {
     return { ...project, notes: testNotes(project.keyboard.lowestNote, project.keyboard.keys, duration || project.video.frames / project.video.fps) };
   }, [project, sweep, noNotes, duration]);
 
+  const previewing = route === 'project' && step === 'style';
   const draw = useCallback((t?: number) => {
     const r = rendererRef.current;
     const v = videoRef.current;
@@ -109,20 +100,24 @@ export default function App() {
     const s = r.stats;
     setStats(`${r.size.width}×${r.size.height} · ${s.notes} notes · ${s.emitters} emitters · CPU ${s.cpuMs.toFixed(1)} ms`);
   }, []);
-
   const redraw = useCallback((t?: number) => {
-    if (mode !== 'calibrate') draw(t);
-    else setFrameTick((k) => k + 1);
-  }, [mode, draw]);
+    if (previewing) draw(t);
+    setFrameTick((k) => k + 1);
+  }, [previewing, draw]);
 
-  // keep renderer in sync with project, quality and layers (only while previewing; calibration edits are cheap to skip)
   useEffect(() => {
-    if (mode !== 'calibrate' && renderProject && rendererRef.current) { rendererRef.current.setProject(renderProject); draw(); }
-  }, [renderProject, gpuName, draw, mode]);
-  useEffect(() => { rendererRef.current?.setScale(scale); if (mode !== 'calibrate') draw(); }, [scale, gpuName, draw, mode]);
-  useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (mode !== 'calibrate') draw(); } }, [layers, draw, mode]);
-  // the sync strip needs the soundtrack
-  useEffect(() => { if (mode === 'notes') notesApi.prepareAudio(); }, [mode, notesApi.prepareAudio]);
+    if (previewing && renderProject && rendererRef.current) { rendererRef.current.setProject(renderProject); draw(); }
+  }, [renderProject, gpuName, draw, previewing]);
+  useEffect(() => { rendererRef.current?.setScale(scale); if (previewing) draw(); }, [scale, gpuName, draw, previewing]);
+  useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (previewing) draw(); } }, [layers, draw, previewing]);
+  const attachPreview = useCallback((c: HTMLCanvasElement | null) => {
+    const r = rendererRef.current;
+    if (!c || !r) return;
+    r.attach(c);
+    if (renderProject) r.setProject(renderProject);
+    r.setScale(scale);
+    requestAnimationFrame(() => draw());
+  }, [renderProject, scale, draw, gpuName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // render every decoded video frame while playing
   useEffect(() => {
@@ -146,9 +141,10 @@ export default function App() {
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
-    if (!v || !videoUrl) return;
+    if (!v || !videoUrl || videoIssue) return;
     if (v.paused) { v.play(); setPlaying(true); } else { v.pause(); setPlaying(false); }
-  }, [videoUrl]);
+  }, [videoUrl, videoIssue]);
+  const pause = () => { videoRef.current?.pause(); setPlaying(false); };
 
   const seek = useCallback((t: number) => {
     const v = videoRef.current;
@@ -159,52 +155,114 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return; // handled by the calibration editor
+      if (e.defaultPrevented || route !== 'project') return;
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT') return;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       const v = videoRef.current;
-      const step = 1 / (project?.video.fps || 30);
+      const st = 1 / (project?.video.fps || 30);
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-      else if (e.code === 'ArrowRight' && v) seek(v.currentTime + (e.shiftKey ? 1 : step));
-      else if (e.code === 'ArrowLeft' && v) seek(v.currentTime - (e.shiftKey ? 1 : step));
+      else if (e.code === 'ArrowRight' && v) seek(v.currentTime + (e.shiftKey ? 1 : st));
+      else if (e.code === 'ArrowLeft' && v) seek(v.currentTime - (e.shiftKey ? 1 : st));
       else if (e.code === 'KeyP') setShowStats((s) => !s);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [togglePlay, seek, project?.video.fps]);
+  }, [togglePlay, seek, project?.video.fps, route]);
+
+  // ---------- autosave ----------
+  useEffect(() => {
+    if (!project?.id) return;
+    setSaved((s) => ({ ...s, state: 'saving' }));
+    const t = setTimeout(async () => {
+      try {
+        const v = videoRef.current;
+        let thumb = lastThumb.current;
+        if (v && v.videoWidth && !videoIssue) {
+          // on the Style screen the thumbnail shows the effects, like the design's project cards
+          const r = rendererRef.current;
+          if (stepRef.current === 'style' && r && !(window as unknown as { __pvHeadless?: boolean }).__pvHeadless) {
+            try {
+              const img = await r.capture(v, v.currentTime);
+              const c = document.createElement('canvas');
+              c.width = img.width; c.height = img.height;
+              c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
+              thumb = makeThumb(c);
+            } catch { thumb = makeThumb(v); }
+          } else if (!thumb || thumb.startsWith('plain:')) {
+            thumb = makeThumb(v);
+          }
+        }
+        lastThumb.current = thumb;
+        await saveToStore(project, thumb);
+        setSaved({ state: 'saved', at: Date.now() });
+      } catch {
+        setSaved({ state: 'error', at: Date.now() });
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [project]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const i = setInterval(() => setClock((c) => c + 1), 30000); return () => clearInterval(i); }, []);
 
   // ---------- opening videos and projects ----------
   const loadVideo = (v: PickedVideo, createProject: boolean) => {
-    if (videoUrl?.startsWith('blob:') && videoUrl !== v.url) URL.revokeObjectURL(videoUrl);
-    setVideoSrc(v);
-    setVideoUrl(v.url);
-    setVideoName(v.name);
+    if (video?.url.startsWith('blob:') && video.url !== v.url) URL.revokeObjectURL(video.url);
+    setVideo(v);
     setPlaying(false);
     setVideoIssue(null);
     wantNewProject.current = createProject;
+  };
+
+  const chooseStep = (p: CalibratedProject): Step => (!p.notes.length ? 'notes' : !p.progress?.calibrated ? 'calibrate' : 'style');
+
+  const openProject = async (p: CalibratedProject) => {
+    const proj: CalibratedProject = { ...p, id: p.id ?? newId() };
+    lastThumb.current = undefined;
+    pause();
+    setProjectState(proj);
+    setRoute('project');
+    setVideo(null);
+    setVideoIssue(null);
+    setDuration(0);
+    setTime(0);
+    // find its video again
+    if (inTauri()) {
+      for (const path of [proj.video.editPath, proj.video.path]) {
+        if (path && (await fileExists(path))) {
+          const [v] = await openPaths([path]);
+          if (v?.kind === 'video') { loadVideo({ ...v, name: proj.video.file, path: proj.video.path ?? path }, false); setStep(chooseStep(proj)); return; }
+        }
+      }
+    }
+    setVideo({ kind: 'video', name: proj.video.file, url: '' });
+    setVideoIssue({ kind: 'missing' });
+    setStep('import');
   };
 
   const applyProjectText = (text: string) => {
     try {
       const data = JSON.parse(text) as CalibratedProject;
       if (data.format !== 'pianoverse-project') throw new Error('Not a Pianoverse project file.');
-      wantNewProject.current = false;
-      setProject(data);
-      setMode('preview');
+      openProject(data);
     } catch (e) {
       alert(`Could not open project: ${(e as Error).message}`);
     }
   };
 
   const openItems = (items: Picked[]) => {
-    const hasProject = items.some((i) => i.kind === 'project');
-    for (const i of items) {
-      if (i.kind === 'project') applyProjectText(i.text);
-      else if (i.kind === 'midi') {
-        if (!project) { alert('Open the video first, then its MIDI file.'); continue; }
-        setMode('notes');
-        notesApi.importMidi(i);
-      } else loadVideo(i, !hasProject);
+    const proj = items.find((i) => i.kind === 'project');
+    const vid = items.find((i): i is PickedVideo => i.kind === 'video');
+    const mid = items.find((i): i is PickedMidi => i.kind === 'midi');
+    if (proj) { applyProjectText(proj.text); if (vid) setTimeout(() => loadVideo(vid, false), 0); return; }
+    if (vid) {
+      const fresh = route === 'home' || !project;
+      if (fresh) { setProjectState(null); setRoute('project'); setStep('import'); }
+      loadVideo(vid, fresh);
+      if (mid) pendingMidi.current = mid;
+      return;
+    }
+    if (mid) {
+      if (!project || route !== 'project') { alert('Open or start a project with its video first, then add the MIDI file.'); return; }
+      notesApi.importMidi(mid);
     }
   };
   const openItemsRef = useRef(openItems);
@@ -226,257 +284,125 @@ export default function App() {
     return () => { gone = true; un?.(); };
   }, []);
 
-  const startNewProject = useCallback(() => {
-    const v = videoRef.current;
-    if (!v || !v.videoWidth) { wantNewProject.current = true; return; }
-    wantNewProject.current = false;
-    const base = videoName.replace(/\.[^.]+$/, '') || 'Untitled';
-    setProject(newProject(base, videoName, v.videoWidth, v.videoHeight, v.duration || 0));
-    setMode('calibrate');
-  }, [videoName]);
+  // a MIDI file dropped together with a new video is imported once the project exists
+  useEffect(() => {
+    const m = pendingMidi.current;
+    if (m && project && video && !videoIssue) { pendingMidi.current = null; notesApi.importMidi(m); }
+  }, [project?.id, video, videoIssue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onMetadata = (v: HTMLVideoElement) => {
+    // a video track the player can't decode shows up as 0 x 0 (audio only)
+    if (!v.videoWidth) { setVideoIssue({ kind: 'unsupported' }); return; }
+    setDuration(v.duration);
+    if (!video) return;
+    const original = editCopyOf.current;
+    editCopyOf.current = null;
+    const paths = original ? { path: original, editPath: video.path } : { path: video.path, editPath: undefined };
+    if (wantNewProject.current && !project) {
+      wantNewProject.current = false;
+      const base = video.name.replace(/\.[^.]+$/, '') || 'Untitled';
+      const p = newProject(base, video.name, v.videoWidth, v.videoHeight, v.duration || 0);
+      setProjectState({ ...p, id: newId(), video: { ...p.video, ...paths, duration: v.duration } });
+    } else if (project && (project.video.file !== video.name || project.video.width !== v.videoWidth || (paths.path && project.video.path !== paths.path) || (paths.editPath && project.video.editPath !== paths.editPath))) {
+      // the project's video was replaced or found again
+      setProjectState({ ...project, video: { ...project.video, file: video.name, width: v.videoWidth, height: v.videoHeight, duration: v.duration, ...(paths.path ? paths : {}) } });
+    }
+  };
 
   const convert = async () => {
-    if (!videoSrc) return;
-    const createProject = wantNewProject.current || !project || project.video.file !== videoSrc.name;
+    if (!video?.path) return;
+    const createProject = wantNewProject.current || !project;
     setVideoIssue({ kind: 'converting', progress: null });
     try {
-      const copy = await convertVideo(videoSrc, (progress) => setVideoIssue({ kind: 'converting', progress }));
+      const copy = await convertVideo(video, (progress) => setVideoIssue({ kind: 'converting', progress }));
+      editCopyOf.current = video.path;
       loadVideo(copy, createProject);
     } catch (e) {
       setVideoIssue({ kind: 'error', message: String((e as Error)?.message ?? e) });
     }
   };
 
-  const enterCalibrate = () => {
-    if (!project) return;
-    if (!project.calibration) setProject({ ...project, calibration: calibrationFromTracking(project, time) });
-    setPlaying(false);
-    videoRef.current?.pause();
-    setMode('calibrate');
+  const goStep = (s: Step) => {
+    if (s === 'export') return;
+    if (s === 'calibrate' && project && !project.calibration) setProjectState({ ...project, calibration: calibrationFromTracking(project, time) });
+    if (s === 'calibrate') pause();
+    setStep(s);
+  };
+  const goHome = () => { pause(); setRoute('home'); setHomeKey((k) => k + 1); };
+  const newProjectFlow = () => { lastThumb.current = undefined; pause(); setProjectState(null); setVideo(null); setVideoIssue(null); setDuration(0); setTime(0); setRoute('project'); setStep('import'); };
+
+  const ws: WS = {
+    project, setProject, video, videoEl: videoRef, videoIssue, convert,
+    time, duration, playing, togglePlay, seek, frameTick,
+    calib, notes: notesApi, renderer: rendererRef.current, layers, setLayers, scale, setScale, sweep, setSweep,
+    pick, onFiles, goStep, goHome,
   };
 
-  const doSave = async () => {
-    if (!project) return;
-    try {
-      const where = await saveProject(project, videoName);
-      if (where) { setSaveMsg('Saved'); setTimeout(() => setSaveMsg(''), 2500); }
-    } catch (e) {
-      alert(String((e as Error)?.message ?? e));
-    }
-  };
-
-  const ready = !!project && !!videoUrl;
-  const calibrating = ready && mode === 'calibrate' && !!calib.corners;
+  const ready = !!project && !!video && !videoIssue;
+  const doneStep = (s: Step) =>
+    s === 'import' ? ready : s === 'notes' ? !!project?.notes.length : s === 'calibrate' ? !!project?.progress?.calibrated : false;
+  const saveText = saved.state === 'saving' ? 'Saving…' : saved.state === 'error' ? 'Not saved' : saved.state === 'saved' ? `Saved ${ago(saved.at)}` : '';
 
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); onFiles(e.dataTransfer.files); }}>
       <header className="topbar">
-        <div className="brand">
-          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="none" stroke="#2FD3B5" strokeWidth="1.8" /><path d="M8 6.5v7M12 5v9M16 7.5v6" stroke="#2FD3B5" strokeWidth="1.8" strokeLinecap="round" /><path d="M5.5 17.5h13" stroke="#E8EAED" strokeWidth="1.8" strokeLinecap="round" /></svg>
-          <span>Pianoverse</span>
-        </div>
-        <VersionAndUpdates />
-        <span className="project-name">{project?.name ?? 'No project open'}</span>
-        {ready && (
-          <div className="seg modes" role="tablist" aria-label="Mode">
-            <button type="button" role="tab" aria-selected={mode === 'calibrate'} className={mode === 'calibrate' ? 'on' : ''} onClick={enterCalibrate}>Calibrate</button>
-            <button type="button" role="tab" aria-selected={mode === 'notes'} className={mode === 'notes' ? 'on' : ''} onClick={() => setMode('notes')} disabled={calib.track.kind === 'running'}>Notes</button>
-            <button type="button" role="tab" aria-selected={mode === 'preview'} className={mode === 'preview' ? 'on' : ''} onClick={() => setMode('preview')} disabled={calib.track.kind === 'running'}>Preview</button>
-          </div>
-        )}
-        <div className="open-buttons">
-          {saveMsg && <span className="saved">{saveMsg}</span>}
-          {project && <button type="button" className="btn" onClick={doSave}>Save project…</button>}
-          <PickButton what="any" className="btn" onPick={pick} onFiles={onFiles}>Open files…</PickButton>
-        </div>
-        <span className="gpu">{gpuError ? 'WebGPU unavailable' : gpuName}</span>
-      </header>
-
-      <div className="body">
-        {calibrating && project ? (
-          <CalibratePanel project={project} c={calib} sweep={sweep} setSweep={setSweep} seek={seek} onDone={() => setMode('preview')} />
-        ) : ready && mode === 'notes' && project ? (
-          <NotesPanel project={project} n={notesApi} onPick={pick} onFiles={onFiles} goCalibrate={enterCalibrate} />
-        ) : (
-          <nav className="layers" aria-label="Layers">
-            <span className="section-label">Layers</span>
-            {LAYER_LABELS.map(([key, label]) => (
-              <label key={key} className="layer">
-                <input type="checkbox" checked={layers[key]} onChange={(e) => setLayers({ ...layers, [key]: e.target.checked })} />
-                {label}
-              </label>
-            ))}
-            <span className="section-label">Preview quality</span>
-            <select value={scale} onChange={(e) => setScale(Number(e.target.value))} aria-label="Preview quality">
-              <option value={0.25}>Quarter</option>
-              <option value={0.5}>Half</option>
-              <option value={1}>Full</option>
-            </select>
-            {project && (() => {
-              const auto = autoNoteAngle(project);
-              const set = project.look?.noteAngle;
-              const angle = typeof set === 'number' ? set : auto;
-              const setAngle = (v: number | null) => setProject({ ...project, look: { ...project.look, noteAngle: v } });
+        <button type="button" className="brand" onClick={goHome} title="Projects"><Logo /><span>Pianoverse</span></button>
+        {route === 'project' && <span className="project-name">{project?.name ?? 'New project'}</span>}
+        {route === 'project' && (
+          <nav className="stepper" aria-label="Steps">
+            {STEPS.map((s, i) => {
+              const done = doneStep(s.id);
+              const disabled = s.id === 'export' || (s.id !== 'import' && !ready);
               return (
-                <>
-                  <span className="section-label">Note angle</span>
-                  <div className="angle">
-                    <svg width="34" height="34" viewBox="-17 -17 34 34" aria-hidden="true">
-                      <circle r="15" fill="none" stroke="#2c333c" />
-                      <g transform={`rotate(${angle})`}>
-                        <line x1="0" y1="-12" x2="0" y2="7" stroke="#2FD3B5" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M-4.5 4 L0 10 L4.5 4" fill="none" stroke="#2FD3B5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </g>
-                    </svg>
-                    <input type="range" min={-MAX_TILT} max={MAX_TILT} step={1} value={angle} onChange={(e) => setAngle(Number(e.target.value))} aria-label="Note angle" />
-                    <span className="deg">{angle}°</span>
-                  </div>
-                  <p className="help">
-                    {typeof set === 'number'
-                      ? <>Set by you. <button type="button" className="link inline" onClick={() => setAngle(null)}>Back to automatic ({auto}°)</button></>
-                      : auto === 0 ? 'Automatic: straight down suits this camera angle.' : 'Automatic: tilted so every key keeps its own lane.'}
-                  </p>
-                </>
+                <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done ? ' done' : '')} disabled={disabled}
+                  onClick={() => goStep(s.id)} title={s.id === 'export' ? 'Export arrives in Milestone 5' : undefined}>
+                  <span className="dot">{done && step !== s.id ? '✓' : i + 1}</span>{s.label}
+                </button>
               );
-            })()}
-            {project && (
-              <>
-                <span className="section-label">Notes</span>
-                {noNotes ? (
-                  <p className="help">No notes yet, so a sweep across every key is shown. Add notes in the <b>Notes</b> tab.</p>
-                ) : (
-                  <label className="layer">
-                    <input type="checkbox" checked={sweep} onChange={(e) => setSweep(e.target.checked)} />
-                    Key sweep instead of notes
-                  </label>
-                )}
-              </>
-            )}
-            <div className="hint">Space play/pause · ← → step a frame · P stats</div>
+            })}
           </nav>
         )}
-
-        <main className="stage">
-          {gpuError && <div className="notice">This window can't use the graphics card: {gpuError}</div>}
-          {videoIssue && (
-            <div className="start issue">
-              <h1>{videoIssue.kind === 'converting' ? 'Making an editing copy…' : 'This video needs converting'}</h1>
-              <p>
-                <b>{videoName}</b> is in a format Pianoverse's player can't read. Phones usually record HEVC (H.265).
-                Pianoverse makes an H.264 copy once, on your graphics card when it can. Your original file isn't changed.
-              </p>
-              {videoIssue.kind === 'converting' && (
-                <div className="track-run">
-                  <div className="bar"><div style={{ width: `${videoIssue.progress && videoIssue.progress.total ? Math.min(100, (videoIssue.progress.done / videoIssue.progress.total) * 100) : 0}%` }} /></div>
-                  <small>
-                    {!videoIssue.progress ? 'Starting…'
-                      : videoIssue.progress.phase === 'download'
-                        ? `${videoIssue.progress.detail} · ${(videoIssue.progress.done / 1048576).toFixed(0)} of ${(videoIssue.progress.total / 1048576).toFixed(0)} MB`
-                        : `${videoIssue.progress.detail} · ${videoIssue.progress.total ? Math.round((videoIssue.progress.done / videoIssue.progress.total) * 100) : 0}%`}
-                  </small>
-                </div>
-              )}
-              {videoIssue.kind === 'error' && <pre className="error-box">{videoIssue.message}</pre>}
-              {videoIssue.kind !== 'converting' && (videoSrc?.path ? (
-                <>
-                  <button type="button" className="btn primary" onClick={convert}>{videoIssue.kind === 'error' ? 'Try again' : 'Convert video'}</button>
-                  <small className="dim">The first time, Pianoverse downloads its video converter (about 90 MB).</small>
-                </>
-              ) : (
-                <p>Open the video with <b>Open files…</b> in the desktop app to convert it, or convert it to H.264 first.</p>
-              ))}
-            </div>
-          )}
-          {!gpuError && !ready && !videoIssue && (
-            <div className="start">
-              <h1>Open your performance</h1>
-              <p>Pick a video to set up, or a video together with its saved project. You can also drop files anywhere on this window.</p>
-              <div className={'step' + (videoName ? ' done' : '')}>
-                <span className="dot">{videoName ? '✓' : '1'}</span>
-                <span className="what"><b>Video</b><small>{videoName || 'mp4, mov or webm'}</small></span>
-                <PickButton what="video" className="btn" onPick={pick} onFiles={onFiles}>{videoName ? 'Change' : 'Choose video'}</PickButton>
+        <div className="top-right">
+          <UpdatePill phase={updater.phase} />
+          {route === 'project' ? <span className="saved dim">{saveText}</span> : <span className="gpu">{gpuError ? 'WebGPU unavailable' : gpuName}</span>}
+          <div className="menu-wrap">
+            <button type="button" className="btn icon" onClick={() => setMenu(!menu)} aria-label="Settings" title="Settings">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+            </button>
+            {menu && (
+              <div className="menu" onMouseLeave={() => setMenu(false)}>
+                <div className="menu-head"><b>Pianoverse {updater.version && `v${updater.version}`}</b><small>{updateStatusText(updater.phase) || (inTauri() ? '' : 'Browser preview')}</small></div>
+                {inTauri() && <button type="button" onClick={() => updater.check()}>Check for updates</button>}
+                {project && <button type="button" onClick={() => { setMenu(false); saveProject(project, project.video.file).catch((e) => alert(String(e?.message ?? e))); }}>Save project file…</button>}
+                <div className="menu-foot dim">{gpuError ? `Graphics: ${gpuError}` : `Graphics: ${gpuName || '…'}`}</div>
               </div>
-              <div className={'step' + (project ? ' done' : '')}>
-                <span className="dot">{project ? '✓' : '2'}</span>
-                <span className="what"><b>Project</b><small>{project ? project.name : 'a saved .pvproj.json (optional)'}</small></span>
-                <PickButton what="project" className="btn" onPick={pick} onFiles={onFiles}>Open project</PickButton>
-              </div>
-              {videoName && !project ? (
-                <button type="button" className="btn primary" onClick={startNewProject}>Set up this video</button>
-              ) : (
-                <PickButton what="any" className="btn primary" onPick={pick} onFiles={onFiles}>Choose files…</PickButton>
-              )}
-            </div>
-          )}
-          <canvas ref={canvasRef} className="preview" style={{ visibility: ready && mode !== 'calibrate' && !videoIssue ? 'visible' : 'hidden' }} />
-          {calibrating && !videoIssue && project && calib.corners && (
-            <CalibrateCanvas
-              video={videoRef.current}
-              videoW={project.video.width}
-              videoH={project.video.height}
-              frameKey={frameTick + time}
-              corners={calib.corners}
-              edge={calib.edge}
-              whiteKeys={project.keyboard.whiteKeys}
-              lowestNote={project.keyboard.lowestNote}
-              keys={project.keyboard.keys}
-              fixed={!!calib.fixHere}
-              fixMode={calib.tracked}
-              onCorners={calib.onCorners}
-              onEdge={calib.onEdge}
-            />
-          )}
-          {showStats && mode !== 'calibrate' && <div className="stats">{fps} fps · {stats}</div>}
-          {ready && mode !== 'calibrate' && (noNotes || sweep) && <div className="badge">Key sweep · test notes</div>}
-        </main>
-      </div>
-
-      {ready && mode === 'notes' && project && !videoIssue && (
-        <SyncTimeline
-          envelope={notesApi.audio?.envelope ?? null}
-          notes={project.notes}
-          time={time}
-          duration={duration}
-          playing={playing}
-          onSlide={(d) => { const src = sourceOf(project); if (src) notesApi.setOffset(src.offset + d); }}
-          onSeek={seek}
-        />
-      )}
-
-      <footer className="transport">
-        <button type="button" className="play" onClick={togglePlay} disabled={!ready} aria-label={playing ? 'Pause' : 'Play'}>
-          {playing
-            ? <svg width="18" height="18" viewBox="0 0 24 24" fill="#0B0D10" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
-            : <svg width="18" height="18" viewBox="0 0 24 24" fill="#0B0D10" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" /></svg>}
-        </button>
-        <span className="time">{fmt(time)} <span className="dim">/ {fmt(duration)}</span></span>
-        <div className="scrub-wrap">
-          {calibrating && project && <QualityStrip project={project} duration={duration} onSeek={seek} />}
-          <input
-            className="scrub" type="range" min={0} max={duration || 1} step={0.001} value={time}
-            onChange={(e) => seek(Number(e.target.value))} disabled={!ready} aria-label="Timeline"
-          />
+            )}
+          </div>
         </div>
-      </footer>
+      </header>
+
+      <div className="route">
+        {route === 'home' && <Home onNew={newProjectFlow} onOpen={(id) => loadFromStore(id).then(openProject).catch((e) => alert(String(e?.message ?? e)))} onPick={pick} onFiles={onFiles} refreshKey={homeKey} />}
+        {route === 'project' && step === 'import' && <ImportStep ws={ws} />}
+        {route === 'project' && step === 'notes' && ready && <NotesStep ws={ws} />}
+        {route === 'project' && step === 'calibrate' && ready && <CalibrateStep ws={ws} />}
+        {route === 'project' && step === 'style' && ready && (gpuError
+          ? <div className="notice">This window can't use the graphics card: {gpuError}</div>
+          : <StyleStep ws={ws} attachPreview={attachPreview} fps={fps} stats={showStats ? `${fps} fps · ${stats}` : ''} />)}
+      </div>
 
       <video
         ref={videoRef}
-        src={videoUrl ?? undefined}
+        src={videoUrl || undefined}
         crossOrigin="anonymous"
         preload="auto"
         playsInline
         style={{ display: 'none' }}
-        onLoadedMetadata={(e) => {
-          const v = e.currentTarget;
-          // a video track the player can't decode shows up as 0 x 0 (audio only)
-          if (!v.videoWidth) { setVideoIssue({ kind: 'unsupported' }); return; }
-          setDuration(v.duration);
-          if (wantNewProject.current && (!project || project.video.file !== videoName)) startNewProject();
-        }}
-        onError={() => { if (videoUrl) setVideoIssue((cur) => cur ?? { kind: 'unsupported' }); }}
+        onLoadedMetadata={(e) => onMetadata(e.currentTarget)}
         onLoadedData={() => redraw()}
         onSeeked={() => redraw()}
         onEnded={() => setPlaying(false)}
+        onError={() => { if (videoUrl) setVideoIssue((cur) => cur ?? { kind: 'unsupported' }); }}
       />
     </div>
   );

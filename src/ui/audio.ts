@@ -2,7 +2,9 @@
 import { mixDown } from '../engine/sync';
 import { DETECT_RATE } from '../engine/detectConfig';
 
-export interface VideoAudio { mono: Float32Array; rate: number; envelope: Float32Array; duration: number }
+/** peaks: min/max pairs at PEAK_RATE bins per second, for drawing the waveform */
+export interface VideoAudio { mono: Float32Array; rate: number; envelope: Float32Array; peaks: Float32Array; duration: number }
+export const PEAK_RATE = 200;
 
 const cache = new Map<string, Promise<VideoAudio>>();
 
@@ -30,11 +32,11 @@ async function decode(url: string): Promise<VideoAudio> {
   const chans: Float32Array[] = [];
   for (let c = 0; c < buf.numberOfChannels; c++) chans.push(buf.getChannelData(c));
   const mono = mixDown(chans);
-  const envelope = await new Promise<Float32Array>((resolve, reject) => {
+  const { envelope, peaks } = await new Promise<{ envelope: Float32Array; peaks: Float32Array }>((resolve, reject) => {
     const w = new Worker(new URL('../engine/audioWorker.ts', import.meta.url), { type: 'module' });
-    w.onmessage = (ev) => { resolve(ev.data.envelope); w.terminate(); };
+    w.onmessage = (ev) => { resolve(ev.data); w.terminate(); };
     w.onerror = (e) => { reject(new Error(e.message)); w.terminate(); };
     w.postMessage({ samples: mono, rate: DETECT_RATE });
   });
-  return { mono, rate: DETECT_RATE, envelope, duration: buf.duration };
+  return { mono, rate: DETECT_RATE, envelope, peaks, duration: buf.duration };
 }

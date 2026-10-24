@@ -46,7 +46,7 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
   const importMidi = useCallback((m: PickedMidi) => run(async () => {
     const info = parseMidi(m.data, m.name);
     if (!info.notes.length) throw new Error(`${m.name} has no notes${info.skippedDrums ? ' (only drums)' : ''}.`);
-    let src: NoteSource = { kind: 'midi', name: m.name, notes: info.notes, offset: 0 };
+    let src: NoteSource = { kind: 'midi', name: m.name, notes: info.notes, offset: 0, sustain: info.sustain };
     const p0 = latest.current;
     if (p0) setProject(withSource(p0, src));
     const a = await getAudio();
@@ -84,6 +84,12 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
     if (p && src) setProject(withSource(p, { ...src, offset: Math.round(offset * 1000) / 1000 }));
   }, [setProject]);
 
+  const setTranspose = useCallback((octaves: number) => {
+    const p = latest.current;
+    const src = p && sourceOf(p);
+    if (p && src) setProject(withSource(p, { ...src, transpose: octaves }));
+  }, [setProject]);
+
   const clear = useCallback(() => {
     const p = latest.current;
     if (p) setProject(withSource(p, undefined));
@@ -92,5 +98,5 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
   /** load the audio in the background so the sync strip can show it */
   const prepareAudio = useCallback(() => { if (videoUrl && audioFor !== videoUrl) run(async () => { await getAudio(); }); }, [videoUrl, audioFor, run, getAudio]);
 
-  return { busy, error, audio: audioFor === videoUrl ? audio : null, importMidi, detect, autoAlign, setOffset, clear, prepareAudio };
+  return { busy, error, audio: audioFor === videoUrl ? audio : null, importMidi, detect, autoAlign, setOffset, setTranspose, clear, prepareAudio };
 }

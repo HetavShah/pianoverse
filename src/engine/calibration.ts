@@ -33,6 +33,8 @@ export interface Calibration {
   /** corners marked on the reference frame (video pixels): back-left, back-right, front-right, front-left */
   corners: Quad;
   cameraMoves: boolean;
+  /** the user has placed the corners (not just the starting box) */
+  cornersSet?: boolean;
   /** raw tracked corners per frame (8 numbers) before smoothing and fixes; null entries = lost */
   raw?: (number[] | null)[];
   /** tracking confidence per frame, 0..1 */

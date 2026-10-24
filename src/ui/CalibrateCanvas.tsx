@@ -21,6 +21,9 @@ export interface CalibrateCanvasProps {
   fixMode: boolean;
   onCorners: (q: Quad, final: boolean) => void;
   onEdge: (e: { a: number; b: number }, final: boolean) => void;
+  /** zoom requests from outside: bump n to apply (k = factor, or 'fit') */
+  zoomCmd?: { n: number; k: number | 'fit' };
+  onZoom?: (z: number) => void;
 }
 
 type Handle = { kind: 'corner'; i: number } | { kind: 'saber'; side: 0 | 1 };
@@ -53,6 +56,13 @@ export default function CalibrateCanvas(p: CalibrateCanvasProps) {
   }, []);
 
   useEffect(() => { setView({ z: 1, cx: p.videoW / 2, cy: p.videoH / 2 }); }, [p.videoW, p.videoH]);
+  useEffect(() => {
+    const c = p.zoomCmd;
+    if (!c) return;
+    if (c.k === 'fit') setView({ z: 1, cx: p.videoW / 2, cy: p.videoH / 2 });
+    else { const k = c.k; setView((v) => ({ ...v, z: Math.min(12, Math.max(1, v.z * k)) })); }
+  }, [p.zoomCmd?.n]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { p.onZoom?.(view.z); }, [view.z]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // video px -> screen (CSS px)
   const fit = Math.min(size.w / p.videoW, size.h / p.videoH) * 0.94;

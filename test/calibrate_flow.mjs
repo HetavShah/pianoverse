@@ -15,11 +15,11 @@ page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await page.addInitScript(() => { window.__pvHeadless = true; });
 await page.goto('http://localhost:4173/');
 await page.waitForTimeout(1200);
-const ins = await page.$$('.start input[type=file]');
-await ins[0].setInputFiles(process.env.CLIP ?? '/home/claude/sample15.webm'); // a WebM copy of the sample (headless Chromium has no H.264)
-await page.waitForTimeout(600);
+await page.click('.row-actions >> text=New project');
+await page.setInputFiles('.file-card .actions input[type=file]', process.env.CLIP ?? '/home/claude/sample15.webm'); // a WebM copy of the sample (headless Chromium has no H.264)
+await page.waitForFunction(() => !!window.pianoverseProject, null, { timeout: 20000 });
 await page.screenshot({ path: `${OUT}/0-video-picked.png` });
-if (await page.$('text=Set up this video')) await page.click('text=Set up this video'); // older flow
+await page.click('.stepper >> text=Calibrate');
 await page.waitForSelector('.calib-wrap canvas');
 await page.waitForTimeout(800);
 await page.screenshot({ path: `${OUT}/1-calibrate-start.png` });
@@ -50,13 +50,13 @@ console.log('corner marking error px (screen-precision drag):', errMark.toFixed(
 await page.screenshot({ path: `${OUT}/3-corners-marked.png` });
 
 // track
-await page.click('.calib-panel .seg >> text=Moved');
+await page.click('.toggle-row >> text=Camera is fixed');
 await page.click('text=Track keyboard');
 await page.waitForTimeout(3000);
 await page.screenshot({ path: `${OUT}/4-tracking.png` });
 const t0 = Date.now();
-await page.waitForSelector('.calib-panel small.ok, .calib-panel small.bad', { timeout: 240000 });
-console.log('tracking wall time s', ((Date.now() - t0) / 1000 + 3).toFixed(1), '|', await page.$eval('.calib-panel small.ok, .calib-panel small.bad', (e) => e.textContent));
+await page.waitForFunction(() => !!window.pianoverseProject?.calibration?.raw, null, { timeout: 240000 });
+console.log('tracking wall time s', ((Date.now() - t0) / 1000 + 3).toFixed(1));
 const p2 = await getProj();
 console.log('fps', p2.video.fps, 'frames', p2.video.frames, 'tracking frames', p2.tracking.frames.length);
 // compare to the known tracking (allowing the marking offset)
@@ -87,7 +87,7 @@ await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/6-zoomed.png` });
 
 // preview mode, captured offscreen
-await page.click('.modes >> text=Preview');
+await page.click('text=Continue to style');
 await page.waitForTimeout(800);
 const dataUrl = await page.evaluate(async () => {
   const v = document.querySelector('video');

@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod media;
+mod projects;
 
 /// Write a project file to the path the user picked in the save dialog.
 #[tauri::command]
@@ -20,7 +21,12 @@ fn main() {
             media::read_file_bytes,
             media::allow_media,
             media::converter_ready,
-            media::convert_video
+            media::convert_video,
+            projects::list_projects,
+            projects::save_project,
+            projects::load_project,
+            projects::delete_project,
+            projects::file_exists
         ])
         .run(tauri::generate_context!())
         .expect("error while running Pianoverse");
