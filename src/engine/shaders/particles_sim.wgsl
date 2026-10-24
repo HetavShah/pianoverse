@@ -231,10 +231,12 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let cnt = P.w;
   let n = abs(cnt);
   let dir = select(1.0, E.count, cnt > 0.0);     // +1 clockwise, -1 anticlockwise (open lines always run forwards)
-  let tRise = (1.1 + 0.4 * rnd(st)) / max(PP.speed, 0.1);
-  let pace = 0.88 + 0.24 * rnd(st);               // sparks travel at their own speeds, so the swarm stretches out
-  let tTrace = 6.5 * E.pad1 * (n / f32(PP.nShape) * 0.5 + 0.5) / max(PP.speed, 0.1) / pace;
-  let reach = min(1.0, 0.45 + 0.7 * rnd(st) + 0.2 * E.vn);   // how far round this spark gets before burning out
+  let tRise = (0.9 + 0.3 * rnd(st)) / max(PP.speed, 0.1);
+  let pace = 0.92 + 0.16 * rnd(st);               // sparks travel at their own speeds, so the swarm stretches out
+  let tTrace = 5.4 * E.pad1 * (n / f32(PP.nShape) * 0.5 + 0.5) / max(PP.speed, 0.1) / pace;
+  // how far round this spark gets: most complete the whole outline, a few burn out on the way
+  let rr = rnd(st);
+  let reach = select(1.0, 0.55 + 0.45 * rnd(st), rr < 0.15);
   let ph = rnd(st) * 6.2831853;
   let side = gaussR(st);
   let isDust = rnd(st) < 0.5;

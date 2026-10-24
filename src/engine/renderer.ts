@@ -98,6 +98,7 @@ export class Renderer {
   private emit = new Float32Array(0);
   private emitStart: number[] = [];
   private emitEnd: number[] = [];
+  private emitSpan = 5;
 
   private sampler: GPUSampler;
   private frameBuf: GPUBuffer;
@@ -434,6 +435,8 @@ export class Renderer {
     rows.forEach((r, i) => this.emit.set(r.data, i * 16));
     this.emitStart = rows.map((r) => r.start);
     this.emitEnd = rows.map((r) => r.end);
+    // how far back an emitter can still be alive (long-lived modes like Shape need more than plumes)
+    this.emitSpan = Math.max(5, ...rows.map((r) => r.end - r.start));
   }
 
   // ---------- per frame ----------
@@ -610,7 +613,7 @@ export class Renderer {
     if (L.particles && this.emitStart.length) {
       const hi = this.upperBound(this.emitStart, t);
       const act: number[] = [];
-      for (let i = hi - 1; i >= 0 && this.emitStart[i] >= t - 5 && act.length < MAX_EMIT; i--) {
+      for (let i = hi - 1; i >= 0 && this.emitStart[i] >= t - this.emitSpan && act.length < MAX_EMIT; i--) {
         if (this.emitEnd[i] >= t) act.push(i);
       }
       if (act.length) {
