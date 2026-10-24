@@ -45,6 +45,9 @@ export interface WS {
   setSweep: (v: boolean) => void;
   pick: (k: PickKind) => void;
   onFiles: (f: FileList | null) => void;
+  /** loop playback: a selected section (seconds) or, without one, the whole video */
+  loop: { on: boolean; range: [number, number] | null };
+  setLoop: (l: { on: boolean; range: [number, number] | null }) => void;
   goStep: (s: Step) => void;
   goHome: () => void;
 }

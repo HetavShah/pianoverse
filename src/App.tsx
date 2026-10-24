@@ -45,6 +45,9 @@ export default function App() {
   const [saved, setSaved] = useState<{ state: 'idle' | 'saving' | 'saved' | 'error'; at: number }>({ state: 'idle', at: 0 });
   const [, setClock] = useState(0);
   const [menu, setMenu] = useState(false);
+  const [loop, setLoop] = useState<{ on: boolean; range: [number, number] | null }>({ on: false, range: null });
+  const loopRef = useRef(loop);
+  loopRef.current = loop;
   const [homeKey, setHomeKey] = useState(0);
   const frameTimes = useRef<number[]>([]);
   const wantNewProject = useRef(false);
@@ -96,7 +99,8 @@ export default function App() {
     const ft = frameTimes.current;
     ft.push(now);
     while (ft.length > 30) ft.shift();
-    if (ft.length > 5) setFps(Math.round(((ft.length - 1) * 1000) / (ft[ft.length - 1] - ft[0])));
+    // frame rate only means something during playback (seeks would read as a tiny number)
+    if (ft.length > 5 && !videoRef.current?.paused) setFps(Math.round(((ft.length - 1) * 1000) / (ft[ft.length - 1] - ft[0])));
     const s = r.stats;
     setStats(`${r.size.width}×${r.size.height} · ${s.notes} notes · ${s.emitters} emitters · CPU ${s.cpuMs.toFixed(1)} ms`);
   }, []);
@@ -127,6 +131,13 @@ export default function App() {
     if (v.requestVideoFrameCallback) {
       const tick = (_now: number, meta: { mediaTime: number }) => {
         if (stop) return;
+        // looping a selected section: jump back to its start at its end
+        const lp = loopRef.current;
+        if (lp.on && lp.range && (meta.mediaTime >= lp.range[1] || meta.mediaTime < lp.range[0] - 0.25)) {
+          v.currentTime = lp.range[0];
+          v.requestVideoFrameCallback!(tick);
+          return;
+        }
         redraw(meta.mediaTime);
         setTime(meta.mediaTime);
         v.requestVideoFrameCallback!(tick);
@@ -142,9 +153,18 @@ export default function App() {
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v || !videoUrl || videoIssue) return;
-    if (v.paused) { v.play(); setPlaying(true); } else { v.pause(); setPlaying(false); }
+    if (v.paused) {
+      const lp = loopRef.current;
+      if (lp.on && lp.range && (v.currentTime < lp.range[0] || v.currentTime >= lp.range[1] - 0.05)) v.currentTime = lp.range[0];
+      v.play(); setPlaying(true);
+    } else { v.pause(); setPlaying(false); }
   }, [videoUrl, videoIssue]);
+  // whole-video looping when no section is selected
+  useEffect(() => { const v = videoRef.current; if (v) v.loop = loop.on && !loop.range; }, [loop]);
+  // looping belongs to one project
+  useEffect(() => { setLoop({ on: false, range: null }); }, [project?.id]);
   const pause = () => { videoRef.current?.pause(); setPlaying(false); };
+  useEffect(() => { if (!playing) { frameTimes.current = []; setFps(0); } }, [playing]);
 
   const seek = useCallback((t: number) => {
     const v = videoRef.current;
@@ -335,7 +355,7 @@ export default function App() {
     project, setProject, video, videoEl: videoRef, videoIssue, convert,
     time, duration, playing, togglePlay, seek, frameTick,
     calib, notes: notesApi, renderer: rendererRef.current, layers, setLayers, scale, setScale, sweep, setSweep,
-    pick, onFiles, goStep, goHome,
+    pick, onFiles, loop, setLoop, goStep, goHome,
   };
 
   const ready = !!project && !!video && !videoIssue;
