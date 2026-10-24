@@ -8,7 +8,8 @@ import CalibratePanel, { QualityStrip } from './ui/CalibratePanel';
 import { calibrationFromTracking, newProject, useCalibration } from './ui/useCalibration';
 import { saveProject } from './ui/saveProject';
 import { ConvertProgress, convertVideo, inTauri, onNativeDrop, openFiles, Picked, PickedVideo, PickKind, pickNative } from './ui/media';
-import NotesPanel, { SyncStrip } from './ui/NotesPanel';
+import NotesPanel from './ui/NotesPanel';
+import SyncTimeline from './ui/SyncTimeline';
 import PickButton from './ui/PickButton';
 import { sourceOf, useNotes } from './ui/useNotes';
 
@@ -430,6 +431,18 @@ export default function App() {
         </main>
       </div>
 
+      {ready && mode === 'notes' && project && !videoIssue && (
+        <SyncTimeline
+          envelope={notesApi.audio?.envelope ?? null}
+          notes={project.notes}
+          time={time}
+          duration={duration}
+          playing={playing}
+          onSlide={(d) => { const src = sourceOf(project); if (src) notesApi.setOffset(src.offset + d); }}
+          onSeek={seek}
+        />
+      )}
+
       <footer className="transport">
         <button type="button" className="play" onClick={togglePlay} disabled={!ready} aria-label={playing ? 'Pause' : 'Play'}>
           {playing
@@ -439,17 +452,6 @@ export default function App() {
         <span className="time">{fmt(time)} <span className="dim">/ {fmt(duration)}</span></span>
         <div className="scrub-wrap">
           {calibrating && project && <QualityStrip project={project} duration={duration} onSeek={seek} />}
-          {ready && mode === 'notes' && project && (
-            <SyncStrip
-              envelope={notesApi.audio?.envelope ?? null}
-              notes={project.notes}
-              time={time}
-              lowest={project.keyboard.lowestNote}
-              keys={project.keyboard.keys}
-              onSlide={(d, final) => { const src = sourceOf(project); if (final && src) notesApi.setOffset(src.offset + d); }}
-              onSeek={seek}
-            />
-          )}
           <input
             className="scrub" type="range" min={0} max={duration || 1} step={0.001} value={time}
             onChange={(e) => seek(Number(e.target.value))} disabled={!ready} aria-label="Timeline"
