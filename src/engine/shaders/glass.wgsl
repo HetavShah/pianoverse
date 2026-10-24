@@ -259,13 +259,14 @@ fn textured(i: VOut, p: vec2f, d: f32, g: vec2f, bx: f32, by: f32, inside: f32, 
   let lv = min(live, 1.0);
   var uv0 = p / tile + vec2f(i.seed * 7.13, i.seed * 3.71);
   if (TP.reflect > 0.5) { uv0 = (i.pos.xy / F.scale) / tile; }
-  let uv = uv0 + vec2f(0.013, -0.045) * F.time * live;
-  let lod = max(0.0, log2(TP.size / max(tile * F.scale, 1.0)));
+  let uv = uv0 + vec2f(0.006, -0.02) * F.time * live;
+  // slightly softer than pixel-exact, so fine detail doesn't sparkle as notes move
+  let lod = max(0.0, log2(TP.size / max(tile * F.scale, 1.0)) + 0.6);
   let tc = textureSampleLevel(texC, texSamp, uv, lod).rgb;
   var tn = textureSampleLevel(texN, texSamp, uv, lod).rgb * 2.0 - 1.0;
   if (live > 0.0) {
     // a second, differently moving layer of the same surface, so the pattern itself keeps changing
-    let uv2 = uv0 * 1.37 + vec2f(0.41, 0.17) + vec2f(-0.031, 0.022) * F.time * live;
+    let uv2 = uv0 * 1.37 + vec2f(0.41, 0.17) + vec2f(-0.014, 0.01) * F.time * live;
     let tn2 = textureSampleLevel(texN, texSamp, uv2, lod).rgb * 2.0 - 1.0;
     tn = mix(tn, tn2, 0.45 * lv);
   }
@@ -273,7 +274,7 @@ fn textured(i: VOut, p: vec2f, d: f32, g: vec2f, bx: f32, by: f32, inside: f32, 
   // surface normal: the texture's relief plus a rounded bevel towards the note's edges
   let edge = 1.0 - smoothstep(0.0, inset * 1.4, -d);
   let n = normalize(vec3f(tn.x * TP.relief + g.x * edge * 0.9, -tn.y * TP.relief + g.y * edge * 0.9, 1.0));
-  let la = F.time * 1.9 * live + i.seed * 6.2832;
+  let la = F.time * 0.7 * live + i.seed * 6.2832;
   let Lk = normalize(vec3f(-0.5 + 0.5 * lv * sin(la), -0.65 + 0.45 * lv * cos(la * 0.83), 0.6));   // key light from the upper left
   let diffuse = max(dot(n, Lk), 0.0);
   let h = normalize(Lk + vec3f(0.0, 0.0, 1.0));
@@ -281,9 +282,9 @@ fn textured(i: VOut, p: vec2f, d: f32, g: vec2f, bx: f32, by: f32, inside: f32, 
   var spec = pow(max(dot(n, h), 0.0), gloss) * (1.0 - rough * 0.7) * TP.shine;
   if (live > 0.0) {
     // tiny bright glints from a fast-moving second light
-    let lb = F.time * 4.3 * live + i.seed * 17.0;
+    let lb = F.time * 1.2 * live + i.seed * 17.0;
     let L2 = normalize(vec3f(0.7 * sin(lb), 0.7 * cos(lb * 1.13), 0.55));
-    spec += pow(max(dot(n, normalize(L2 + vec3f(0.0, 0.0, 1.0))), 0.0), 260.0) * 2.2 * lv * TP.shine;
+    spec += pow(max(dot(n, normalize(L2 + vec3f(0.0, 0.0, 1.0))), 0.0), 60.0) * 0.9 * lv * TP.shine;
   }
   let fres = pow(1.0 - n.z, 2.0);
   let lum0 = dot(tc, vec3f(0.2126, 0.7152, 0.0722));
