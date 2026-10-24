@@ -94,13 +94,18 @@ export class Keyboard {
 
   /** key footprint in plane coords (white-key units across, 0 = back .. 1 = front) */
   footprint(p: number): { quad: [number, number][]; black: boolean } {
-    const o = Math.floor((p - this.lowest) / 12);
-    const r = (p - this.lowest) - o * 12;
+    // white-key ordinals counted from C-1, so keyboards starting on A or E line up too
+    const ord = (q: number) => {
+      const o = Math.floor(q / 12), r = q - o * 12;
+      return r in WHITE_OFF ? o * 7 + WHITE_OFF[r] : o * 7 + BLACK_OFF[r];
+    };
+    const base = ord(this.lowest);
+    const r = ((p % 12) + 12) % 12;
     if (r in WHITE_OFF) {
-      const w = o * 7 + WHITE_OFF[r];
+      const w = ord(p) - base;
       return { quad: [[w + 0.08, 0.66], [w + 0.92, 0.66], [w + 0.92, 0.97], [w + 0.08, 0.97]], black: false };
     }
-    const c = o * 7 + BLACK_OFF[r];
+    const c = ord(p) - base;
     return { quad: [[c - 0.26, 0.06], [c + 0.26, 0.06], [c + 0.26, 0.58], [c - 0.26, 0.58]], black: true };
   }
 
