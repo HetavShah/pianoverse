@@ -14,7 +14,7 @@ struct VOut {
 @group(1) @binding(1) var texC: texture_2d<f32>;
 @group(1) @binding(2) var texN: texture_2d<f32>;
 @group(1) @binding(3) var texR: texture_2d<f32>;
-struct TexParams { mode: f32, scale: f32, relief: f32, shine: f32, solid: f32, size: f32, lo: f32, hi: f32, metal: f32, tile: f32, p1: f32, p2: f32 };
+struct TexParams { mode: f32, scale: f32, relief: f32, shine: f32, solid: f32, size: f32, lo: f32, hi: f32, metal: f32, tile: f32, reflect: f32, live: f32 };
 @group(1) @binding(4) var<uniform> TP: TexParams;
 
 // Notes travel along a fall direction: U points from the landing point back toward where notes come from.
@@ -253,19 +253,38 @@ fn textured(i: VOut, p: vec2f, d: f32, g: vec2f, bx: f32, by: f32, inside: f32, 
   let w = i.dims.x;
   let col = i.col;
   let tile = w * TP.tile * TP.scale;
-  let uv = p / tile + vec2f(i.seed * 7.13, i.seed * 3.71);
+  // the texture either rides along with the note, or stays put on screen so notes slide through it
+  // like a reflection; "live" slowly drifts it and moves the light so different facets glint in turn
+  let live = TP.live;
+  let lv = min(live, 1.0);
+  var uv0 = p / tile + vec2f(i.seed * 7.13, i.seed * 3.71);
+  if (TP.reflect > 0.5) { uv0 = (i.pos.xy / F.scale) / tile; }
+  let uv = uv0 + vec2f(0.013, -0.045) * F.time * live;
   let lod = max(0.0, log2(TP.size / max(tile * F.scale, 1.0)));
   let tc = textureSampleLevel(texC, texSamp, uv, lod).rgb;
   var tn = textureSampleLevel(texN, texSamp, uv, lod).rgb * 2.0 - 1.0;
+  if (live > 0.0) {
+    // a second, differently moving layer of the same surface, so the pattern itself keeps changing
+    let uv2 = uv0 * 1.37 + vec2f(0.41, 0.17) + vec2f(-0.031, 0.022) * F.time * live;
+    let tn2 = textureSampleLevel(texN, texSamp, uv2, lod).rgb * 2.0 - 1.0;
+    tn = mix(tn, tn2, 0.45 * lv);
+  }
   let rough = textureSampleLevel(texR, texSamp, uv, lod).r;
   // surface normal: the texture's relief plus a rounded bevel towards the note's edges
   let edge = 1.0 - smoothstep(0.0, inset * 1.4, -d);
   let n = normalize(vec3f(tn.x * TP.relief + g.x * edge * 0.9, -tn.y * TP.relief + g.y * edge * 0.9, 1.0));
-  let Lk = normalize(vec3f(-0.5, -0.65, 0.6));            // key light from the upper left
+  let la = F.time * 1.9 * live + i.seed * 6.2832;
+  let Lk = normalize(vec3f(-0.5 + 0.5 * lv * sin(la), -0.65 + 0.45 * lv * cos(la * 0.83), 0.6));   // key light from the upper left
   let diffuse = max(dot(n, Lk), 0.0);
   let h = normalize(Lk + vec3f(0.0, 0.0, 1.0));
   let gloss = mix(120.0, 6.0, clamp(rough, 0.0, 1.0));
-  let spec = pow(max(dot(n, h), 0.0), gloss) * (1.0 - rough * 0.7) * TP.shine;
+  var spec = pow(max(dot(n, h), 0.0), gloss) * (1.0 - rough * 0.7) * TP.shine;
+  if (live > 0.0) {
+    // tiny bright glints from a fast-moving second light
+    let lb = F.time * 4.3 * live + i.seed * 17.0;
+    let L2 = normalize(vec3f(0.7 * sin(lb), 0.7 * cos(lb * 1.13), 0.55));
+    spec += pow(max(dot(n, normalize(L2 + vec3f(0.0, 0.0, 1.0))), 0.0), 260.0) * 2.2 * lv * TP.shine;
+  }
   let fres = pow(1.0 - n.z, 2.0);
   let lum0 = dot(tc, vec3f(0.2126, 0.7152, 0.0722));
   let lum = clamp((lum0 - TP.lo) / max(TP.hi - TP.lo, 0.02), 0.0, 1.0);   // the texture's own range, stretched

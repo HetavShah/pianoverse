@@ -70,6 +70,8 @@ export interface Look {
   texRelief: number; // strength of the surface bumps
   texShine: number; // highlights
   texSolid: number; // 0 = see-through, 1 = solid
+  texReflect: boolean; // texture stays put on screen and notes slide through it
+  texLive: number; // 0 = still, higher = the surface keeps shimmering
   // saber
   saberBright: number;
   saberThick: number;
@@ -118,7 +120,7 @@ export const DEFAULT_LOOK: Look = {
   colorBy: 'pitch', hueShift: 0, colorSat: 1, colorCycle: 20,
   palette: 'teal', colorA: '#3c6eff', colorB: '#78ffaa', splitNote: 60,
   noteAngle: null, noteSpeed: 680, noteWidth: 1, noteLength: 1, noteVelocity: 1, noteBright: 1, noteGlow: 1, noteFill: 1, noteOpacity: 1, noteRim: 1, noteRound: 1, noteFade: 1, noteStyle: 'glass', noteShape: 'bar', noteDepth: 1,
-  noteTexture: 'ice', texMode: 'tint', texScale: 1, texRelief: 1, texShine: 1, texSolid: 0.85,
+  noteTexture: 'ice', texMode: 'tint', texScale: 1, texRelief: 1, texShine: 1, texSolid: 0.85, texReflect: false, texLive: 0,
   saberBright: 1, saberThick: 1, saberFlicker: 1, saberReact: 1, saberTint: 1,
   flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3,
   keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
@@ -236,7 +238,7 @@ export type Control =
   | { key: keyof Look; kind: 'select'; label: string; options: { value: string; label: string }[]; when?: (l: Look) => boolean; segmented?: boolean }
   | { key: keyof Look; kind: 'texture'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'color'; label: string; when?: (l: Look) => boolean }
-  | { key: keyof Look; kind: 'toggle'; label: string; hint?: string }
+  | { key: keyof Look; kind: 'toggle'; label: string; hint?: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'note'; label: string; when?: (l: Look) => boolean };
 
 export interface Section { title: string; controls: Control[] }
@@ -275,6 +277,8 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
       { key: 'texScale', kind: 'slider', label: 'Texture size', min: 0.25, max: 4, step: 0.01, fmt: x, when: tex },
       { key: 'texRelief', kind: 'slider', label: 'Bumps', min: 0, max: 3, step: 0.01, fmt: pct, when: tex, hint: 'How strongly the surface detail catches the light' },
       { key: 'texShine', kind: 'slider', label: 'Shine', min: 0, max: 3, step: 0.01, fmt: pct, when: tex },
+      { key: 'texReflect', kind: 'toggle', label: 'Reflection', hint: 'The texture stays put and notes slide through it, like light on glass', when: tex },
+      { key: 'texLive', kind: 'slider', label: 'Live shimmer', min: 0, max: 2, step: 0.01, fmt: pct, when: tex, hint: 'The surface keeps moving and glinting as notes fall' },
       { key: 'texSolid', kind: 'slider', label: 'Solid', min: 0, max: 1, step: 0.01, fmt: pct, when: tex, hint: 'Low lets the video show through the notes' },
     ] },
     { title: 'Size and shape', controls: [

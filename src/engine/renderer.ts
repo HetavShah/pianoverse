@@ -445,7 +445,7 @@ export class Renderer {
     ]));
     if (glass.length) q.writeBuffer(this.glassBuf, 0, new Float32Array(glass));
     if (lk.noteStyle === 'texture') this.wantTexture(lk.noteTexture);
-    q.writeBuffer(this.texUni, 0, new Float32Array([['tint', 'natural', 'glow'].indexOf(lk.texMode), lk.texScale, lk.texRelief, lk.texShine, lk.texSolid, this.tex.size, this.tex.lo, this.tex.hi, this.tex.metal, this.tex.tile, 0, 0]));
+    q.writeBuffer(this.texUni, 0, new Float32Array([['tint', 'natural', 'glow'].indexOf(lk.texMode), lk.texScale, lk.texRelief, lk.texShine, lk.texSolid, this.tex.size, this.tex.lo, this.tex.hi, this.tex.metal, this.tex.tile, lk.texReflect ? 1 : 0, lk.texLive]));
     if (keys.length) q.writeBuffer(this.keysBuf, 0, new Float32Array(keys));
     if (sprites.length) q.writeBuffer(this.spriteBuf, 0, new Float32Array(sprites));
     if (lights.length) q.writeBuffer(this.lightsBuf, 0, new Float32Array(lights));

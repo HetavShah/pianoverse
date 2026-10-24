@@ -34,7 +34,7 @@ for (const t of TIMES) {
     c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
     return c.toDataURL('image/png');
   }, { proj, t, scale: SCALE });
-  writeFileSync(`${OUT}/t${t.toFixed(1)}.png`, Buffer.from(url.split(',')[1], 'base64'));
+  writeFileSync(`${OUT}/t${Number.isInteger(Math.round(t * 1000) / 100) ? t.toFixed(1) : t.toFixed(3)}.png`, Buffer.from(url.split(',')[1], 'base64'));
 }
 console.log('wrote', TIMES.length, 'frames to', OUT);
 await b.close();
