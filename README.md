@@ -11,12 +11,11 @@
   <img src="https://img.shields.io/badge/status-Milestone%205%20done-2FD3B5?style=flat" alt="Milestone 5 done">
 </p>
 
-<h3 align="center">Add falling notes to your piano videos.</h3>
+<h3 align="center">Falling notes on your real keys.</h3>
 
 <p align="center">
-  Pianoverse is a Windows app. Give it a video of yourself playing and the MIDI from the same take:<br>
-  it lines them up, finds your keyboard in every frame, and draws each note falling onto the key you pressed,<br>
-  with a glowing line along the keys and sparks where the note lands. Then it exports the video for Shorts, Reels or YouTube.
+  Add your piano video and its MIDI. Pianoverse drops every note onto the key you pressed,<br>
+  lights up your keys and sends sparks flying, then exports it for Shorts, Reels or YouTube. For Windows.
 </p>
 
 <p align="center">
