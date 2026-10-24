@@ -29,9 +29,10 @@ if (EXTRA) await page.evaluate(({ b64, type }) => {
   window.pianoverse.renderer.userFiles = async (id) => (id === 'test' ? (type.startsWith('video') ? { video: blob } : { color: blob }) : null);
 }, { b64: EXTRA, type: EXTRA_TYPE });
 for (const t of TIMES) {
-  const url = await page.evaluate(async ({ proj, t, scale }) => {
+  const url = await page.evaluate(async ({ proj, t, scale, layers }) => {
     const r = window.pianoverse.renderer;
     r.setScale(scale);
+    if (layers) r.layers = { ...r.layers, ...layers };
     r.setProject(proj);
     await r.texturesReady?.();
     const v = document.querySelector('video');
@@ -41,7 +42,7 @@ for (const t of TIMES) {
     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
     c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
     return c.toDataURL('image/png');
-  }, { proj, t, scale: SCALE });
+  }, { proj, t, scale: SCALE, layers: process.env.LAYERS ? JSON.parse(process.env.LAYERS) : null });
   writeFileSync(`${OUT}/t${Number.isInteger(Math.round(t * 1000) / 100) ? t.toFixed(1) : t.toFixed(3)}.png`, Buffer.from(url.split(',')[1], 'base64'));
 }
 console.log('wrote', TIMES.length, 'frames to', OUT);

@@ -366,11 +366,39 @@ export class Renderer {
     const kb = new Keyboard(this.kb.lowest, this.kb.edgeA, this.kb.edgeB);
     const lk = this.look;
     const rows: { start: number; end: number; data: number[] }[] = [];
+    const mode = lk.partMode;
     for (const n of this.notes) {
       kb.H = trackingMatrix(this.proj, Math.round(n.s * this.proj.video.fps));
       const tg = kb.target(n.p);
       const rnd = mulberry32(n.idx * 7919 + 101);
       const vv = lk.partVelocity ? n.vn : 0.5; // "louder notes, bigger plumes" off: every note average
+      if (mode !== 'plume') {
+        const held = Math.min(4, Math.max(0.2, n.e - n.s));
+        const slope = Math.abs(tg.along[0]) > 1e-3 ? tg.along[1] / tg.along[0] : 0;
+        if (mode === 'fountain') {
+          const sp = tg.unit * 13 * lk.partSpeed * (0.85 + 0.3 * vv);
+          const G = (sp * sp) / (2 * tg.unit * 7 * Math.max(0.2, lk.partRise));
+          const life = Math.min(Math.max(held, 0.35), 2.5);
+          const rate = Math.min(1000 / life, 420 * (0.6 + 0.8 * vv) * lk.partAmount);
+          if (rate > 0) rows.push({ start: n.s, end: n.s + life + 2.5 * lk.partLife, data: [n.s, life, rate, 0, tg.x, tg.y, 0, -sp, ...n.col, vv, n.idx * 16, 2, slope, G] });
+        } else if (mode === 'spray') {
+          const sp = tg.unit * 12 * lk.partSpeed * (0.85 + 0.3 * vv);
+          const burst = Math.floor(110 * (0.6 + 0.8 * vv) * lk.partAmount);
+          const rate = Math.min((1000 - burst) / held, 620 * (0.6 + 0.8 * vv) * lk.partAmount);
+          if (rate > 0) rows.push({ start: n.s, end: n.s + held + 1.5 * lk.partLife, data: [n.s, held, rate, burst, tg.x, tg.y, 0, -sp, ...n.col, vv, n.idx * 16, 3, 0, 0] });
+        } else {
+          const mid = this.whiteKeys / 2;
+          const c0 = kb.P(mid, kb.edgeY(mid));
+          const up = this.up, u = kb.unit(mid, kb.edgeY(mid));
+          const C: [number, number] = [c0[0] + up[0] * u * 4, c0[1] + up[1] * u * 4];
+          const ang = Math.atan2(tg.along[1], tg.along[0]);
+          const ends = [kb.P(0, kb.edgeY(0)), kb.P(this.whiteKeys, kb.edgeY(this.whiteKeys))];
+          const half = Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) / 2;
+          const rate = 320 * (0.6 + 0.8 * vv) * lk.partAmount;
+          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.6 + 4.9 * lk.partLife, data: [n.s, 0.6, rate, 0, tg.x, tg.y, C[0], C[1], ...n.col, vv, n.idx * 16, 4, ang, half * (1 + lk.partSpread)] });
+        }
+        continue;
+      }
       const streams = 1 + (rnd() < 0.35 + 0.4 * vv ? 1 : 0);
       for (let j = 0; j < streams; j++) {
         const a = gauss(rnd, -Math.PI / 2, 0.32);

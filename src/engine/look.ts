@@ -23,14 +23,17 @@ export const NOTE_STYLE_CARDS: { id: string; label: string; set: Partial<Look> }
 ];
 /** SeeMusic-style particle presets: each sets the particle physics and look */
 export const PARTICLE_PRESETS: { id: string; label: string; set: Partial<Look> }[] = [
-  { id: 'default', label: 'Default', set: { partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
-  { id: 'explode', label: 'Explode', set: { partAmount: 1.6, partSpeed: 2.6, partSwirl: 0.4, partLife: 0.7, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0.4, partGravity: 0.35, partWind: 0, partRise: 1 } },
-  { id: 'fast', label: 'Fast playing', set: { partAmount: 0.7, partSpeed: 1.4, partSwirl: 0.8, partLife: 0.55, partSize: 0.85, partRays: false, partOctaves: 1, partTurbFreq: 1.3, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.2 } },
-  { id: 'count', label: 'High count', set: { partAmount: 2.8, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 0.75, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0.2, partGravity: 0, partWind: 0, partRise: 1 } },
-  { id: 'turb', label: 'High turbulence', set: { partAmount: 1.2, partSpeed: 1, partSwirl: 2.6, partLife: 1.3, partSize: 1, partRays: false, partOctaves: 3, partTurbFreq: 1.4, partSpread: 0, partGravity: 0, partWind: 0, partRise: 0.8 } },
-  { id: 'streaks', label: 'Long streaklets', set: { partAmount: 0.9, partSpeed: 1.6, partSwirl: 0.6, partLife: 1.1, partSize: 0.9, partRays: true, partRayLen: 2.2, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.2 } },
-  { id: 'straight', label: 'Straight out', set: { partAmount: 1, partSpeed: 1.8, partSwirl: 0.05, partLife: 1, partSize: 1, partRays: true, partRayLen: 1, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.6 } },
-  { id: 'twirl', label: 'Twirl', set: { partAmount: 1.2, partSpeed: 0.8, partSwirl: 2.2, partLife: 1.6, partSize: 1, partRays: false, partOctaves: 2, partTurbFreq: 0.6, partSpread: 0, partGravity: 0, partWind: 0.2, partRise: 0.7 } },
+  { id: 'default', label: 'Default', set: { partMode: 'plume', partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
+  { id: 'explode', label: 'Explode', set: { partMode: 'plume', partAmount: 1.6, partSpeed: 2.6, partSwirl: 0.4, partLife: 0.7, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0.4, partGravity: 0.35, partWind: 0, partRise: 1 } },
+  { id: 'fast', label: 'Fast playing', set: { partMode: 'plume', partAmount: 0.7, partSpeed: 1.4, partSwirl: 0.8, partLife: 0.55, partSize: 0.85, partRays: false, partOctaves: 1, partTurbFreq: 1.3, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.2 } },
+  { id: 'count', label: 'High count', set: { partMode: 'plume', partAmount: 2.8, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 0.75, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0.2, partGravity: 0, partWind: 0, partRise: 1 } },
+  { id: 'turb', label: 'High turbulence', set: { partMode: 'plume', partAmount: 1.2, partSpeed: 1, partSwirl: 2.6, partLife: 1.3, partSize: 1, partRays: false, partOctaves: 3, partTurbFreq: 1.4, partSpread: 0, partGravity: 0, partWind: 0, partRise: 0.8 } },
+  { id: 'streaks', label: 'Long streaklets', set: { partMode: 'plume', partAmount: 0.9, partSpeed: 1.6, partSwirl: 0.6, partLife: 1.1, partSize: 0.9, partRays: true, partRayLen: 2.2, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.2 } },
+  { id: 'straight', label: 'Straight out', set: { partMode: 'plume', partAmount: 1, partSpeed: 1.8, partSwirl: 0.05, partLife: 1, partSize: 1, partRays: true, partRayLen: 1, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.6 } },
+  { id: 'fountain', label: 'Fountain', set: { partMode: 'fountain', partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
+  { id: 'spray', label: 'Held-note spray', set: { partMode: 'spray', partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 0.85, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
+  { id: 'vortex', label: 'Vortex', set: { partMode: 'vortex', partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
+  { id: 'twirl', label: 'Twirl', set: { partMode: 'plume', partAmount: 1.2, partSpeed: 0.8, partSwirl: 2.2, partLife: 1.6, partSize: 1, partRays: false, partOctaves: 2, partTurbFreq: 0.6, partSpread: 0, partGravity: 0, partWind: 0.2, partRise: 0.7 } },
 ];
 
 export const KEY_NAMES = ['C', 'C♯ / D♭', 'D', 'E♭', 'E', 'F', 'F♯ / G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
@@ -187,6 +190,7 @@ export interface Look {
   partColor: number; // 0 = white, 1 = note colour
   partVelocity: boolean; // louder notes, bigger plumes
   partSpeed: number; // launch speed
+  partMode: 'plume' | 'fountain' | 'spray' | 'vortex'; // the kind of particle animation
   partTurbX: number; partTurbY: number; partTurbZ: number; // turbulence strength per direction (Z: in and out of the screen)
   partTurbFreq: number; // size of the swirls (higher = smaller, busier)
   partTurbEvo: number; // how fast the swirls change
@@ -247,7 +251,7 @@ export const DEFAULT_LOOK: Look = {
   flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3,
   keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
   partAmount: 1, partRise: 1, partSwirl: 1, partWind: 0, partGravity: 0, partLife: 1, partSize: 1, partTwinkle: 1, partHaze: 1, partStars: 1, partColor: 1, partVelocity: true,
-  partSpeed: 1, partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
+  partSpeed: 1, partMode: 'plume', partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
   partSpread: 0, partOpacity: 1, partAlphaF: 0, partAdditive: 1, partBright: 1, partRays: false, partRayLen: 1,
   bgDarken: 1, bgContrast: 1, bgSaturation: 1, bgVignette: 1,
   footOpacity: 1, footScale: 1, footX: 0, footY: 0, footRot: 0, footCropT: 0, footCropB: 0, footCropL: 0, footCropR: 0, footBright: 0, footHue: 0,

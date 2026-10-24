@@ -59,6 +59,146 @@ fn turbVel(p: vec2f, t: f32) -> vec2f {
   return v * vec2f(PP.turbX, PP.turbY);
 }
 
+// shared ending: fade in and out over the particle's life, twinkle, colour
+fn finishP(pos: vec2f, vel: vec2f, age: f32, plife: f32, bright: f32, star: f32, col: vec3f, st: ptr<function, u32>) -> Particle {
+  var o: Particle;
+  let twPh = rnd(st) * 6.2831853;
+  let tf = 6.0 + 20.0 * rnd(st);
+  let env = clamp(age / 0.06, 0.0, 1.0) * pow(clamp(1.0 - age / plife, 0.0, 1.0), 1.3);
+  let s1 = sin(age * tf + twPh);
+  let tw = max(mix(1.0, 0.55 + 0.45 * s1 * s1, PP.twinkle), 0.0);
+  o.pos = pos;
+  o.vel = vel;
+  o.b = env * tw * bright;
+  o.star = star;
+  o.z = 0.0;
+  o.pad = 0.0;
+  o.col = vec4f(col, tw);
+  return o;
+}
+
+// FOUNTAIN: drops shoot up while the key is held, arc over under gravity and bounce on the keyboard line
+fn fountain(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
+  var off: Particle;
+  off.pos = vec2f(-10000.0);
+  off.b = 0.0;
+  let total = min(E.rate * E.life, f32(PP.perEmit));
+  if (f32(k) >= total) { return off; }
+  let ts = E.start + (f32(k) + rnd(st)) / max(E.rate, 1.0);
+  if (ts > t) { return off; }
+  let plife = (1.5 + 0.9 * rnd(st)) * PP.lifeMul;
+  let age = t - ts;
+  if (age > plife) { return off; }
+  let ang = gaussR(st) * 0.17;
+  let sp = 0.82 + 0.3 * rnd(st);
+  var v = vec2f(E.vel.x * cos(ang) - E.vel.y * sin(ang), E.vel.x * sin(ang) + E.vel.y * cos(ang)) * sp;
+  let g = vec2f(PP.wind * 140.0, E.pad1 * (1.0 + PP.gravity));
+  let sl = E.pad0;                                   // the keyboard line's slope on screen
+  let N = normalize(vec2f(-sl, 1.0));
+  var q = vec2f(0.0);
+  var rem = age;
+  var fade = 1.0;
+  for (var b = 0; b < 4; b++) {
+    let den = g.y - sl * g.x;
+    let tHit = -2.0 * (v.y - sl * v.x) / max(den, 1e-3);
+    if (tHit <= 0.002 || tHit >= rem) {
+      q += v * rem + 0.5 * g * rem * rem;
+      v += g * rem;
+      break;
+    }
+    q += v * tHit + 0.5 * g * tHit * tHit;
+    v += g * tHit;
+    let vn = dot(v, N);
+    v = (v - vn * N) * 0.72 - vn * N * 0.42;         // bounce: lose energy, slide a little
+    rem -= tHit;
+    fade *= 0.75;
+  }
+  let pos = E.pos + q + vec2f(gaussR(st), gaussR(st)) * 1.5;
+  let bright = (0.9 + 0.7 * rnd(st)) * (0.8 + 0.5 * E.vn) * fade;
+  var star = 0.0;
+  if (rnd(st) < 0.02 * PP.stars) { star = 1.0; }
+  let col = mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix);
+  return finishP(pos, v, age, plife, bright, star, col, st);
+}
+
+// HELD-NOTE SPRAY: a fine jet of mist rises while the key is held; letting go ends it with a small burst
+fn spray(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
+  var off: Particle;
+  off.pos = vec2f(-10000.0);
+  off.b = 0.0;
+  let total = min(E.rate * E.life, f32(PP.perEmit) - E.count);
+  let kf = f32(k);
+  var ts: f32;
+  var v0: vec2f;
+  var plife: f32;
+  var bright: f32;
+  let base = length(E.vel);
+  if (kf < total) {
+    ts = E.start + (kf + rnd(st)) / max(E.rate, 1.0);
+    let a = -1.5707963 + gaussR(st) * 0.13;
+    v0 = vec2f(cos(a), sin(a)) * base * (0.65 + 0.6 * rnd(st));
+    plife = (0.7 + 0.7 * rnd(st)) * PP.lifeMul;
+    bright = (0.75 + 0.7 * rnd(st)) * (0.8 + 0.5 * E.vn);
+  } else if (kf < total + E.count) {
+    ts = E.start + E.life;                          // the release burst
+    let a = -1.5707963 + gaussR(st) * 0.95;
+    v0 = vec2f(cos(a), sin(a)) * base * (0.35 + 0.55 * rnd(st));
+    plife = (0.45 + 0.6 * rnd(st)) * PP.lifeMul;
+    bright = (1.0 + 0.6 * rnd(st)) * (0.8 + 0.5 * E.vn);
+  } else { return off; }
+  if (ts > t) { return off; }
+  let age = t - ts;
+  if (age > plife) { return off; }
+  let kd = 2.4;
+  let ex = 1.0 - exp(-kd * age);
+  var pos = E.pos + v0 * ex / kd + vec2f(PP.wind * 60.0, -38.0 * PP.rise + PP.gravity * 120.0) * age;
+  pos += turbVel(pos, t) * min(age, 1.5) * 0.3 * PP.swirl;
+  let vel = v0 * (1.0 - ex) + vec2f(0.0, -38.0);
+  var star = 0.0;
+  if (rnd(st) < 0.012 * PP.stars) { star = 1.0; }
+  let col = mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix);
+  return finishP(pos, vel, age, plife, bright, star, col, st);
+}
+
+// VORTEX: particles leave the key and join a ring that orbits above the keyboard; louder notes orbit faster
+fn vortex(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
+  var off: Particle;
+  off.pos = vec2f(-10000.0);
+  off.b = 0.0;
+  let total = min(E.rate * E.life, f32(PP.perEmit));
+  if (f32(k) >= total) { return off; }
+  let ts = E.start + (f32(k) + rnd(st)) / max(E.rate, 1.0);
+  if (ts > t) { return off; }
+  let plife = (2.6 + 2.2 * rnd(st)) * PP.lifeMul;
+  let age = t - ts;
+  if (age > plife) { return off; }
+  let C = E.vel;                                    // ring centre
+  let ax = vec2f(cos(E.pad0), sin(E.pad0));         // along the keyboard
+  let ay = vec2f(-ax.y, ax.x);
+  let flat = 0.32;                                  // the ring seen at an angle
+  let h = E.pos - C;
+  let hx = dot(h, ax);
+  let hy = dot(h, ay) / flat;
+  let R0 = E.pad1 * (0.55 + 0.5 * rnd(st));
+  let th0 = atan2(hy, hx) + gaussR(st) * 0.25;
+  let w = (0.8 + 1.1 * E.vn) * (0.75 + 0.5 * rnd(st)) * PP.speed;
+  let th = th0 + w * age;
+  let R = R0 * (1.0 + 0.1 * age * PP.swirl);
+  let ph = rnd(st) * 6.2831853;
+  let lift = sin(th * 2.0 + ph) * R * 0.05 + (rnd(st) - 0.5) * R * 0.12;
+  let orbit = C + ax * cos(th) * R + ay * (sin(th) * R * flat + lift);
+  let e = smoothstep(0.0, 0.55, age);
+  let pos = mix(E.pos + vec2f(0.0, -220.0) * age, orbit, e);
+  let vel = (-ax * sin(th) + ay * cos(th) * flat) * R * w;
+  // the far side of the ring is dimmer, the near side brighter
+  let depth = 0.6 + 0.4 * sin(th);
+  let bright = (0.9 + 0.7 * rnd(st)) * (0.8 + 0.5 * E.vn) * mix(1.0, depth, e);
+  var star = 0.0;
+  if (rnd(st) < 0.015 * PP.stars) { star = 1.0; }
+  let col = mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix);
+  return finishP(pos, vel, age, plife, bright, star, col, st);
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let id = gid.x;
@@ -85,6 +225,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var star = 0.0;
   var col: vec3f;
 
+  if (E.kind > 1.5) {
+    var p: Particle;
+    if (E.kind < 2.5) { p = fountain(E, k, t, &st); }
+    else if (E.kind < 3.5) { p = spray(E, k, t, &st); }
+    else { p = vortex(E, k, t, &st); }
+    parts[id] = p;
+    return;
+  }
   if (E.kind < 0.5) {
     // stream: an invisible emitter rises from the hit point and sheds particles along its path
     let total = E.rate * E.life / 1.7;
