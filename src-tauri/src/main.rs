@@ -17,6 +17,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             write_text_file,
             media::read_text_file,
+            media::read_file_bytes,
             media::allow_media,
             media::converter_ready,
             media::convert_video

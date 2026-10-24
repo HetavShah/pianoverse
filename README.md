@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2011-0B0D10?style=flat&logo=windows&logoColor=2FD3B5" alt="Windows 11">
   <img src="https://img.shields.io/badge/GPU-WebGPU%20%2B%20WGSL-0B0D10?style=flat&logoColor=2FD3B5" alt="WebGPU">
   <img src="https://img.shields.io/badge/shell-Tauri%202-0B0D10?style=flat&logo=tauri&logoColor=2FD3B5" alt="Tauri 2">
-  <img src="https://img.shields.io/badge/status-Milestone%202-2FD3B5?style=flat" alt="Milestone 2">
+  <img src="https://img.shields.io/badge/status-Milestone%203-2FD3B5?style=flat" alt="Milestone 3">
 </p>
 
 <h3 align="center">Film yourself playing. Pianoverse makes the music visible.</h3>
@@ -101,7 +101,7 @@ A few ideas that make it work:
 
 - [x] **Milestone 1 — Engine prototype.** GPU renderer reproduces the approved look on the sample video, live.
 - [x] **Milestone 2 — Calibration and tracking.** Mark four corners on any frame, built-in keyboard tracker (drift-free, sub-pixel), manual fixes that blend into neighbouring frames, any keyboard size from 25 to 88 keys.
-- [ ] **Milestone 3 — Notes and sync.** MIDI import, automatic alignment, note detection from audio.
+- [x] **Milestone 3 — Notes and sync.** MIDI import (tempo maps, velocities), automatic alignment to the video's audio within a few milliseconds, sync strip with nudging, note detection from audio with Spotify's basic-pitch for videos without MIDI.
 - [ ] **Milestone 4 — Style panels and presets.** Every setting live, including the electric-arc saber; save and share looks.
 - [ ] **Milestone 5 — Export.** Full-quality render with NVENC hardware encoding.
 - [ ] **Milestone 6 — Polish.** Installer, autosave, undo, speed tuning.
@@ -116,7 +116,7 @@ A few ideas that make it work:
 2. Click **Choose files…** and pick `samples/interstellar-take1.mp4` and `samples/interstellar-take1.pvproj.json` together (or drop them on the window).
 3. Press **Space** to play.
 
-**Your own video:** choose just the video and click **Set up this video**. Drag the four handles onto the corners of the keys, pick **Moved** and **Track keyboard** if the camera wasn't fixed, then switch to **Preview**. If the keyboard runs steeply across the frame, notes tilt automatically so every key keeps its own lane; the **Note angle** slider sets it by hand. Until MIDI import lands, a sweep across every key shows where notes will fall. **Save project…** keeps the setup for next time.
+**Your own video:** choose just the video and click **Set up this video**. Drag the four handles onto the corners of the keys, pick **Moved** and **Track keyboard** if the camera wasn't fixed, then switch to **Preview**. If the keyboard runs steeply across the frame, notes tilt automatically so every key keeps its own lane; the **Note angle** slider sets it by hand. Then open the **Notes** tab: **Import MIDI file…** (it lines itself up with the video's sound) or **Detect notes from audio** if you have no MIDI. **Save project…** keeps everything for next time.
 
 | Key | Action |
 | --- | --- |
@@ -151,6 +151,9 @@ src/
     geometry.ts              homographies
     tracker.ts               keyboard tracker (pyramidal Lucas-Kanade + RANSAC)
     calibration.ts           presets, smoothing, fixes, per-frame keyboard pose
+    notes.ts                 MIDI import, note sources and offsets
+    sync.ts                  automatic alignment (onset envelope + overlap-normalised correlation)
+    detect.ts                note detection from audio (basic-pitch, loaded on demand)
     project.ts               project file, notes, keyboard geometry
     renderer.ts              per-frame scene building and GPU passes
     shaders/
@@ -180,7 +183,7 @@ docs/images/                 README images
 | Interface | React + TypeScript, Vite |
 | Renderer | WebGPU with WGSL shaders |
 | Tracking | Built-in: pyramidal Lucas-Kanade against the marked frame + RANSAC homography, in a Web Worker |
-| Notes | MIDI, or detected from audio |
+| Notes | MIDI via @tonejs/midi, or detected from audio with Spotify basic-pitch (TensorFlow.js) |
 
 </details>
 

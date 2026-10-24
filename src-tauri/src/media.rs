@@ -49,6 +49,16 @@ pub fn allow_media(app: AppHandle, path: String) -> Result<(), String> {
     app.asset_protocol_scope().allow_file(&path).map_err(|e| e.to_string())
 }
 
+/// Raw bytes of a small file the user picked (MIDI files).
+#[tauri::command]
+pub fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
+    let meta = std::fs::metadata(&path).map_err(|e| format!("Could not open {path}: {e}"))?;
+    if meta.len() > 64 * 1024 * 1024 {
+        return Err(format!("{path} is too large to be a MIDI file"));
+    }
+    std::fs::read(&path).map(tauri::ipc::Response::new).map_err(|e| format!("Could not read {path}: {e}"))
+}
+
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("Could not read {path}: {e}"))

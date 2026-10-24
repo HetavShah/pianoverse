@@ -12,6 +12,8 @@ export interface ProjectFile {
   notes: RawNote[];
   /** appearance settings saved with the project */
   look?: { noteAngle?: number | null };
+  /** where the notes came from and how they are lined up with the video */
+  noteSource?: import('./notes').NoteSource;
 }
 
 export type RGB = [number, number, number]; // 0..1

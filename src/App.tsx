@@ -7,25 +7,16 @@ import CalibrateCanvas from './ui/CalibrateCanvas';
 import CalibratePanel, { QualityStrip } from './ui/CalibratePanel';
 import { calibrationFromTracking, newProject, useCalibration } from './ui/useCalibration';
 import { saveProject } from './ui/saveProject';
-import { ConvertProgress, convertVideo, inTauri, onNativeDrop, openFiles, Picked, PickedVideo, pickNative } from './ui/media';
+import { ConvertProgress, convertVideo, inTauri, onNativeDrop, openFiles, Picked, PickedVideo, PickKind, pickNative } from './ui/media';
+import NotesPanel, { SyncStrip } from './ui/NotesPanel';
+import PickButton from './ui/PickButton';
+import { sourceOf, useNotes } from './ui/useNotes';
 
 type VideoIssue =
   | { kind: 'unsupported' }
   | { kind: 'converting'; progress: ConvertProgress | null }
   | { kind: 'error'; message: string };
 
-/** A file-open control: the native dialog in the desktop app, a file input in a browser. */
-function PickButton(props: { what: 'video' | 'project' | 'any'; className: string; children: React.ReactNode; onPick: (what: 'video' | 'project' | 'any') => void; onFiles: (f: FileList | null) => void }) {
-  const { what, className, children, onPick, onFiles } = props;
-  if (inTauri()) return <button type="button" className={className} onClick={() => onPick(what)}>{children}</button>;
-  const accept = what === 'video' ? 'video/*,.mp4,.mov,.webm,.mkv' : what === 'project' ? '.json,application/json' : 'video/*,.mp4,.mov,.webm,.mkv,.json,application/json';
-  return (
-    <label className={className}>
-      {children}
-      <input type="file" multiple={what === 'any'} accept={accept} hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
-    </label>
-  );
-}
 
 const LAYER_LABELS: [keyof Layers, string][] = [
   ['notes', 'Notes'],
@@ -36,7 +27,7 @@ const LAYER_LABELS: [keyof Layers, string][] = [
   ['bloom', 'Bloom'],
 ];
 
-type Mode = 'calibrate' | 'preview';
+type Mode = 'calibrate' | 'notes' | 'preview';
 
 function fmt(t: number) {
   if (!isFinite(t)) return '0:00.0';
@@ -76,6 +67,7 @@ export default function App() {
   const [videoIssue, setVideoIssue] = useState<VideoIssue | null>(null);
 
   const calib = useCalibration({ project, setProject, time, videoUrl });
+  const notesApi = useNotes({ project, setProject, videoUrl });
   // test hook: lets automated checks read the current project
   useEffect(() => { (window as unknown as { pianoverseProject: unknown }).pianoverseProject = project; }, [project]);
 
@@ -118,16 +110,18 @@ export default function App() {
   }, []);
 
   const redraw = useCallback((t?: number) => {
-    if (mode === 'preview') draw(t);
+    if (mode !== 'calibrate') draw(t);
     else setFrameTick((k) => k + 1);
   }, [mode, draw]);
 
   // keep renderer in sync with project, quality and layers (only while previewing; calibration edits are cheap to skip)
   useEffect(() => {
-    if (mode === 'preview' && renderProject && rendererRef.current) { rendererRef.current.setProject(renderProject); draw(); }
+    if (mode !== 'calibrate' && renderProject && rendererRef.current) { rendererRef.current.setProject(renderProject); draw(); }
   }, [renderProject, gpuName, draw, mode]);
-  useEffect(() => { rendererRef.current?.setScale(scale); if (mode === 'preview') draw(); }, [scale, gpuName, draw, mode]);
-  useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (mode === 'preview') draw(); } }, [layers, draw, mode]);
+  useEffect(() => { rendererRef.current?.setScale(scale); if (mode !== 'calibrate') draw(); }, [scale, gpuName, draw, mode]);
+  useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (mode !== 'calibrate') draw(); } }, [layers, draw, mode]);
+  // the sync strip needs the soundtrack
+  useEffect(() => { if (mode === 'notes') notesApi.prepareAudio(); }, [mode, notesApi.prepareAudio]);
 
   // render every decoded video frame while playing
   useEffect(() => {
@@ -205,7 +199,11 @@ export default function App() {
     const hasProject = items.some((i) => i.kind === 'project');
     for (const i of items) {
       if (i.kind === 'project') applyProjectText(i.text);
-      else loadVideo(i, !hasProject);
+      else if (i.kind === 'midi') {
+        if (!project) { alert('Open the video first, then its MIDI file.'); continue; }
+        setMode('notes');
+        notesApi.importMidi(i);
+      } else loadVideo(i, !hasProject);
     }
   };
   const openItemsRef = useRef(openItems);
@@ -214,7 +212,7 @@ export default function App() {
   const onFiles = (files: FileList | null | undefined) => {
     if (files?.length) openFiles(Array.from(files)).then(openItems);
   };
-  const pick = (what: 'video' | 'project' | 'any') => {
+  const pick = (what: PickKind) => {
     pickNative(what).then(openItems).catch((e) => alert(String(e?.message ?? e)));
   };
 
@@ -281,6 +279,7 @@ export default function App() {
         {ready && (
           <div className="seg modes" role="tablist" aria-label="Mode">
             <button type="button" role="tab" aria-selected={mode === 'calibrate'} className={mode === 'calibrate' ? 'on' : ''} onClick={enterCalibrate}>Calibrate</button>
+            <button type="button" role="tab" aria-selected={mode === 'notes'} className={mode === 'notes' ? 'on' : ''} onClick={() => setMode('notes')} disabled={calib.track.kind === 'running'}>Notes</button>
             <button type="button" role="tab" aria-selected={mode === 'preview'} className={mode === 'preview' ? 'on' : ''} onClick={() => setMode('preview')} disabled={calib.track.kind === 'running'}>Preview</button>
           </div>
         )}
@@ -295,6 +294,8 @@ export default function App() {
       <div className="body">
         {calibrating && project ? (
           <CalibratePanel project={project} c={calib} sweep={sweep} setSweep={setSweep} seek={seek} onDone={() => setMode('preview')} />
+        ) : ready && mode === 'notes' && project ? (
+          <NotesPanel project={project} n={notesApi} onPick={pick} onFiles={onFiles} goCalibrate={enterCalibrate} />
         ) : (
           <nav className="layers" aria-label="Layers">
             <span className="section-label">Layers</span>
@@ -341,7 +342,7 @@ export default function App() {
               <>
                 <span className="section-label">Notes</span>
                 {noNotes ? (
-                  <p className="help">No notes yet, so a sweep across every key is shown. MIDI import comes in the next milestone.</p>
+                  <p className="help">No notes yet, so a sweep across every key is shown. Add notes in the <b>Notes</b> tab.</p>
                 ) : (
                   <label className="layer">
                     <input type="checkbox" checked={sweep} onChange={(e) => setSweep(e.target.checked)} />
@@ -406,7 +407,7 @@ export default function App() {
               )}
             </div>
           )}
-          <canvas ref={canvasRef} className="preview" style={{ visibility: ready && mode === 'preview' && !videoIssue ? 'visible' : 'hidden' }} />
+          <canvas ref={canvasRef} className="preview" style={{ visibility: ready && mode !== 'calibrate' && !videoIssue ? 'visible' : 'hidden' }} />
           {calibrating && !videoIssue && project && calib.corners && (
             <CalibrateCanvas
               video={videoRef.current}
@@ -424,8 +425,8 @@ export default function App() {
               onEdge={calib.onEdge}
             />
           )}
-          {showStats && mode === 'preview' && <div className="stats">{fps} fps · {stats}</div>}
-          {ready && mode === 'preview' && (noNotes || sweep) && <div className="badge">Key sweep · test notes</div>}
+          {showStats && mode !== 'calibrate' && <div className="stats">{fps} fps · {stats}</div>}
+          {ready && mode !== 'calibrate' && (noNotes || sweep) && <div className="badge">Key sweep · test notes</div>}
         </main>
       </div>
 
@@ -438,6 +439,17 @@ export default function App() {
         <span className="time">{fmt(time)} <span className="dim">/ {fmt(duration)}</span></span>
         <div className="scrub-wrap">
           {calibrating && project && <QualityStrip project={project} duration={duration} onSeek={seek} />}
+          {ready && mode === 'notes' && project && (
+            <SyncStrip
+              envelope={notesApi.audio?.envelope ?? null}
+              notes={project.notes}
+              time={time}
+              lowest={project.keyboard.lowestNote}
+              keys={project.keyboard.keys}
+              onSlide={(d, final) => { const src = sourceOf(project); if (final && src) notesApi.setOffset(src.offset + d); }}
+              onSeek={seek}
+            />
+          )}
           <input
             className="scrub" type="range" min={0} max={duration || 1} step={0.001} value={time}
             onChange={(e) => seek(Number(e.target.value))} disabled={!ready} aria-label="Timeline"
