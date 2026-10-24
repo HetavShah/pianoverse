@@ -41,6 +41,8 @@ export interface ParticleScene {
   shape: string; // built-in name or 'user:<id>' SVG
   size: number; // x the default size
   dir: 'cw' | 'ccw';
+  /** notes in the section also send the usual particles (default on) */
+  keep?: boolean;
 }
 
 export type RGB = [number, number, number]; // 0..1

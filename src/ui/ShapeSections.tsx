@@ -41,7 +41,7 @@ export default function ShapeSections(props: {
   return (
     <div className="ctl-section">
       <span className="section-label">Shape sections</span>
-      <p className="help">Notes played inside a section send sparks that trace a shape. Outside, the particles below play as usual.</p>
+      <p className="help">Notes played inside a section also send sparks that trace a shape. The particle style below plays everywhere.</p>
       {scenes.length > 0 && (
         <div className="sec-list">
           {scenes.map((s) => (
@@ -77,6 +77,10 @@ export default function ShapeSections(props: {
               <button type="button" className={sel.dir === 'ccw' ? 'on' : ''} onClick={() => edit({ dir: 'ccw' })}>Anticlockwise</button>
             </div>
           </div>
+          <label className="toggle-row compact ctl">
+            <span>Keep the normal particles too</span>
+            <input type="checkbox" checked={sel.keep !== false} onChange={(e) => edit({ keep: e.target.checked })} />
+          </label>
           <button type="button" className="btn small ghost danger-text" onClick={() => { setScenes(scenes.filter((s) => s.id !== sel.id)); setSelected(null); }}>Remove this section</button>
         </div>
       )}
