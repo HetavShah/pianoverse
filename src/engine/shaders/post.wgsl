@@ -66,6 +66,7 @@ struct BG {
   iOpacity: f32, iScale: f32, iX: f32, iY: f32,
   iRot: f32, iBright: f32, iContrast: f32, iHue: f32,
   iSat: f32, iAspect: f32, xform: f32, on: f32,
+  alphaOut: f32, q1: f32, q2: f32, q3: f32,
 };
 @group(1) @binding(8) var<uniform> BGU: BG;
 
@@ -160,6 +161,11 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
     base = mix(background(i.uv), base, inside * BGU.fOpacity);
   }
   let Lc = 0.98 * (vec3f(1.0) - exp(-light * 1.545));   // soft knee: light never burns the hands out
+  if (BGU.alphaOut > 0.5) {
+    // effects only, on a transparent background: over the original video this gives light + video * (1 - alpha)
+    let a = clamp(max(max(max(Lc.r, Lc.g), Lc.b), clamp(L.a, 0.0, 0.8)), 0.0, 1.0);
+    return vec4f(select(vec3f(0.0), clamp(Lc / max(a, 1e-4), vec3f(0.0), vec3f(1.0)), a > 1e-4), a);
+  }
   var out = base + Lc * (vec3f(1.0) - base * 0.55);
 
   let l = clamp(dot(out, vec3f(0.333)), 0.0, 1.0);

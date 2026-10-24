@@ -29,6 +29,8 @@ export interface ProjectFile {
   look?: Partial<import('./look').Look>;
   /** the preset the look started from */
   presetId?: string;
+  /** export choices (size, format, where to save) */
+  exportSettings?: Partial<import('../ui/exportRun').ExportSettings>;
   /** sections of the video where particles trace a shape instead of the normal particle style */
   particleScenes?: ParticleScene[];
   /** where the notes came from and how they are lined up with the video */

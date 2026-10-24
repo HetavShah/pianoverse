@@ -35,13 +35,13 @@ fn ffmpeg_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 #[cfg(windows)]
-fn hide_window(cmd: &mut Command) {
+pub(crate) fn hide_window(cmd: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
 #[cfg(not(windows))]
-fn hide_window(_cmd: &mut Command) {}
+pub(crate) fn hide_window(_cmd: &mut Command) {}
 
 /// Let the WebView read a file the user picked (asset protocol scope).
 #[tauri::command]
@@ -69,7 +69,7 @@ pub fn converter_ready(app: AppHandle) -> Result<bool, String> {
     Ok(ffmpeg_path(&app)?.exists())
 }
 
-async fn ensure_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) async fn ensure_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
     let exe = ffmpeg_path(app)?;
     if exe.exists() {
         return Ok(exe);

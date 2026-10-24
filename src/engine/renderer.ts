@@ -153,6 +153,8 @@ export class Renderer {
   private tex: TexSet;
   private texWant = '';
   private texLoad: Promise<void> = Promise.resolve();
+  /** export: effects only, with transparency (for editing programs) */
+  alphaOut = false;
   /** reads the user's own textures (set by the app) */
   userFiles: UserFiles | null = null;
 
@@ -193,7 +195,7 @@ export class Renderer {
     this.texSampler = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
     this.texUni = buf(48, U.UNIFORM | U.COPY_DST);
     this.noteUni = buf(144, U.UNIFORM | U.COPY_DST);
-    this.bgUni = buf(112, U.UNIFORM | U.COPY_DST);
+    this.bgUni = buf(128, U.UNIFORM | U.COPY_DST);
     this.bgTex = d.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
     this.tex = placeholder(d);
     this.glassBuf = buf(MAX_GLASS * 64, U.VERTEX | U.COPY_DST);
@@ -863,7 +865,8 @@ export class Renderer {
       c[0], c[1], c[2], img ? 1 : 0,
       lk.bgImgOpacity, lk.bgImgScale, lk.bgImgX, lk.bgImgY,
       lk.bgImgRot * rad, lk.bgImgBright, lk.bgImgContrast, lk.bgImgHue * rad,
-      lk.bgImgSat, this.bgAspect, xform ? 1 : 0, active ? 1 : 0,
+      lk.bgImgSat, this.bgAspect, xform ? 1 : 0, active || this.alphaOut ? 1 : 0,
+      this.alphaOut ? 1 : 0, 0, 0, 0,
     ]);
   }
 

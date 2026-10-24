@@ -1,6 +1,7 @@
 // Hide the console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod export;
 mod media;
 mod projects;
 mod textures;
@@ -16,6 +17,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(export::ExportState::default())
         .invoke_handler(tauri::generate_handler![
             write_text_file,
             media::read_text_file,
@@ -23,6 +25,15 @@ fn main() {
             media::allow_media,
             media::converter_ready,
             media::convert_video,
+            export::export_encoders,
+            export::export_start,
+            export::export_frame,
+            export::export_finish,
+            export::export_cancel,
+            export::export_default_dir,
+            export::file_exists_any,
+            export::write_file_bytes,
+            export::show_in_folder,
             textures::import_texture,
             textures::list_textures,
             textures::delete_texture,

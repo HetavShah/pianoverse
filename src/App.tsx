@@ -16,6 +16,7 @@ import ImportStep from './ui/steps/ImportStep';
 import NotesStep from './ui/steps/NotesStep';
 import CalibrateStep from './ui/steps/CalibrateStep';
 import StyleStep from './ui/steps/StyleStep';
+import ExportStep from './ui/steps/ExportStep';
 
 type RVFCVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
@@ -355,7 +356,7 @@ export default function App() {
   };
 
   const goStep = (s: Step) => {
-    if (s === 'export') return;
+    if (s === 'export') pause();
     if (s === 'calibrate' && project && !project.calibration) setProjectState({ ...project, calibration: calibrationFromTracking(project, time) });
     if (s === 'calibrate') pause();
     setStep(s);
@@ -363,6 +364,8 @@ export default function App() {
   const goHome = () => { pause(); setRoute('home'); setHomeKey((k) => k + 1); };
   const newProjectFlow = () => { lastThumb.current = undefined; pause(); setProjectState(null); setVideo(null); setVideoIssue(null); setDuration(0); setTime(0); setRoute('project'); setStep('import'); };
 
+  // test hook: lets automated checks pick a part of the timeline
+  (window as unknown as { pianoverseSetLoop: unknown }).pianoverseSetLoop = setLoop;
   const ws: WS = {
     project, setProject, video, videoEl: videoRef, videoIssue, convert,
     time, duration, playing, togglePlay, seek, frameTick,
@@ -384,10 +387,10 @@ export default function App() {
           <nav className="stepper" aria-label="Steps">
             {STEPS.map((s, i) => {
               const done = doneStep(s.id);
-              const disabled = s.id === 'export' || (s.id !== 'import' && !ready);
+              const disabled = s.id !== 'import' && !ready;
               return (
                 <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done ? ' done' : '')} disabled={disabled}
-                  onClick={() => goStep(s.id)} title={s.id === 'export' ? 'Export arrives in Milestone 5' : undefined}>
+                  onClick={() => goStep(s.id)}>
                   <span className="dot">{done && step !== s.id ? '✓' : i + 1}</span>{s.label}
                 </button>
               );
@@ -421,6 +424,9 @@ export default function App() {
         {route === 'project' && step === 'style' && ready && (gpuError
           ? <div className="notice">This window can't use the graphics card: {gpuError}</div>
           : <StyleStep ws={ws} attachPreview={attachPreview} fps={fps} stats={showStats ? `${fps} fps · ${stats}` : ''} />)}
+        {route === 'project' && step === 'export' && ready && (gpuError
+          ? <div className="notice">This window can't use the graphics card: {gpuError}</div>
+          : <ExportStep ws={ws} />)}
       </div>
 
       <video
