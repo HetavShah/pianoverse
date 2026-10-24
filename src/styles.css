@@ -355,3 +355,5 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .wheel-lab { color: var(--dim); font-size: 11.5px; }
 .wheel-exact { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); cursor: pointer; }
 .wheel-exact input[type=color] { width: 26px; height: 20px; border: 1px solid var(--border2); border-radius: 5px; background: none; padding: 0; cursor: pointer; }
+.ctl.toggle-row { flex-direction: row; align-items: center; justify-content: space-between; }
+.ctl.toggle-row > span { font-size: 13px; }

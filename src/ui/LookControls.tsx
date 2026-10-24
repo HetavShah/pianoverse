@@ -25,8 +25,8 @@ function TexturePicker({ look, patch }: { look: Look; patch: Patch }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const base = import.meta.env.BASE_URL ?? '/';
-  const current = look.noteStyle === 'texture' ? look.noteTexture : 'glass';
-  const pick = (id: string) => patch(id === 'glass' ? { noteStyle: 'glass' } : { noteStyle: 'texture', noteTexture: id });
+  const current = look.noteTexture;
+  const pick = (id: string) => patch({ noteTexture: id, texOn: true });
   const upload = async () => {
     setErr(''); setBusy(true);
     try {
@@ -39,9 +39,6 @@ function TexturePicker({ look, patch }: { look: Look; patch: Patch }) {
   return (
     <div className="ctl">
       <div className="tex-grid">
-        <button type="button" className={'tex' + (current === 'glass' ? ' on' : '')} onClick={() => pick('glass')} title="The original glass notes">
-          <img src={`${base}textures/glass/thumb.jpg`} alt="" /><span>Glass</span>
-        </button>
         {NOTE_TEXTURES.map((t) => (
           <button key={t.id} type="button" className={'tex' + (current === t.id ? ' on' : '')} onClick={() => pick(t.id)} title={t.credit}>
             <img src={`${base}textures/${t.id}/thumb.jpg`} alt="" /><span>{t.label}</span>
@@ -51,7 +48,7 @@ function TexturePicker({ look, patch }: { look: Look; patch: Patch }) {
           <div key={t.id} className={'tex mine' + (current === 'user:' + t.id ? ' on' : '')} title={t.name + (t.files.normal ? ' · with normal map' : '')}>
             <button type="button" className="tex-pick" onClick={() => pick('user:' + t.id)}><UserThumb t={t} /><span>{t.name}</span></button>
             <button type="button" className="tex-del" aria-label={`Remove ${t.name}`} title="Remove from your textures"
-              onClick={async () => { if (current === 'user:' + t.id) pick('glass'); await deleteTexture(t.id); }}>×</button>
+              onClick={async () => { if (current === 'user:' + t.id) pick(NOTE_TEXTURES[0].id); await deleteTexture(t.id); }}>×</button>
           </div>
         ))}
         <button type="button" className="tex add" onClick={upload} disabled={busy} title="Use your own image. Picking a *_Color file from ambientCG or Poly Haven also brings in its normal and roughness maps.">
@@ -154,15 +151,6 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
           ))}
         </div>
       );
-    case 'material': {
-      const solid = look.noteStyle === 'flat';
-      return (
-        <div className="seg full">
-          <button type="button" className={solid ? 'on' : ''} onClick={() => patch({ noteStyle: 'flat' })}>Solid colour</button>
-          <button type="button" className={!solid ? 'on' : ''} onClick={() => { if (solid) patch({ noteStyle: 'glass' }); }}>Texture</button>
-        </div>
-      );
-    }
     case 'texture':
       return <TexturePicker look={look} patch={patch} />;
     case 'select':
@@ -191,7 +179,7 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
       return (
         <label className="ctl">
           <span>{c.label}</span>
-          <select value={String(v)} onChange={(e) => set(c.key, e.target.value)}>{c.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+          <select value={String(v)} onChange={(e) => set(c.key, typeof v === 'number' ? Number(e.target.value) : e.target.value)}>{c.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
         </label>
       );
   }

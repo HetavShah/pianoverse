@@ -46,7 +46,7 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
   const importMidi = useCallback((m: PickedMidi) => run(async () => {
     const info = parseMidi(m.data, m.name);
     if (!info.notes.length) throw new Error(`${m.name} has no notes${info.skippedDrums ? ' (only drums)' : ''}.`);
-    let src: NoteSource = { kind: 'midi', name: m.name, notes: info.notes, offset: 0, sustain: info.sustain };
+    let src: NoteSource = { kind: 'midi', name: m.name, notes: info.notes, offset: 0, sustain: info.sustain, bars: info.bars, tracks: info.tracks, channels: info.channels };
     const p0 = latest.current;
     if (p0) setProject(withSource(p0, src));
     const a = await getAudio();

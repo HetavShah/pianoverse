@@ -1,8 +1,9 @@
 // WebGPU renderer: video frame + glass notes + saber + key glow + impact sprites + particle plumes + bloom.
 import commonSrc from './shaders/common.wgsl?raw';
 import { fallUp } from './direction';
-import { DEFAULT_LOOK, Look, NOTE_SHAPES, NOTE_STYLES, resolveLook, saberBase } from './look';
+import { DEFAULT_LOOK, Look, NOTE_2D, NOTE_3D, resolveLook, saberBase } from './look';
 import glassSrc from './shaders/glass.wgsl?raw';
+import labelsSrc from './shaders/labels.wgsl?raw';
 import { loadTexSet, placeholder, TexSet, UserFiles } from './noteTextures';
 import keysSrc from './shaders/keys.wgsl?raw';
 import spritesSrc from './shaders/sprites.wgsl?raw';
@@ -41,6 +42,37 @@ const additive: GPUBlendState = {
   color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
   alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
 };
+
+const hexRGB = (h: string): [number, number, number] => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(h.trim());
+  const n = m ? parseInt(m[1], 16) : 0xffffff;
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+};
+
+const SHARP_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+const FLAT_NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+/** note names, sharp spellings in cells 0-11 and flat spellings in 12-23 (64 px cells, 6 x 4) */
+function makeAtlas(d: GPUDevice): GPUTexture {
+  const C = 64, W = C * 6, H = C * 4;
+  const tex = d.createTexture({ size: [W, H], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+  try {
+    const cv = new OffscreenCanvas(W, H);
+    const g = cv.getContext('2d')!;
+    g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    [...SHARP_NAMES, ...FLAT_NAMES].forEach((name, i) => {
+      g.font = `600 ${name.length > 1 ? 34 : 40}px "Segoe UI", "Segoe UI Symbol", "DejaVu Sans", sans-serif`;
+      g.fillText(name, (i % 6) * C + C / 2, Math.floor(i / 6) * C + C / 2 + 2);
+    });
+    d.queue.copyExternalImageToTexture({ source: cv }, { texture: tex }, [W, H]);
+  } catch (e) { console.warn('[labels]', e); }
+  return tex;
+}
+const FLAT_KEYS = { major: [5, 10, 3, 8, 1, 6], minor: [2, 7, 0, 5, 10, 3] };
+
+/** notes drawn by the original approved glass code (anything else goes through the style shader) */
+const originalNotes = (lk: Look) => lk.noteDim === '3d' && lk.note3d === 'glass' && !lk.texOn && lk.noteEdge === 1 && lk.noteOpacity === 1
+  && lk.lightDir === DEFAULT_LOOK.lightDir && lk.lightPower === 1 && lk.lightShine === 1 && lk.noteDistort === 0;
 
 export class Renderer {
   layers: Layers = { ...DEFAULT_LAYERS };
@@ -83,6 +115,10 @@ export class Renderer {
 
   private glassPipe: GPURenderPipeline;
   private keysPipe: GPURenderPipeline;
+  private labelPipe: GPURenderPipeline;
+  private labelBuf: GPUBuffer;
+  private atlas: GPUTexture;
+  private bars: number[] = [];
   private spritePipe: GPURenderPipeline;
   private saberPipe: GPURenderPipeline;
   private partPipe: GPURenderPipeline;
@@ -96,6 +132,7 @@ export class Renderer {
   // note texture (the Texture note style)
   private texSampler: GPUSampler;
   private texUni: GPUBuffer;
+  private noteUni: GPUBuffer;
   private tex: TexSet;
   private texWant = '';
   private texLoad: Promise<void> = Promise.resolve();
@@ -138,10 +175,13 @@ export class Renderer {
     this.frameBuf = buf(192, U.UNIFORM | U.COPY_DST);
     this.texSampler = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
     this.texUni = buf(48, U.UNIFORM | U.COPY_DST);
+    this.noteUni = buf(144, U.UNIFORM | U.COPY_DST);
     this.tex = placeholder(d);
     this.glassBuf = buf(MAX_GLASS * 48, U.VERTEX | U.COPY_DST);
     this.keysBuf = buf(MAX_KEYS * 6 * 28, U.VERTEX | U.COPY_DST);
     this.spriteBuf = buf(MAX_SPRITES * 48, U.VERTEX | U.COPY_DST);
+    this.labelBuf = buf(MAX_GLASS * 48, U.VERTEX | U.COPY_DST);
+    this.atlas = makeAtlas(d);
     this.saberUni = buf(48, U.UNIFORM | U.COPY_DST);
     this.saberMap = buf(64 * 8, U.STORAGE | U.COPY_DST);
     this.heatBuf = buf(40 * 16, U.STORAGE | U.COPY_DST);
@@ -185,6 +225,13 @@ export class Renderer {
       fragment: { module: keysM, entryPoint: 'fs', targets: lightTarget },
       primitive: { topology: 'triangle-list' },
     });
+    const labelsM = mod(labelsSrc);
+    this.labelPipe = d.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module: labelsM, entryPoint: 'vs', buffers: [inst3] },
+      fragment: { module: labelsM, entryPoint: 'fs', targets: lightTarget },
+      primitive: { topology: 'triangle-strip' },
+    });
     const spritesM = mod(spritesSrc);
     this.spritePipe = d.createRenderPipeline({
       layout: 'auto',
@@ -225,6 +272,8 @@ export class Renderer {
     this.whiteKeys = proj.keyboard.whiteKeys;
     this.kb = new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b);
     this.look = resolveLook(proj.look);
+    const ns = proj.noteSource;
+    this.bars = ns?.bars ? ns.bars.map((b) => b + ns.offset) : [];
     this.notes = prepareNotes(proj.notes, proj.keyboard.lowestNote, proj.keyboard.keys, this.look);
     this.up = fallUp(proj);
     this.buildEmitters();
@@ -342,6 +391,7 @@ export class Renderer {
     this.uploadSource(source);
 
     const glass: number[] = [];
+    const labels: number[] = [];
     const keys: number[] = [];
     const sprites: number[] = [];
     const lights: number[] = [];
@@ -370,6 +420,9 @@ export class Renderer {
     };
     const scaleC = (c: RGB, k: number): RGB => [c[0] * k, c[1] * k, c[2] * k];
 
+    const flatNames = lk.labelAccidental === 'flat' || (lk.labelAccidental === 'auto' && FLAT_KEYS[lk.labelQuality].includes(lk.labelKey));
+    const midX = this.whiteKeys / 2;
+    const distC = kb.P(midX, kb.edgeY(midX));
     // notes in a window around t (sorted by start)
     const lo = this.lowerBound(this.notes, t - 12);
     let visible = 0;
@@ -380,8 +433,10 @@ export class Renderer {
       const col = n.col;
       const vn = n.vn;
       const dd = n.s - t;
-      const w = Math.max(24, tg.unit * 1.05) * (lk.noteVelocity === 1 ? 0.9 + 0.2 * vn : 1 + (0.2 * vn - 0.1) * lk.noteVelocity) * lk.noteWidth;
-      const len0 = Math.min(300 * (FALL / 680), Math.max(w * 1.4, (n.e - n.s) * FALL * 0.8 - 8));
+      let w = Math.max(24, tg.unit * 1.05) * (lk.noteVelocity === 1 ? 0.9 + 0.2 * vn : 1 + (0.2 * vn - 0.1) * lk.noteVelocity) * lk.noteWidth;
+      if (lk.noteBWRatio !== 1 && kb.footprint(n.p).black) w /= lk.noteBWRatio;
+      const end = lk.noteSustain ? n.h : n.e;
+      const len0 = Math.min(300 * (FALL / 680) * (lk.noteSustain ? 4 : 1), Math.max(w * lk.noteMinLen, (end - n.s) * FALL * 0.8 - 8));
       const len = lk.noteLength === 1 ? len0 : Math.max(w * 0.6, len0 * lk.noteLength);
       // distances measured from the landing point back along the fall direction
       const sB = dd * FALL;
@@ -391,6 +446,19 @@ export class Renderer {
       if (L.notes && sT > 0 && sB < sMax + 40 && glass.length / 12 < MAX_GLASS) {
         const fade = lk.noteFade > 0 ? Math.min(1, Math.max(0, (sMax - sB + 60) / (220 * lk.noteFade))) : 1;
         glass.push(tg.x, tg.y, sB, sT, w, fade * (0.85 + 0.3 * vn * lk.noteVelocity), fade, U[0], col[0], col[1], col[2], U[1]);
+        if (lk.labels && sT - Math.max(sB, 0) > w * 0.75 && labels.length / 12 < MAX_GLASS) {
+          const sl = Math.max(sB, 0) + w * 0.7;
+          let lx = tg.x + U[0] * sl, ly = tg.y + U[1] * sl, half = w * 0.48 * lk.labelSize;
+          if (lk.noteDistort !== 0) {
+            const k = Math.min(4, Math.max(0.05, 1 + (lk.noteDistort * sl) / this.srcH));
+            const Nx = -U[1], Ny = U[0];
+            const lat = (tg.x - distC[0]) * Nx + (tg.y - distC[1]) * Ny;
+            lx += Nx * lat * (k - 1); ly += Ny * lat * (k - 1); half *= k;
+          }
+          const pc = ((n.p % 12) + 12) % 12;
+          const lc = lighten(col, 0.85);
+          labels.push(lx, ly, half, pc + (flatNames ? 12 : 0), U[0], U[1], 0, 0, lc[0], lc[1], lc[2], lk.labelOpacity * fade);
+        }
         visible++;
         if (sB <= 0 && L.impact) dot(tg.x, tg.y, tg.unit * 0.3 * lk.flashSize, scaleC(lighten(col, 0.6), 0.5 * lk.flashBright));
       }
@@ -431,12 +499,28 @@ export class Renderer {
     }
     bass = Math.min(1, bass);
 
+    // bar lines: one across the keyboard at the start of every bar
+    if (lk.barLines && L.notes && this.bars.length) {
+      const nK = this.whiteKeys;
+      const A = kb.P(-0.2, kb.edgeY(-0.2)), B = kb.P(nK + 0.2, kb.edgeY(nK + 0.2));
+      const th = 3, c = 1.1 * lk.barOpacity;
+      const sMaxBar = Math.hypot(this.srcW, this.srcH);
+      for (const b of this.bars) {
+        const s0 = (b - t) * FALL;
+        if (s0 < 0 || s0 > sMaxBar) continue;
+        if (keys.length / 42 >= MAX_KEYS) break;
+        const q = [[A[0] + U[0] * s0, A[1] + U[1] * s0], [B[0] + U[0] * s0, B[1] + U[1] * s0], [B[0] + U[0] * (s0 + th), B[1] + U[1] * (s0 + th)], [A[0] + U[0] * (s0 + th), A[1] + U[1] * (s0 + th)]];
+        const uv = [[0, 0], [1, 0], [1, 1], [0, 1]];
+        for (const i of [0, 1, 2, 0, 2, 3]) keys.push(q[i][0], q[i][1], uv[i][0] * 0.4 + 0.3, uv[i][1], c, c, c);
+      }
+    }
+
     // frame uniforms
     const sb = saberBase(lk);
     q.writeBuffer(this.frameBuf, 0, new Float32Array([
       this.srcW, this.srcH, this.rtW, this.rtH, this.scale, t, bass, Math.floor(t * 24),
       lk.noteBright, lk.noteGlow, lk.noteFill, lk.noteRim, lk.noteRound,
-      Math.max(0, NOTE_STYLES.findIndex((x) => x.id === lk.noteStyle)), Math.max(0, NOTE_SHAPES.findIndex((x) => x.id === lk.noteShape)), lk.noteDepth,
+      originalNotes(lk) ? 0 : 1, 0, lk.noteDepth,
       lk.saberBright, lk.saberThick, lk.saberFlicker, lk.saberReact, lk.saberTint, lk.noteOpacity, 0, 0,
       sb[0], sb[1], sb[2], 0,
       lk.partSize, lk.partHaze, 0, 0,
@@ -444,7 +528,9 @@ export class Renderer {
       lk.bassPulse, 0, 0, 0,
     ]));
     if (glass.length) q.writeBuffer(this.glassBuf, 0, new Float32Array(glass));
-    if (lk.noteStyle === 'texture') this.wantTexture(lk.noteTexture);
+    if (labels.length) q.writeBuffer(this.labelBuf, 0, new Float32Array(labels));
+    if (lk.texOn) this.wantTexture(lk.noteTexture);
+    q.writeBuffer(this.noteUni, 0, this.noteParams(lk));
     q.writeBuffer(this.texUni, 0, new Float32Array([['tint', 'natural', 'glow'].indexOf(lk.texMode), lk.texScale, lk.texRelief, lk.texShine, lk.texSolid, this.tex.size, this.tex.lo, this.tex.hi, this.tex.metal, this.tex.tile, lk.texReflect ? 1 : 0, lk.texLive]));
     if (keys.length) q.writeBuffer(this.keysBuf, 0, new Float32Array(keys));
     if (sprites.length) q.writeBuffer(this.spriteBuf, 0, new Float32Array(sprites));
@@ -515,10 +601,21 @@ export class Renderer {
           { binding: 2, resource: this.tex.normal.createView() },
           { binding: 3, resource: this.tex.rough.createView() },
           { binding: 4, resource: { buffer: this.texUni } },
+          { binding: 5, resource: { buffer: this.noteUni } },
         ],
       })));
       lp.setVertexBuffer(0, this.glassBuf);
       lp.draw(4, glass.length / 12);
+    }
+    if (labels.length) {
+      lp.setPipeline(this.labelPipe);
+      lp.setBindGroup(0, frameGroup('labels', this.labelPipe));
+      lp.setBindGroup(1, this.group('labels1', () => d.createBindGroup({
+        layout: this.labelPipe.getBindGroupLayout(1),
+        entries: [{ binding: 0, resource: this.atlas.createView() }, { binding: 1, resource: this.sampler }],
+      })));
+      lp.setVertexBuffer(0, this.labelBuf);
+      lp.draw(4, labels.length / 12);
     }
     if (L.saber && saberBox) {
       lp.setPipeline(this.saberPipe);
@@ -632,6 +729,29 @@ export class Renderer {
     return { width: w, height: h, data };
   }
 
+  /** the note style settings the shader reads (NoteParams in glass.wgsl) */
+  private noteParams(lk: Look): Float32Array {
+    const th = (lk.lightDir * Math.PI) / 180, el = (lk.lightHeight * Math.PI) / 2;
+    // the glass facets' light: exactly the original numbers at the default direction
+    const gl: [number, number] = lk.lightDir === DEFAULT_LOOK.lightDir ? [0.55, 0.85] : [-Math.cos(th) * 1.012, Math.sin(th) * 1.012];
+    const oc = hexRGB(lk.outlineColor);
+    const kb = this.kb;
+    const cx = this.whiteKeys / 2;
+    const C = kb.P(cx, kb.edgeY(cx));
+    const shape = lk.noteDim === '3d' ? NOTE_3D.findIndex((o) => o.id === lk.note3d) : NOTE_2D.findIndex((o) => o.id === lk.note2d);
+    return new Float32Array([
+      lk.noteDim === '3d' ? 1 : 0, Math.max(0, shape), lk.noteEdge, lk.noteDepth,
+      lk.noteOpacity, Math.cos(th) * Math.cos(el), -Math.sin(th) * Math.cos(el), Math.sin(el),
+      lk.lightPower, lk.lightShine, lk.outlineOn ? 1 : 0, lk.outlineWidth,
+      lk.outlineDepth, oc[0], oc[1], oc[2],
+      lk.texOn ? 1 : 0, lk.texReflectivity, gl[0], gl[1],
+      lk.texBright, lk.texContrast, (lk.texHue * Math.PI) / 180, lk.texSat,
+      lk.texMirror ? 1 : 0, lk.texOpacity, lk.texBlend, lk.texEmboss ? 1 : 0,
+      lk.texEmbossDepth, lk.texRgbOpacity, lk.texCutOn ? 1 : 0, lk.texCutThresh,
+      lk.texCutOpacity, lk.noteDistort, C[0], C[1],
+    ]);
+  }
+
   /** start loading a note texture if it isn't the one in use */
   private wantTexture(key: string) {
     if (!key || key === this.texWant) return;
@@ -652,7 +772,7 @@ export class Renderer {
 
   /** resolves once the current look's texture has loaded (for tests and export) */
   async texturesReady(): Promise<void> {
-    if (this.look.noteStyle === 'texture') this.wantTexture(this.look.noteTexture);
+    if (this.look.texOn) this.wantTexture(this.look.noteTexture);
     await this.texLoad;
   }
 
