@@ -1,4 +1,4 @@
-// In-app updates: on start, every 30 minutes, and when the version label is clicked, ask GitHub Releases
+// In-app updates: on start, every 5 minutes, on window focus, and when the version label is clicked, ask GitHub Releases
 // for a newer signed build and offer a one-click install. The result is always visible next to the version.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -63,9 +63,14 @@ export function VersionAndUpdates() {
 
   useEffect(() => {
     if (!inTauri()) return;
-    run();
-    const timer = window.setInterval(run, 30 * 60 * 1000);
-    return () => window.clearInterval(timer);
+    let last = 0;
+    const tick = () => { last = Date.now(); run(); };
+    tick();
+    // every 5 minutes, and whenever the window comes back into focus (at most once a minute)
+    const timer = window.setInterval(tick, 5 * 60 * 1000);
+    const onFocus = () => { if (Date.now() - last > 60 * 1000) tick(); };
+    window.addEventListener('focus', onFocus);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); };
   }, [run]);
 
   if (!version) return null;
