@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_LAYERS, Layers, Renderer } from './engine/renderer';
 import type { ProjectFile } from './engine/project';
+import { UpdateBanner, useAppVersion } from './updater';
 
 const LAYER_LABELS: [keyof Layers, string][] = [
   ['notes', 'Notes'],
@@ -40,6 +41,7 @@ export default function App() {
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState('');
   const frameTimes = useRef<number[]>([]);
+  const appVersion = useAppVersion();
 
   // GPU setup
   useEffect(() => {
@@ -158,6 +160,7 @@ export default function App() {
         <div className="brand">
           <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="none" stroke="#2FD3B5" strokeWidth="1.8" /><path d="M8 6.5v7M12 5v9M16 7.5v6" stroke="#2FD3B5" strokeWidth="1.8" strokeLinecap="round" /><path d="M5.5 17.5h13" stroke="#E8EAED" strokeWidth="1.8" strokeLinecap="round" /></svg>
           <span>Pianoverse</span>
+          {appVersion && <span className="version">v{appVersion}</span>}
         </div>
         <span className="project-name">{project?.name ?? 'No project open'}</span>
         <div className="open-buttons">
@@ -166,6 +169,7 @@ export default function App() {
             <input type="file" multiple accept="video/*,.mp4,.mov,.webm,.json,application/json" hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
           </label>
         </div>
+        <UpdateBanner />
         <span className="gpu">{gpuError ? 'WebGPU unavailable' : gpuName}</span>
       </header>
 

@@ -52,3 +52,7 @@ body { background: var(--bg); color: var(--text); font-family: Inter, 'Segoe UI'
 .step .what small { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn.primary { justify-content: center; height: 44px; background: var(--accent); color: var(--accent-ink); border: 0; font-weight: 600; font-size: 14px; }
 .btn.primary:hover { filter: brightness(1.08); }
+.version { font-size: 12px; font-weight: 500; color: var(--dim); font-family: 'Cascadia Mono', Consolas, monospace; }
+.update { display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 14px; border-radius: 10px; background: #10201d; border: 1px solid #23544b; font-size: 13px; }
+.update.error { border-color: #7a3b2e; background: #24130f; padding: 8px 14px; }
+.btn.small { height: 32px; font-size: 13px; padding: 0 12px; }

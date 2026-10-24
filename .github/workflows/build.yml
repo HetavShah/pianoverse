@@ -30,14 +30,25 @@ jobs:
 
       - run: npm ci
 
+      # Every build gets its own version (0.2.<build number>) so installed apps see it as an update.
+      - name: Set version from build number
+        shell: bash
+        run: |
+          V="0.2.${{ github.run_number }}"
+          node -e "const fs=require('fs');const f='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(f,'utf8'));c.version='$V';fs.writeFileSync(f,JSON.stringify(c,null,2))"
+          echo "Building Pianoverse $V"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
-          tagName: build-${{ github.run_number }}
-          releaseName: 'Pianoverse build ${{ github.run_number }} (v__VERSION__)'
+          tagName: v__VERSION__
+          releaseName: 'Pianoverse v__VERSION__'
           releaseBody: |
-            Download **Pianoverse_*_x64-setup.exe** below and run it.
-            Then click **Open video…** and **Open project data…** and pick the two files in `F:\Pianoverse\samples`.
+            Already have Pianoverse 0.2 or newer? It updates itself: click **Install and restart** in the top bar.
+            First install: download **Pianoverse_*_x64-setup.exe** below and run it.
           releaseDraft: false
-          prerelease: true
+          prerelease: false
+          includeUpdaterJson: true
