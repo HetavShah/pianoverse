@@ -135,7 +135,7 @@ npm run tauri dev     # desktop app with hot reload
 npm run build         # type-check + production web build
 ```
 
-Every push to `main` builds the Windows installer on GitHub Actions and publishes it as a pre-release.
+Every push to `main` builds a signed Windows installer on GitHub Actions and publishes it as a release; installed copies of Pianoverse pick it up through the built-in updater.
 
 <details>
 <summary><b>Project layout</b></summary>

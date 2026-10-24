@@ -51,7 +51,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJCNDgxQUQxM0ZENDJEMTAKUldRUUxkUS8wUnBJdTIrSDQvUkR2Z1BHODhUaGZQQURoTkNhZmVwSmdHb0E5N1VUUEZkMmEyUzUK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ5ODFBOTZCQ0FGOEZBQjQKUldTMCt2akthNm1CU1JVOTJUY05wbjU4SzdnQSt2d2ZYZnpXd0dsbms4aDZSMEpDczFaZFQxZnEK",
       "endpoints": [
         "https://github.com/HetavShah/pianoverse/releases/latest/download/latest.json"
       ],

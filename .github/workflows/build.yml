@@ -38,11 +38,22 @@ jobs:
           node -e "const fs=require('fs');const f='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(f,'utf8'));c.version='$V';fs.writeFileSync(f,JSON.stringify(c,null,2))"
           echo "Building Pianoverse $V"
 
+      # Fail fast with a readable message instead of a long Rust build that dies at the signing step.
+      - name: Check update-signing secrets
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          PW: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          [ -n "$KEY" ] || { echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY is missing (Settings > Secrets and variables > Actions)."; exit 1; }
+          [ -n "$PW" ] || { echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD is missing (Settings > Secrets and variables > Actions)."; exit 1; }
+          echo "Signing secrets present."
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: 'Pianoverse v__VERSION__'
