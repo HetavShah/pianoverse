@@ -4,7 +4,7 @@ import { fallUp } from './direction';
 import { DEFAULT_LOOK, Look, NOTE_2D, NOTE_3D, resolveLook, saberBase } from './look';
 import glassSrc from './shaders/glass.wgsl?raw';
 import labelsSrc from './shaders/labels.wgsl?raw';
-import { MAX_SHAPE_POINTS, svgToPoints } from './shapePoints';
+import { imageToPoints, MAX_SHAPE_POINTS, svgToPoints } from './shapePoints';
 import { loadTexSet, placeholder, refreshVideo, seekVideo, TexSet, UserFiles } from './noteTextures';
 import keysSrc from './shaders/keys.wgsl?raw';
 import spritesSrc from './shaders/sprites.wgsl?raw';
@@ -118,6 +118,7 @@ export class Renderer {
   private shapeWant = '';
   private shapeLoad: Promise<void> = Promise.resolve();
   private scenes: import('./project').ParticleScene[] = [];
+  private shapeHasFill: boolean[] = [];
   private emitBuf: GPUBuffer;
   private flowBuf: GPUBuffer;
   private partBuf: GPUBuffer;
@@ -412,7 +413,7 @@ export class Renderer {
           const size = Math.min(this.srcW * 0.8, Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) * 0.75) * shapeSize;
           const cy = Math.max(size * 0.55, Math.min(...ends.map((e) => e[1]), c0[1]) - tg.unit * 2.5 - size * 0.5);
           const cx = Math.min(this.srcW - size * 0.55, Math.max(size * 0.55, c0[0]));
-          const rate = 450 * (0.6 + 0.8 * vv) * lk.partAmount;
+          const rate = (this.shapeHasFill[slot] ? 1000 : 450) * (0.6 + 0.8 * vv) * lk.partAmount;
           if (rate > 0) rows.push({ start: n.s, end: n.s + 0.15 + (1.6 + 7.5 * lk.partShapeHold) / Math.max(0.1, lk.partSpeed) + 2.1 * lk.partLife, data: [n.s, 0.15, rate, shapeDir * (slot + 1), tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
         } else {
           const mid = this.whiteKeys / 2;
@@ -917,20 +918,26 @@ export class Renderer {
     this.shapeWant = sig;
     this.shapeLoad = (async () => {
       const lists: (Float32Array | null)[] = [];
+      const fills: (Float32Array | null)[] = [];
       for (const key of keys) {
         let text: string | null = null;
+        let pts: Float32Array | null = null;
+        let fill: Float32Array | null = null;
+        const per = Math.floor(MAX_SHAPE_POINTS / Math.max(1, keys.length));
         try {
           if (key.startsWith('user:')) {
             const f = this.userFiles ? await this.userFiles(key.slice(5)) : null;
-            if (f?.color) text = await f.color.text();
+            if (f?.color && (f.color.type === 'image/svg+xml' || /^\s*<(\?xml|svg)/i.test(await f.color.slice(0, 200).text()))) text = await f.color.text();
+            else if (f?.color) { const r = imageToPoints(await createImageBitmap(f.color), per); if (r) { pts = r.outline; fill = r.fill; } }   // a picture: its edges and its inside
           } else {
             const r = await fetch(`${import.meta.env?.BASE_URL ?? '/'}shapes/${key}.svg`);
             if (r.ok) text = await r.text();
           }
-        } catch { text = null; }
-        const pts = text ? svgToPoints(text, Math.floor(MAX_SHAPE_POINTS / Math.max(1, keys.length))) : null;
-        if (text && !pts) console.warn('[shape] no outline found in', key);
+        } catch (e) { console.warn('[shape]', e); text = null; }
+        if (text) pts = svgToPoints(text, per);
+        if (!pts) console.warn('[shape] no outline found in', key);
         lists.push(pts);
+        fills.push(fill);
       }
       if (this.shapeWant !== sig) return;
       // table: per slot (first point, point count); points follow, with their outline starts made absolute
@@ -941,10 +948,19 @@ export class Renderer {
         const first = SHAPE_SLOTS + all.length / 4;
         table[i * 4] = first; table[i * 4 + 1] = pts.length / 4;
         for (let k = 0; k < pts.length; k += 4) all.push(pts[k], pts[k + 1], pts[k + 2] + first, pts[k + 3]);
+        const fl = fills[i];
+        if (fl && fl.length) {
+          table[i * 4 + 2] = SHAPE_SLOTS + all.length / 4; table[i * 4 + 3] = fl.length / 4;
+          for (let k = 0; k < fl.length; k++) all.push(fl[k]);
+        }
       });
       this.device.queue.writeBuffer(this.shapeBuf, 0, table);
       if (all.length) this.device.queue.writeBuffer(this.shapeBuf, SHAPE_SLOTS * 16, new Float32Array(all));
       this.shapeLoaded = sig;
+      // pictures send more sparks per note (they fill an area, not just a line); emitters depend on it
+      const hadFill = this.shapeHasFill.join();
+      this.shapeHasFill = fills.map((f) => !!f && f.length > 0);
+      if (hadFill !== this.shapeHasFill.join()) this.buildEmitters();
       this.onTexture?.();
     })().catch((e) => console.warn('[shape]', e));
   }

@@ -229,6 +229,43 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let slot = u32(abs(E.count) + 0.5) - 1u;
   let tbl = shape[min(slot, 7u)];
   if (tbl.y < 2.0) { return off; }
+  // pictures also have a filled inside: most sparks settle somewhere inside and drift with the picture's flow
+  if (tbl.w > 0.5 && rnd(st) < 0.62) {
+    let fi = u32(tbl.z) + min(u32(rnd(st) * tbl.w), u32(tbl.w) - 1u);
+    let F0 = shape[fi];
+    let tUp = (0.9 + 0.4 * rnd(st)) / max(PP.speed, 0.1);
+    let tStay = (3.5 + 2.5 * rnd(st)) * E.pad1 / max(PP.speed, 0.1);
+    let age = t - ts;
+    if (age > tUp + tStay) { return off; }
+    let spot = E.vel + F0.xy * size;
+    let fdir = vec2f(sin(F0.z), -cos(F0.z)) * select(1.0, -1.0, E.count < 0.0);
+    var pos: vec2f;
+    var b = 1.0;
+    if (age < tUp) {
+      let u = age / tUp;
+      let e = u * u * (3.0 - 2.0 * u);
+      let p1 = E.pos + vec2f(gaussR(st) * size * 0.08, -size * 0.3);
+      let m = 1.0 - e;
+      pos = m * m * E.pos + 2.0 * m * e * p1 + e * e * spot;
+      b = smoothstep(0.0, 0.2, u);
+    } else {
+      let a2 = age - tUp;
+      pos = spot + fdir * a2 * size * 0.008 * (0.6 + 0.8 * rnd(st)) + vec2f(sin(age * 2.0 + F0.z), cos(age * 1.7)) * size * 0.003;
+      b = 1.0 - smoothstep(tStay * 0.55, tStay, a2);
+    }
+    let twPh = rnd(st) * 6.2831853;
+    let s1 = sin(age * (5.0 + 10.0 * rnd(st)) + twPh);
+    let tw = max(mix(1.0, 0.55 + 0.45 * s1 * s1, PP.twinkle), 0.0);
+    var o: Particle;
+    o.pos = pos;
+    o.vel = fdir * size * 0.02;
+    o.b = (0.75 + 0.5 * rnd(st)) * (0.75 + 0.45 * E.vn) * b * tw;
+    o.star = select(0.0, 1.0, rnd(st) < 0.01 * PP.stars);
+    o.z = 0.0;
+    o.pad = 0.0;
+    o.col = vec4f(mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix), tw);
+    return o;
+  }
   // which outline: picked by length (a random point on the drawing, then its outline)
   let idx = u32(tbl.x) + min(u32(rnd(st) * tbl.y), u32(tbl.y) - 1u);
   let P = shape[idx];
