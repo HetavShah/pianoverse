@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/hero.png" alt="Pianoverse: before and after — glass notes falling onto a real keyboard with a light saber and glitter plumes" width="100%">
+  <img src="docs/images/hero.png" alt="Pianoverse: a frame from a piano video before and after, with notes falling onto the keys" width="100%">
 </p>
 
 <p align="center">
@@ -11,12 +11,12 @@
   <img src="https://img.shields.io/badge/status-Milestone%205%20done-2FD3B5?style=flat" alt="Milestone 5 done">
 </p>
 
-<h3 align="center">Film yourself playing. Pianoverse makes the music visible.</h3>
+<h3 align="center">Add falling notes to your piano videos.</h3>
 
 <p align="center">
-  Glass notes rain down onto your <b>real</b> keyboard, land on a light saber that flares where you play,<br>
-  and every note releases a plume of glitter that curls through the air — rendered live on your graphics card<br>
-  and exported as a finished video for Shorts, Reels or YouTube.
+  Pianoverse is a Windows app. Give it a video of yourself playing and the MIDI from the same take:<br>
+  it lines them up, finds your keyboard in every frame, and draws each note falling onto the key you pressed,<br>
+  with a glowing line along the keys and sparks where the note lands. Then it exports the video for Shorts, Reels or YouTube.
 </p>
 
 <p align="center">
@@ -36,13 +36,13 @@
 
 **Notes** — glass, gem, round, solid, outline or soft-glow bars, with real textures inside if you like. Their length is how long you held the key; the sustain pedal can stretch them.
 
-**A light saber on your keys** — a line of light along the back edge of your keyboard that flares in the note's colour wherever you play. Plasma, straight, electric, soft beam or flame.
+**Saber** — a glowing line along the back edge of your keyboard, where the notes land. It brightens at each key you play, in that note's colour. Plasma, straight, electric, soft beam or flame.
 
-**Particles** — every hit launches fine sparkles that rise in plumes, arc like a fountain, spray from held notes, spiral in a vortex, or trace a shape such as a heart.
+**Particles** — each note sends small sparks up from its key. They can rise in plumes, arc like a fountain, spray from held notes, spiral in a vortex, or trace a shape such as a heart.
 
-**Real light** — impacts throw coloured light onto your hands and keys, louder notes hit harder, held keys keep glowing, and bass notes make the whole scene breathe.
+**Lighting** — each note lights its key and casts its colour onto your fingers. Louder notes are brighter, held keys stay lit, and bass notes briefly brighten the whole frame.
 
-**Locked to your keyboard** — the camera can move; Pianoverse tracks the keyboard frame by frame so every note lands on the right key.
+**Keyboard tracking** — Pianoverse finds the keyboard in every frame, so the notes stay on the right keys even if the phone moves.
 
   </td>
   </tr>
@@ -146,7 +146,7 @@ A few ideas that make it work:
 
 - **Keyboard-space geometry.** Every key, the saber line and every landing point are defined on the keyboard plane and projected into the frame with that frame's tracked homography, so effects stay glued to the keys even when the camera drifts.
 - **Stateless particles.** A particle's position at time *t* is recomputed from the moment its note was hit, inside a compute shader. Any frame can be drawn on its own, which makes scrubbing instant and export identical every time.
-- **Light that behaves.** Effects build up in an HDR light layer, get bloom, and are blended with a soft knee, so bright moments glow without blowing out your hands.
+- **Soft blending.** Effects are drawn in an HDR light layer with bloom, then blended in with a soft knee so bright moments do not turn your hands white.
 - **One engine everywhere.** The same WGSL shaders drive the live preview and the export. Export renders each frame offscreen at the output size, reads it back and pipes the raw pixels to FFmpeg, which encodes on the graphics card when it can.
 
 ---
@@ -263,4 +263,4 @@ Note textures use CC0 materials from [ambientCG](https://ambientcg.com).
 
 ---
 
-<p align="center"><sub>Made by Hetav Shah · played on a 61-key keyboard · lit by a GTX 1650</sub></p>
+<p align="center"><sub>Made by Hetav Shah</sub></p>
