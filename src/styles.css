@@ -357,3 +357,7 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .wheel-exact input[type=color] { width: 26px; height: 20px; border: 1px solid var(--border2); border-radius: 5px; background: none; padding: 0; cursor: pointer; }
 .ctl.toggle-row { flex-direction: row; align-items: center; justify-content: space-between; }
 .ctl.toggle-row > span { font-size: 13px; }
+
+.tex .tex-blank.none { display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 22px; }
+.more-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; }
+.more-toggle:hover { color: var(--text); border-color: var(--border2); }

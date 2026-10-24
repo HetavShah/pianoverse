@@ -12,6 +12,15 @@ export const NOTE_2D: { id: Note2D; label: string }[] = [
 export const NOTE_3D: { id: Note3D; label: string }[] = [
   { id: 'glass', label: 'Glass' }, { id: 'gem', label: 'Gem' }, { id: 'round', label: 'Round' }, { id: 'outline', label: 'Outline' }, { id: 'angled', label: 'Angled' },
 ];
+/** the note styles offered as picture cards (each sets 2D/3D and the shape) */
+export const NOTE_STYLE_CARDS: { id: string; label: string; set: Partial<Look> }[] = [
+  { id: 'glass', label: 'Glass', set: { noteDim: '3d', note3d: 'glass' } },
+  { id: 'gem', label: 'Gem', set: { noteDim: '3d', note3d: 'gem' } },
+  { id: 'round', label: 'Round', set: { noteDim: '3d', note3d: 'round' } },
+  { id: 'solid', label: 'Solid', set: { noteDim: '2d', note2d: 'filled' } },
+  { id: 'outline', label: 'Outline', set: { noteDim: '2d', note2d: 'hollow' } },
+  { id: 'soft', label: 'Soft glow', set: { noteDim: '2d', note2d: 'soft' } },
+];
 export const KEY_NAMES = ['C', 'C♯ / D♭', 'D', 'E♭', 'E', 'F', 'F♯ / G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
 /** Built-in note textures (CC0, ambientCG). A custom texture is 'file:' + the image's path on this computer. */
@@ -289,11 +298,12 @@ export type Control =
   | { key: keyof Look; kind: 'wheel'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'select'; label: string; options: { value: string; label: string }[]; when?: (l: Look) => boolean; segmented?: boolean }
   | { key: keyof Look; kind: 'texture'; label: string; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'noteStyle'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'color'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'toggle'; label: string; hint?: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'note'; label: string; when?: (l: Look) => boolean };
 
-export interface Section { title: string; controls: Control[] }
+export interface Section { title: string; controls: Control[]; /** hidden under "More settings" */ more?: boolean }
 
 const pct = (v: number) => `${Math.round(v * 100)}`;
 const x = (v: number) => `${v.toFixed(2)}×`;
@@ -322,80 +332,80 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     ] },
   ],
   notes: [
-    { title: 'Note style', controls: [
+    { title: 'Style', controls: [
+      { key: 'note3d', kind: 'noteStyle', label: 'Style' },
+    ] },
+    { title: 'Texture', controls: [
+      { key: 'noteTexture', kind: 'texture', label: 'Texture' },
+    ] },
+    { title: 'Adjust', controls: [
+      { key: 'noteWidth', kind: 'slider', label: 'Width', min: 0.3, max: 1.8, step: 0.01, fmt: x },
+      { key: 'noteRound', kind: 'slider', label: 'Rounded corners', min: 0, max: 1.92, step: 0.01, fmt: pct },
+      { key: 'noteBright', kind: 'slider', label: 'Brightness', min: 0.2, max: 2.5, step: 0.01, fmt: pct },
+      { key: 'noteGlow', kind: 'slider', label: 'Glow', min: 0, max: 3, step: 0.01, fmt: pct },
+      { key: 'noteSpeed', kind: 'slider', label: 'Fall speed', min: 250, max: 1500, step: 10, fmt: (v) => `${Math.round(v)} px/s` },
+    ] },
+    // ---- everything below sits under "More settings"
+    { title: 'Shape', more: true, controls: [
       { key: 'noteDim', kind: 'select', label: 'Dimensions', segmented: true, options: [{ value: '2d', label: '2D' }, { value: '3d', label: '3D' }] },
       { key: 'note2d', kind: 'select', label: 'Style', segmented: true, when: is2d, options: NOTE_2D.map((o) => ({ value: o.id, label: o.label })) },
       { key: 'note3d', kind: 'select', label: 'Shape', segmented: true, when: is3d, options: NOTE_3D.map((o) => ({ value: o.id, label: o.label })) },
-    ] },
-    { title: 'Size and shape', controls: [
-      { key: 'noteWidth', kind: 'slider', label: 'Note width', min: 0.3, max: 1.8, step: 0.01, fmt: x, hint: 'Compared with the key' },
-      { key: 'noteRound', kind: 'slider', label: 'Corner size', min: 0, max: 1.92, step: 0.01, fmt: pct, hint: 'All the way up makes pill-shaped notes' },
       { key: 'noteEdge', kind: 'slider', label: 'Edge width', min: 0.2, max: 4, step: 0.01, fmt: x },
-      { key: 'noteMinLen', kind: 'slider', label: 'Minimum length', min: 0.3, max: 4, step: 0.01, fmt: x, hint: 'Shortest note, in note widths' },
-      { key: 'noteLength', kind: 'slider', label: 'Length', min: 0.3, max: 2.5, step: 0.01, fmt: x, hint: 'Longer or shorter bars; they still land on time' },
-      { key: 'noteBWRatio', kind: 'slider', label: 'White / black width ratio', min: 0.5, max: 2.5, step: 0.01, fmt: (v) => v.toFixed(2), hint: 'Above 1 makes black-key notes narrower than white-key notes' },
       { key: 'noteDepth', kind: 'slider', label: 'Note depth', min: 0, max: 3, step: 0.01, fmt: x, when: (l) => is3d(l) && l.note3d !== 'glass' },
-      { key: 'noteOpacity', kind: 'slider', label: 'Note opacity', min: 0, max: 1, step: 0.01, fmt: pct },
+      { key: 'noteLength', kind: 'slider', label: 'Length', min: 0.3, max: 2.5, step: 0.01, fmt: x, hint: 'Longer or shorter bars; they still land on time' },
+      { key: 'noteMinLen', kind: 'slider', label: 'Minimum length', min: 0.3, max: 4, step: 0.01, fmt: x, hint: 'Shortest note, in note widths' },
+      { key: 'noteBWRatio', kind: 'slider', label: 'White / black width ratio', min: 0.5, max: 2.5, step: 0.01, fmt: (v) => v.toFixed(2) },
+      { key: 'noteOpacity', kind: 'slider', label: 'Opacity', min: 0, max: 1, step: 0.01, fmt: pct },
       { key: 'noteDistort', kind: 'slider', label: 'Position distortion', min: -1, max: 1, step: 0.01, fmt: (v) => v.toFixed(2), hint: 'Notes close in (−) or spread out (+) as they rise' },
       { key: 'noteVelocity', kind: 'slider', label: 'Louder notes bigger', min: 0, max: 2, step: 0.01, fmt: pct },
+      { key: 'noteFade', kind: 'slider', label: 'Fade in', min: 0, max: 1, step: 0.01, fmt: pct },
       { key: 'noteSustain', kind: 'toggle', label: 'Sustain draw hold', hint: 'Notes stay long while the sustain pedal holds them (MIDI files)' },
     ] },
-    { title: 'Note lighting', controls: [
-      { key: 'lightDir', kind: 'slider', label: 'Light direction', min: 0, max: 360, step: 1, fmt: (v) => `${Math.round(v)}°`, hint: '90° = from the top, 180° = from the left' },
+    { title: 'Lighting', more: true, controls: [
+      { key: 'lightDir', kind: 'slider', label: 'Light direction', min: 0, max: 360, step: 1, fmt: (v) => `${Math.round(v)}°` },
       { key: 'lightHeight', kind: 'slider', label: 'Light height', min: 0.05, max: 1, step: 0.01, fmt: pct },
       { key: 'lightPower', kind: 'slider', label: 'Light strength', min: 0, max: 2.5, step: 0.01, fmt: pct },
       { key: 'lightShine', kind: 'slider', label: 'Shine', min: 0, max: 3, step: 0.01, fmt: pct },
-      { key: 'noteBright', kind: 'slider', label: 'Brightness', min: 0.2, max: 2.5, step: 0.01, fmt: pct },
       { key: 'noteRim', kind: 'slider', label: 'Edge light', min: 0, max: 2, step: 0.01, fmt: pct },
       { key: 'noteFill', kind: 'slider', label: 'Body', min: 0, max: 3, step: 0.01, fmt: pct },
-      { key: 'noteGlow', kind: 'slider', label: 'Glow', min: 0, max: 3, step: 0.01, fmt: pct },
     ] },
-    { title: 'Outline', controls: [
-      { key: 'outlineOn', kind: 'toggle', label: 'Outline', when: is2d },
+    { title: 'Outline', more: true, controls: [
+      { key: 'outlineOn', kind: 'toggle', label: 'Outline (2D notes)', when: is2d },
       { key: 'outlineWidth', kind: 'slider', label: 'Outline width', min: 0.2, max: 4, step: 0.01, fmt: x, when: (l) => is2d(l) && l.outlineOn },
       { key: 'outlineDepth', kind: 'slider', label: 'Outline depth', min: 0, max: 2, step: 0.01, fmt: (v) => v.toFixed(2), when: (l) => is2d(l) && l.outlineOn },
       { key: 'outlineColor', kind: 'wheel', label: 'Outline colour', when: (l) => is2d(l) && l.outlineOn },
     ] },
-    { title: 'Texture', controls: [
-      { key: 'texOn', kind: 'toggle', label: 'Note texture' },
-      { key: 'noteTexture', kind: 'texture', label: 'Texture', when: tex },
-      { key: 'texReflect', kind: 'toggle', label: 'Texture reflection', hint: 'The texture stays put and notes slide through it, like light on glass', when: (l) => tex(l) && is3d(l) },
-      { key: 'texReflect', kind: 'toggle', label: 'Fixed in place (off = moves with notes)', when: (l) => tex(l) && is2d(l) },
-      { key: 'texReflectivity', kind: 'slider', label: '3D reflectivity', min: 0, max: 2, step: 0.01, fmt: pct, when: (l) => tex(l) && is3d(l) && l.texReflect },
+    { title: 'Texture details', more: true, controls: [
       { key: 'texMode', kind: 'select', label: 'Colour', segmented: true, when: tex, options: [{ value: 'tint', label: 'Tinted' }, { value: 'natural', label: 'Natural' }, { value: 'glow', label: 'Glow' }] },
-      { key: 'texMirror', kind: 'toggle', label: 'Use mirroring', when: tex, hint: 'Flips alternate tiles so the texture has no seams' },
-      { key: 'texOpacity', kind: 'slider', label: 'Opacity', min: 0, max: 1, step: 0.01, fmt: pct, when: tex },
-      { key: 'texBlend', kind: 'slider', label: 'Blend', min: 0, max: 1, step: 0.01, fmt: pct, when: tex, hint: 'How much the texture replaces the plain note colour' },
+      { key: 'texReflect', kind: 'toggle', label: 'Reflection (texture stays put)', when: tex },
+      { key: 'texReflectivity', kind: 'slider', label: '3D reflectivity', min: 0, max: 2, step: 0.01, fmt: pct, when: (l) => tex(l) && is3d(l) && l.texReflect },
       { key: 'texScale', kind: 'slider', label: 'Scale', min: 0.25, max: 4, step: 0.01, fmt: x, when: tex },
+      { key: 'texOpacity', kind: 'slider', label: 'Opacity', min: 0, max: 1, step: 0.01, fmt: pct, when: tex },
+      { key: 'texBlend', kind: 'slider', label: 'Blend', min: 0, max: 1, step: 0.01, fmt: pct, when: tex },
       { key: 'texRelief', kind: 'slider', label: 'Bumps', min: 0, max: 3, step: 0.01, fmt: pct, when: tex },
       { key: 'texLive', kind: 'slider', label: 'Live shimmer', min: 0, max: 2, step: 0.01, fmt: pct, when: tex },
       { key: 'texSolid', kind: 'slider', label: 'Solid', min: 0, max: 1, step: 0.01, fmt: pct, when: (l) => tex(l) && is3d(l) && l.note3d === 'glass' },
-    ] },
-    { title: 'Texture colour', controls: [
+      { key: 'texMirror', kind: 'toggle', label: 'Use mirroring', when: tex },
       { key: 'texBright', kind: 'slider', label: 'Texture brightness', min: -0.5, max: 0.5, step: 0.01, fmt: (v) => v.toFixed(2), when: tex },
       { key: 'texContrast', kind: 'slider', label: 'Texture contrast', min: 0, max: 3, step: 0.01, fmt: (v) => v.toFixed(2), when: tex },
       { key: 'texHue', kind: 'slider', label: 'Texture hue', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°`, hue: true, when: tex },
       { key: 'texSat', kind: 'slider', label: 'Texture saturation', min: 0, max: 2, step: 0.01, fmt: (v) => v.toFixed(2), when: tex },
-      { key: 'texRgbOpacity', kind: 'slider', label: 'Original colour opacity', min: 0, max: 1, step: 0.01, fmt: pct, when: tex },
+      { key: 'texRgbOpacity', kind: 'slider', label: 'Original colour', min: 0, max: 1, step: 0.01, fmt: pct, when: tex },
       { key: 'texEmboss', kind: 'toggle', label: 'Emboss', when: tex },
       { key: 'texEmbossDepth', kind: 'slider', label: 'Emboss depth', min: 0, max: 3, step: 0.01, fmt: (v) => v.toFixed(2), when: (l) => tex(l) && l.texEmboss },
-      { key: 'texCutOn', kind: 'toggle', label: 'Cut out', when: tex, hint: 'Dark parts of the texture drop away' },
+      { key: 'texCutOn', kind: 'toggle', label: 'Cut out', when: tex },
       { key: 'texCutThresh', kind: 'slider', label: 'Cut out threshold', min: 0, max: 1, step: 0.01, fmt: pct, when: (l) => tex(l) && l.texCutOn },
       { key: 'texCutOpacity', kind: 'slider', label: 'Cut out opacity', min: 0, max: 1, step: 0.01, fmt: pct, when: (l) => tex(l) && l.texCutOn },
     ] },
-    { title: 'Bar lines and labels', controls: [
+    { title: 'Bar lines and labels', more: true, controls: [
       { key: 'barLines', kind: 'toggle', label: 'Bar lines', hint: 'A line at the start of every bar (MIDI files)' },
       { key: 'barOpacity', kind: 'slider', label: 'Bar lines opacity', min: 0, max: 1, step: 0.01, fmt: pct, when: (l) => l.barLines },
-      { key: 'labels', kind: 'toggle', label: 'Labels', hint: 'Note names on the notes' },
+      { key: 'labels', kind: 'toggle', label: 'Note names' },
       { key: 'labelSize', kind: 'slider', label: 'Label size', min: 0.4, max: 2.5, step: 0.01, fmt: x, when: (l) => l.labels },
       { key: 'labelOpacity', kind: 'slider', label: 'Label opacity', min: 0, max: 1, step: 0.01, fmt: pct, when: (l) => l.labels },
-      { key: 'labelKey', kind: 'select', label: 'Label key', when: (l) => l.labels, options: KEY_NAMES.map((k, i) => ({ value: String(i), label: k })) },
-      { key: 'labelQuality', kind: 'select', label: 'Label quality', segmented: true, when: (l) => l.labels, options: [{ value: 'major', label: 'Major' }, { value: 'minor', label: 'Minor' }] },
+      { key: 'labelKey', kind: 'select', label: 'Key', when: (l) => l.labels, options: KEY_NAMES.map((k, i) => ({ value: String(i), label: k })) },
+      { key: 'labelQuality', kind: 'select', label: 'Major / minor', segmented: true, when: (l) => l.labels, options: [{ value: 'major', label: 'Major' }, { value: 'minor', label: 'Minor' }] },
       { key: 'labelAccidental', kind: 'select', label: 'Accidentals', segmented: true, when: (l) => l.labels, options: [{ value: 'auto', label: 'From key' }, { value: 'sharp', label: '♯' }, { value: 'flat', label: '♭' }] },
-    ] },
-    { title: 'Motion', controls: [
-      { key: 'noteSpeed', kind: 'slider', label: 'Fall speed', min: 250, max: 1500, step: 10, fmt: (v) => `${Math.round(v)} px/s`, hint: 'Faster notes are longer for the same held time' },
-      { key: 'noteFade', kind: 'slider', label: 'Fade in', min: 0, max: 1, step: 0.01, fmt: pct, hint: 'How softly notes appear at the edge of the frame' },
     ] },
   ],
   saber: [

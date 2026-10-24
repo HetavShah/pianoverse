@@ -34,10 +34,10 @@ const frame = async (name) => {
 };
 const look = () => page.evaluate(() => window.pianoverseProject.look ?? {});
 const setRange = (label, v) => page.$eval(`input[aria-label="${label}"]`, (el, v) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, String(v)); el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
-await page.click('label:has-text("Note texture") input[type=checkbox]');
+await page.click('.tex >> text=Ice');
 await page.waitForTimeout(2500);
 await page.screenshot({ path: `${OUT}/1-texture-ice.png` }); await frame('1-frame.png');
-await page.click('.tex >> text=Gold foil'); await page.click('.seg button:text-is("Natural")');
+await page.click('.tex >> text=Gold foil'); await page.click('.more-toggle'); await page.click('.seg button:text-is("Natural")');
 await setRange('Scale', 1.5); await setRange('Bumps', 1.6);
 await page.waitForTimeout(2500);
 await page.screenshot({ path: `${OUT}/2-foil-natural.png` }); await frame('2-frame.png');

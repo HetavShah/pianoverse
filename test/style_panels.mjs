@@ -17,7 +17,7 @@ await page.waitForTimeout(800);
 const look = () => page.evaluate(() => window.pianoverseProject.look ?? {});
 const setRange = (label, v) => page.$eval(`input[aria-label="${label}"]`, (el, v) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, String(v)); el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
 await page.screenshot({ path: `${OUT}/1-notes-panel.png` });
-await setRange('Glow', 2.2); await setRange('Note width', 1.3);
+await setRange('Glow', 2.2); await setRange('Width', 1.3);
 console.log('notes changed:', JSON.stringify(await look()));
 console.log('reset arrows shown:', await page.$$eval('.reset', (e) => e.length), '| preset says changed:', await page.$eval('.preset-bar', (e) => e.textContent.includes('Changed')));
 await page.click('.layer-row >> text=Particles'); await page.waitForTimeout(200);

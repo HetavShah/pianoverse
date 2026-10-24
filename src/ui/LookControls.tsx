@@ -1,7 +1,7 @@
 // Controls for one layer of the look, generated from LOOK_SCHEMA.
 import { noteName } from '../engine/calibration';
 import { useEffect, useRef, useState } from 'react';
-import { COLOR_BY, Control, GRADIENTS, hexToHsv, hsvToHex, LayerId, Look, LOOK_SCHEMA, NOTE_TEXTURES, noteColor, PaletteId, toHex } from '../engine/look';
+import { COLOR_BY, Control, GRADIENTS, hexToHsv, hsvToHex, LayerId, Look, LOOK_SCHEMA, NOTE_STYLE_CARDS, NOTE_TEXTURES, noteColor, PaletteId, toHex } from '../engine/look';
 import { deleteTexture, importTexture, textureThumb, UserTexture, useUserTextures } from './textureStore';
 
 type Set = (k: keyof Look, v: unknown) => void;
@@ -25,8 +25,8 @@ function TexturePicker({ look, patch }: { look: Look; patch: Patch }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const base = import.meta.env.BASE_URL ?? '/';
-  const current = look.noteTexture;
-  const pick = (id: string) => patch({ noteTexture: id, texOn: true });
+  const current = look.texOn ? look.noteTexture : 'none';
+  const pick = (id: string) => patch(id === 'none' ? { texOn: false } : { noteTexture: id, texOn: true });
   const upload = async () => {
     setErr(''); setBusy(true);
     try {
@@ -39,6 +39,9 @@ function TexturePicker({ look, patch }: { look: Look; patch: Patch }) {
   return (
     <div className="ctl">
       <div className="tex-grid">
+        <button type="button" className={'tex' + (current === 'none' ? ' on' : '')} onClick={() => pick('none')} title="Plain notes, no texture">
+          <span className="tex-blank none">—</span><span>None</span>
+        </button>
         {NOTE_TEXTURES.map((t) => (
           <button key={t.id} type="button" className={'tex' + (current === t.id ? ' on' : '')} onClick={() => pick(t.id)} title={t.credit}>
             <img src={`${base}textures/${t.id}/thumb.jpg`} alt="" /><span>{t.label}</span>
@@ -153,6 +156,19 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
       );
     case 'texture':
       return <TexturePicker look={look} patch={patch} />;
+    case 'noteStyle': {
+      const base = import.meta.env.BASE_URL ?? '/';
+      const cur = NOTE_STYLE_CARDS.find((c) => Object.entries(c.set).every(([k, val]) => look[k as keyof Look] === val))?.id;
+      return (
+        <div className="tex-grid">
+          {NOTE_STYLE_CARDS.map((c) => (
+            <button key={c.id} type="button" className={'tex' + (cur === c.id ? ' on' : '')} onClick={() => patch(c.set)}>
+              <img src={`${base}notestyles/${c.id}.jpg`} alt="" /><span>{c.label}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
     case 'select':
       if (c.segmented) {
         return (
@@ -188,18 +204,30 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
 const visible = (c: Control, look: Look) => !('when' in c && c.when && !c.when(look));
 
 export default function LookControls({ layer, look, base, set, patch }: { layer: LayerId; look: Look; base: Look; set: Set; patch: Patch }) {
+  const [more, setMore] = useState(false);
+  const all = LOOK_SCHEMA[layer];
+  const section = (sec: (typeof all)[number]) => {
+    const rows = sec.controls.filter((c) => visible(c, look));
+    if (!rows.length) return null;
+    return (
+      <div key={sec.title} className="ctl-section">
+        <span className="section-label">{sec.title}</span>
+        {rows.map((c, i) => <Row key={c.key + c.kind + i} c={c} look={look} base={base} set={set} patch={patch} />)}
+      </div>
+    );
+  };
+  const extra = all.filter((sec) => sec.more);
+  const extraChanged = extra.some((sec) => sec.controls.some((c) => look[c.key] !== base[c.key]));
   return (
     <>
-      {LOOK_SCHEMA[layer].map((sec) => {
-        const rows = sec.controls.filter((c) => visible(c, look));
-        if (!rows.length) return null;
-        return (
-          <div key={sec.title} className="ctl-section">
-            <span className="section-label">{sec.title}</span>
-            {rows.map((c, i) => <Row key={c.key + c.kind + i} c={c} look={look} base={base} set={set} patch={patch} />)}
-          </div>
-        );
-      })}
+      {all.filter((sec) => !sec.more).map(section)}
+      {extra.length > 0 && (
+        <button type="button" className="more-toggle" onClick={() => setMore(!more)} aria-expanded={more}>
+          <span>{more ? 'Fewer settings' : 'More settings'}{extraChanged && !more ? ' · changed' : ''}</span>
+          <span className="chev">{more ? '▴' : '▾'}</span>
+        </button>
+      )}
+      {more && extra.map(section)}
     </>
   );
 }
