@@ -8,7 +8,7 @@ struct Emitter {
 };
 struct Particle { pos: vec2f, vel: vec2f, b: f32, star: f32, z: f32, pad: f32, col: vec4f };
 struct Params {
-  time: f32, nEmit: u32, perEmit: u32, pad: u32, up: vec2f, pad2: vec2f,
+  time: f32, nEmit: u32, perEmit: u32, nShape: u32, up: vec2f, pad2: vec2f,
   // physics and look (1 / 0 = the original approved look)
   swirl: f32, wind: f32, gravity: f32, lifeMul: f32,
   rise: f32, twinkle: f32, stars: f32, colorMix: f32,
@@ -21,6 +21,7 @@ struct Params {
 @group(0) @binding(1) var<storage, read> emitters: array<Emitter>;
 @group(0) @binding(2) var<storage, read> flow: array<vec4f>;   // 0..9: kx, ky, amplitude, omega; 10..19: phase
 @group(0) @binding(3) var<storage, read_write> parts: array<Particle>;
+@group(0) @binding(4) var<storage, read> shape: array<vec2f>;   // outline points of the chosen shape, unit box
 
 fn pcg(v: u32) -> u32 {
   let s = v * 747796405u + 2891336453u;
@@ -199,6 +200,69 @@ fn vortex(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   return finishP(pos, vel, age, plife, bright, star, col, st);
 }
 
+// SHAPE: particles rise from the key, gather on the outline of a picture above the keyboard,
+// hold it for a moment, then float up and fade away
+fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
+  var off: Particle;
+  off.pos = vec2f(-10000.0);
+  off.b = 0.0;
+  if (PP.nShape == 0u) { return off; }
+  let total = min(E.rate * E.life, f32(PP.perEmit));
+  if (f32(k) >= total) { return off; }
+  let ts = E.start + (f32(k) + rnd(st)) / max(E.rate, 1.0);
+  if (ts > t) { return off; }
+  let plife = (3.0 + 1.2 * rnd(st)) * PP.lifeMul;
+  let age = t - ts;
+  if (age > plife) { return off; }
+  let size = E.pad0;
+  let idx = min(u32(rnd(st) * f32(PP.nShape)), PP.nShape - 1u);
+  let goal = E.vel + shape[idx] * size + vec2f(gaussR(st), gaussR(st)) * size * 0.006;
+  let a = age / plife;
+  let tArrive = 0.32;
+  let tLeave = tArrive + 0.3 * E.pad1;
+  var pos: vec2f;
+  var vel: vec2f;
+  let side = gaussR(st) * size * 0.25;
+  if (a < tArrive) {
+    // fly up from the key along a curve and land on the outline
+    let u = a / tArrive;
+    let e = u * u * (3.0 - 2.0 * u);
+    let p0 = E.pos;
+    let p1 = E.pos + vec2f(side, -size * 0.55);
+    let p2 = goal + vec2f(-side * 0.4, size * 0.25);
+    let p3 = goal;
+    let m = 1.0 - e;
+    pos = m * m * m * p0 + 3.0 * m * m * e * p1 + 3.0 * m * e * e * p2 + e * e * e * p3;
+    vel = (p3 - p0) / max(tArrive * plife, 0.01);
+  } else if (a < tLeave) {
+    // hold the shape, with a gentle shimmer
+    let ph = rnd(st) * 6.2831853;
+    pos = goal + vec2f(sin(age * 3.1 + ph), cos(age * 2.7 + ph)) * size * 0.004;
+    vel = vec2f(0.0, -5.0);
+  } else {
+    // float up into the sky and fade
+    let u = (a - tLeave) / max(1.0 - tLeave, 0.01);
+    let rise = size * 0.9 * PP.rise * pow(u, 1.5);
+    pos = goal + vec2f(0.0, -rise) + turbVel(goal, t) * u * 0.25 * PP.swirl + vec2f(PP.wind * 80.0 * u, 0.0);
+    vel = vec2f(0.0, -size * 0.9 / plife);
+  }
+  var o: Particle;
+  let twPh = rnd(st) * 6.2831853;
+  let s1 = sin(age * (6.0 + 14.0 * rnd(st)) + twPh);
+  let tw = max(mix(1.0, 0.6 + 0.4 * s1 * s1, PP.twinkle), 0.0);
+  let fadeIn = smoothstep(0.0, 0.04, a);
+  let fadeOut = 1.0 - smoothstep(tLeave, 1.0, a);
+  let atShape = select(0.75, 1.15, a >= tArrive && a < tLeave);
+  o.pos = pos;
+  o.vel = vel;
+  o.b = (0.8 + 0.5 * rnd(st)) * (0.8 + 0.4 * E.vn) * fadeIn * fadeOut * tw * atShape;
+  o.star = select(0.0, 1.0, rnd(st) < 0.015 * PP.stars);
+  o.z = 0.0;
+  o.pad = 0.0;
+  o.col = vec4f(mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix), tw);
+  return o;
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let id = gid.x;
@@ -229,7 +293,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     var p: Particle;
     if (E.kind < 2.5) { p = fountain(E, k, t, &st); }
     else if (E.kind < 3.5) { p = spray(E, k, t, &st); }
-    else { p = vortex(E, k, t, &st); }
+    else if (E.kind < 4.5) { p = vortex(E, k, t, &st); }
+    else { p = shapeP(E, k, t, &st); }
     parts[id] = p;
     return;
   }

@@ -190,7 +190,10 @@ export interface Look {
   partColor: number; // 0 = white, 1 = note colour
   partVelocity: boolean; // louder notes, bigger plumes
   partSpeed: number; // launch speed
-  partMode: 'plume' | 'fountain' | 'spray' | 'vortex'; // the kind of particle animation
+  partMode: 'plume' | 'fountain' | 'spray' | 'vortex' | 'shape'; // the kind of particle animation
+  partShape: string; // 'shape' mode: built-in name or 'user:<id>' SVG
+  partShapeSize: number;
+  partShapeHold: number; // how long the shape holds
   partTurbX: number; partTurbY: number; partTurbZ: number; // turbulence strength per direction (Z: in and out of the screen)
   partTurbFreq: number; // size of the swirls (higher = smaller, busier)
   partTurbEvo: number; // how fast the swirls change
@@ -251,7 +254,7 @@ export const DEFAULT_LOOK: Look = {
   flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3,
   keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
   partAmount: 1, partRise: 1, partSwirl: 1, partWind: 0, partGravity: 0, partLife: 1, partSize: 1, partTwinkle: 1, partHaze: 1, partStars: 1, partColor: 1, partVelocity: true,
-  partSpeed: 1, partMode: 'plume', partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
+  partSpeed: 1, partMode: 'plume', partShape: 'heart', partShapeSize: 1, partShapeHold: 1, partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
   partSpread: 0, partOpacity: 1, partAlphaF: 0, partAdditive: 1, partBright: 1, partRays: false, partRayLen: 1,
   bgDarken: 1, bgContrast: 1, bgSaturation: 1, bgVignette: 1,
   footOpacity: 1, footScale: 1, footX: 0, footY: 0, footRot: 0, footCropT: 0, footCropB: 0, footCropL: 0, footCropR: 0, footBright: 0, footHue: 0,

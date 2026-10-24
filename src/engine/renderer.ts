@@ -4,6 +4,7 @@ import { fallUp } from './direction';
 import { DEFAULT_LOOK, Look, NOTE_2D, NOTE_3D, resolveLook, saberBase } from './look';
 import glassSrc from './shaders/glass.wgsl?raw';
 import labelsSrc from './shaders/labels.wgsl?raw';
+import { MAX_SHAPE_POINTS, svgToPoints } from './shapePoints';
 import { loadTexSet, placeholder, refreshVideo, seekVideo, TexSet, UserFiles } from './noteTextures';
 import keysSrc from './shaders/keys.wgsl?raw';
 import spritesSrc from './shaders/sprites.wgsl?raw';
@@ -108,6 +109,11 @@ export class Renderer {
   private heatBuf: GPUBuffer;
   private simUni: GPUBuffer;
   private partDrawUni: GPUBuffer;
+  private shapeBuf: GPUBuffer;
+  private nShape = 0;
+  private shapeKey = '';
+  private shapeWant = '';
+  private shapeLoad: Promise<void> = Promise.resolve();
   private emitBuf: GPUBuffer;
   private flowBuf: GPUBuffer;
   private partBuf: GPUBuffer;
@@ -196,6 +202,7 @@ export class Renderer {
     this.heatBuf = buf(40 * 16, U.STORAGE | U.COPY_DST);
     this.simUni = buf(112, U.UNIFORM | U.COPY_DST);
     this.partDrawUni = buf(32, U.UNIFORM | U.COPY_DST);
+    this.shapeBuf = buf(MAX_SHAPE_POINTS * 8, U.STORAGE | U.COPY_DST);
     this.emitBuf = buf(MAX_EMIT * 64, U.STORAGE | U.COPY_DST);
     this.flowBuf = buf(20 * 16, U.STORAGE | U.COPY_DST);
     this.partBuf = buf(MAX_EMIT * PER_EMIT * 48, U.STORAGE);
@@ -386,6 +393,15 @@ export class Renderer {
           const burst = Math.floor(110 * (0.6 + 0.8 * vv) * lk.partAmount);
           const rate = Math.min((1000 - burst) / held, 620 * (0.6 + 0.8 * vv) * lk.partAmount);
           if (rate > 0) rows.push({ start: n.s, end: n.s + held + 1.5 * lk.partLife, data: [n.s, held, rate, burst, tg.x, tg.y, 0, -sp, ...n.col, vv, n.idx * 16, 3, 0, 0] });
+        } else if (mode === 'shape') {
+          const mid = this.whiteKeys / 2;
+          const c0 = kb.P(mid, kb.edgeY(mid));
+          const ends = [kb.P(0, kb.edgeY(0)), kb.P(this.whiteKeys, kb.edgeY(this.whiteKeys))];
+          const size = Math.min(this.srcW * 0.8, Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) * 0.75) * lk.partShapeSize;
+          const cy = Math.max(size * 0.55, Math.min(...ends.map((e) => e[1]), c0[1]) - tg.unit * 2.5 - size * 0.5);
+          const cx = Math.min(this.srcW - size * 0.55, Math.max(size * 0.55, c0[0]));
+          const rate = 450 * (0.6 + 0.8 * vv) * lk.partAmount;
+          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.5 + 4.3 * lk.partLife, data: [n.s, 0.5, rate, 0, tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
         } else {
           const mid = this.whiteKeys / 2;
           const c0 = kb.P(mid, kb.edgeY(mid));
@@ -604,7 +620,8 @@ export class Renderer {
         nEmit = act.length;
       }
     }
-    q.writeBuffer(this.simUni, 0, new Uint32Array([0, nEmit, PER_EMIT, 0]));
+    if (lk.partMode === 'shape') this.wantShape(lk.partShape);
+    q.writeBuffer(this.simUni, 0, new Uint32Array([0, nEmit, PER_EMIT, lk.partMode === 'shape' ? this.nShape : 0]));
     q.writeBuffer(this.simUni, 0, new Float32Array([t]));
     q.writeBuffer(this.simUni, 16, new Float32Array([
       0, -1, 0, 0, // glitter rises straight up the screen
@@ -626,6 +643,7 @@ export class Renderer {
           { binding: 1, resource: { buffer: this.emitBuf } },
           { binding: 2, resource: { buffer: this.flowBuf } },
           { binding: 3, resource: { buffer: this.partBuf } },
+          { binding: 4, resource: { buffer: this.shapeBuf } },
         ],
       })));
       cp.dispatchWorkgroups(Math.ceil((nEmit * PER_EMIT) / 64));
@@ -876,6 +894,29 @@ export class Renderer {
     this.device.queue.copyExternalImageToTexture({ source: cv }, { texture: this.bgTex }, [cv.width, cv.height]);
   }
 
+  /** load the outline points of a particle shape (built-in name or 'user:<id>' SVG) */
+  private wantShape(key: string) {
+    if (!key || key === this.shapeKey || key === this.shapeWant) return;
+    this.shapeWant = key;
+    this.shapeLoad = (async () => {
+      let text: string | null = null;
+      if (key.startsWith('user:')) {
+        const f = this.userFiles ? await this.userFiles(key.slice(5)) : null;
+        if (f?.color) text = await f.color.text();
+      } else {
+        const r = await fetch(`${import.meta.env?.BASE_URL ?? '/'}shapes/${key}.svg`);
+        if (r.ok) text = await r.text();
+      }
+      if (!text || this.shapeWant !== key) return;
+      const pts = svgToPoints(text);
+      if (!pts) { console.warn('[shape] no outline found in', key); return; }
+      this.device.queue.writeBuffer(this.shapeBuf, 0, pts);
+      this.nShape = pts.length / 2;
+      this.shapeKey = key;
+      this.onTexture?.();
+    })().catch((e) => console.warn('[shape]', e));
+  }
+
   /** start loading a note texture if it isn't the one in use */
   private wantTexture(key: string) {
     if (!key || key === this.texWant) return;
@@ -898,8 +939,10 @@ export class Renderer {
   async texturesReady(): Promise<void> {
     if (this.look.texOn) this.wantTexture(this.look.noteTexture);
     if (this.look.bgImageOn && this.look.bgImage) this.wantBackground(this.look.bgImage);
+    if (this.look.partMode === 'shape') this.wantShape(this.look.partShape);
     await this.texLoad;
     await this.bgLoad;
+    await this.shapeLoad;
   }
 
   /** resolves once the GPU has finished all submitted work (for tests and export) */
