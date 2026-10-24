@@ -40,14 +40,10 @@ jobs:
 
       # Fail fast with a readable message instead of a long Rust build that dies at the signing step.
       - name: Check update-signing secrets
-        shell: bash
         env:
-          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          PW: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          [ -n "$KEY" ] || { echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY is missing (Settings > Secrets and variables > Actions)."; exit 1; }
-          [ -n "$PW" ] || { echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD is missing (Settings > Secrets and variables > Actions)."; exit 1; }
-          echo "Signing secrets present."
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: node scripts/check-signing.mjs
 
       - uses: tauri-apps/tauri-action@v0
         env:
