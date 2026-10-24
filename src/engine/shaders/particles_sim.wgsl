@@ -211,8 +211,10 @@ fn alongShape(start: u32, cnt: f32, f: f32) -> vec2f {
   return mix(shape[start + i0].xy, shape[start + i1].xy, fract(g));
 }
 
-// SHAPE: particles rise from the key to the start of an outline (its lowest point), trace the whole outline
-// once in one direction, and disappear as they get back to where they started
+// SHAPE: a key press sends a little swarm up from the key to the start of an outline (its lowest point).
+// The swarm flows round the outline in one direction like sparks, each spark at its own pace and a little off
+// the line, shedding glitter that drifts and fades behind it. Sparks burn out along the way; the furthest ones
+// vanish as they reach the start again. With no notes playing, nothing is left.
 fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   var off: Particle;
   off.pos = vec2f(-10000.0);
@@ -223,51 +225,77 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let ts = E.start + (f32(k) + rnd(st)) / max(E.rate, 1.0);
   if (ts > t) { return off; }
   let size = E.pad0;
-  // which outline: picked by length (a random point on the drawing, then its outline)
   let idx = min(u32(rnd(st) * f32(PP.nShape)), PP.nShape - 1u);
   let P = shape[idx];
   let start = u32(P.z);
   let cnt = P.w;
   let n = abs(cnt);
   let dir = select(1.0, E.count, cnt > 0.0);     // +1 clockwise, -1 anticlockwise (open lines always run forwards)
-  let tRise = 0.6 / max(PP.speed, 0.1);
-  let tTrace = 2.4 * E.pad1 * (n / f32(PP.nShape) * 0.5 + 0.5) / max(PP.speed, 0.1) * (0.98 + 0.04 * rnd(st));
+  let tRise = (0.5 + 0.2 * rnd(st)) / max(PP.speed, 0.1);
+  let pace = 0.82 + 0.36 * rnd(st);               // sparks travel at their own speeds, so the swarm stretches out
+  let tTrace = 2.4 * E.pad1 * (n / f32(PP.nShape) * 0.5 + 0.5) / max(PP.speed, 0.1) / pace;
+  let reach = min(1.0, 0.45 + 0.7 * rnd(st) + 0.2 * E.vn);   // how far round this spark gets before burning out
+  let ph = rnd(st) * 6.2831853;
+  let side = gaussR(st);
+  let isDust = rnd(st) < 0.5;
+  let rel = rnd(st) * reach;                      // dust: where along the trip it is shed
+  let dlife = (0.5 + 0.9 * rnd(st)) * PP.lifeMul;
+  let drift = vec2f(gaussR(st), gaussR(st) - 0.6) * size * 0.05;
   let age = t - ts;
-  if (age > tRise + tTrace) { return off; }
-  let wob = vec2f(gaussR(st), gaussR(st)) * size * 0.005;
   let home = E.vel + shape[start].xy * size;
   var pos: vec2f;
   var vel: vec2f;
   var b = 1.0;
-  if (age < tRise) {
-    // rise from the key and arrive at the start heading along the outline
+
+  // where a spark is on the outline at trip fraction u: a little off the line, wavering
+  let surge = 0.025;
+  if (isDust) {
+    let tr = tRise + rel * tTrace;
+    if (age < tr) { return off; }
+    let a2 = age - tr;
+    if (a2 > dlife) { return off; }
+    let f = (rel + surge * sin(rel * 12.566 + ph)) * select(n * dir, n - 1.0, cnt < 0.0);
+    let p0 = E.vel + alongShape(start, cnt, f) * size;
+    pos = p0 + drift * a2 + vec2f(PP.wind * 40.0, 22.0 * (1.0 + PP.gravity)) * a2 * a2 + turbVel(p0, t) * a2 * 0.12 * PP.swirl;
+    vel = drift;
+    b = 0.55 * (1.0 - a2 / dlife) * (1.0 - a2 / dlife);
+  } else if (age < tRise) {
+    // rise from the key along a loose curve and arrive heading along the outline
     let u = age / tRise;
     let e = u * u * (3.0 - 2.0 * u);
     let ahead = E.vel + alongShape(start, cnt, 4.0 * dir) * size;
-    let p0 = E.pos;
-    let p1 = E.pos + vec2f(gaussR(st) * size * 0.06, -size * 0.25);
-    let p2 = home - normalize(ahead - home + vec2f(1e-4)) * size * 0.18;
+    let p0 = E.pos + vec2f(gaussR(st), gaussR(st)) * size * 0.01;
+    let p1 = E.pos + vec2f(side * size * 0.1, -size * (0.2 + 0.15 * rnd(st)));
+    let p2 = home - normalize(ahead - home + vec2f(1e-4)) * size * (0.12 + 0.1 * rnd(st));
     let m = 1.0 - e;
-    pos = m * m * m * p0 + 3.0 * m * m * e * p1 + 3.0 * m * e * e * p2 + e * e * e * home + wob * e;
+    pos = m * m * m * p0 + 3.0 * m * m * e * p1 + 3.0 * m * e * e * p2 + e * e * e * home;
+    pos += vec2f(sin(age * 9.0 + ph), cos(age * 7.0 + ph)) * size * 0.006;
     vel = (home - p0) / tRise;
-    b = smoothstep(0.0, 0.15, u);
+    b = smoothstep(0.0, 0.2, u);
   } else {
-    // trace the outline once, then vanish as it closes
     let u = (age - tRise) / tTrace;
-    var f = u * n * dir;
-    if (cnt < 0.0) { f = u * (n - 1.0); }
-    pos = E.vel + alongShape(start, cnt, f) * size + wob;
-    vel = (E.vel + alongShape(start, cnt, f + dir) * size - (pos - wob)) * (n / tTrace);
-    b = 1.0 - smoothstep(0.9, 1.0, u);
+    if (u > reach) { return off; }
+    var f = (u + surge * sin(u * 12.566 + ph)) * n * dir;
+    if (cnt < 0.0) { f = (u + surge * sin(u * 12.566 + ph)) * (n - 1.0); }
+    let c = alongShape(start, cnt, f);
+    let c2 = alongShape(start, cnt, f + dir);
+    let T = normalize(c2 - c + vec2f(1e-5));
+    let Nn = vec2f(-T.y, T.x);
+    // off the line: a fixed lane per spark plus a slow waver, growing a little as it travels
+    let lane = (side * 0.012 + sin(age * 4.5 + ph) * 0.008) * (0.6 + 0.8 * u);
+    pos = E.vel + c * size + Nn * lane * size + turbVel(E.vel + c * size, t) * 0.03 * PP.swirl * u;
+    vel = T * size * n / tTrace * 0.01;
+    // burn out: sparks that stop early fade quickly; the ones that make it all the way vanish at the start
+    b = (1.0 - smoothstep(reach - 0.08, reach, u)) * (0.75 + 0.25 * sin(age * 11.0 + ph));
   }
   var o: Particle;
   let twPh = rnd(st) * 6.2831853;
   let s1 = sin(age * (6.0 + 14.0 * rnd(st)) + twPh);
-  let tw = max(mix(1.0, 0.6 + 0.4 * s1 * s1, PP.twinkle), 0.0);
+  let tw = max(mix(1.0, 0.55 + 0.45 * s1 * s1, PP.twinkle), 0.0);
   o.pos = pos;
   o.vel = vel;
-  o.b = (0.9 + 0.6 * rnd(st)) * (0.8 + 0.4 * E.vn) * b * tw;
-  o.star = select(0.0, 1.0, rnd(st) < 0.015 * PP.stars);
+  o.b = (0.85 + 0.6 * rnd(st)) * (0.75 + 0.45 * E.vn) * b * tw;
+  o.star = select(0.0, 1.0, !isDust && rnd(st) < 0.03 * PP.stars);
   o.z = 0.0;
   o.pad = 0.0;
   o.col = vec4f(mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix), tw);
