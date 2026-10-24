@@ -383,15 +383,18 @@ export class Renderer {
     this.shapeKeys = [lk.partShape || 'heart', ...this.scenes.map((sc) => sc.shape || 'heart')];
     for (const n of this.notes) {
       const scene = this.scenes.findIndex((sc) => n.s >= sc.start && n.s < sc.end);
-      const mode = scene >= 0 ? 'shape' : lk.partMode;
       const sc = scene >= 0 ? this.scenes[scene] : null;
-      const slot = scene >= 0 ? scene + 1 : 0;
-      const shapeDir = (sc ? sc.dir : lk.partShapeDir) === 'ccw' ? -1 : 1;
-      const shapeSize = sc ? sc.size : lk.partShapeSize;
       kb.H = trackingMatrix(this.proj, Math.round(n.s * this.proj.video.fps));
       const tg = kb.target(n.p);
-      const rnd = mulberry32(n.idx * 7919 + 101);
       const vv = lk.partVelocity ? n.vn : 0.5; // "louder notes, bigger plumes" off: every note average
+      // in a shape section the note sends sparks to the shape, and (unless turned off) its usual particles too
+      const jobs: { mode: string; slot: number; dir: number; size: number }[] = [];
+      if (!sc || sc.keep !== false) jobs.push({ mode: lk.partMode, slot: 0, dir: lk.partShapeDir === 'ccw' ? -1 : 1, size: lk.partShapeSize });
+      if (sc) jobs.push({ mode: 'shape', slot: scene + 1, dir: sc.dir === 'ccw' ? -1 : 1, size: sc.size });
+      for (const job of jobs) {
+      const { mode, slot } = job;
+      const shapeDir = job.dir, shapeSize = job.size;
+      const rnd = mulberry32(n.idx * 7919 + 101 + slot * 31);
       if (mode !== 'plume') {
         const held = Math.min(4, Math.max(0.2, n.e - n.s));
         const slope = Math.abs(tg.along[0]) > 1e-3 ? tg.along[1] / tg.along[0] : 0;
@@ -414,7 +417,7 @@ export class Renderer {
           const cy = Math.max(size * 0.55, Math.min(...ends.map((e) => e[1]), c0[1]) - tg.unit * 2.5 - size * 0.5);
           const cx = Math.min(this.srcW - size * 0.55, Math.max(size * 0.55, c0[0]));
           const rate = (this.shapeHasFill[slot] ? 1000 : 450) * (0.6 + 0.8 * vv) * lk.partAmount;
-          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.15 + (1.6 + 7.5 * lk.partShapeHold) / Math.max(0.1, lk.partSpeed) + 2.1 * lk.partLife, data: [n.s, 0.15, rate, shapeDir * (slot + 1), tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
+          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.15 + (1.6 + 7.5 * lk.partShapeHold) / Math.max(0.1, lk.partSpeed) + 2.1 * lk.partLife, data: [n.s, 0.15, rate, shapeDir * (slot + 1), tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16 + 12, 5, size, lk.partShapeHold] });
         } else {
           const mid = this.whiteKeys / 2;
           const c0 = kb.P(mid, kb.edgeY(mid));
@@ -441,6 +444,7 @@ export class Renderer {
       }
       const burst = Math.floor((24 + 30 * vv) * lk.partAmount);
       if (burst > 0) rows.push({ start: n.s, end: n.s + 1.4 * lk.partLife, data: [n.s, 0, 0, burst, tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 8, 1, 0, 0] });
+      }
     }
     rows.sort((a, b) => a.start - b.start);
     this.emit = new Float32Array(rows.length * 16);
