@@ -3,6 +3,27 @@
 
 import type { RGB } from './project';
 
+export type NoteStyle = 'glass' | 'neon' | 'frosted' | 'crystal' | 'chrome' | 'flat' | 'outline' | 'block3d' | 'texture';
+export type NoteShape = 'bar' | 'pill' | 'gem' | 'drop';
+export const NOTE_STYLES: { id: NoteStyle; label: string }[] = [
+  { id: 'glass', label: 'Glass' }, { id: 'neon', label: 'Neon tube' }, { id: 'frosted', label: 'Frosted' }, { id: 'crystal', label: 'Crystal' },
+  { id: 'chrome', label: 'Chrome' }, { id: 'flat', label: 'Flat' }, { id: 'outline', label: 'Outline' }, { id: 'block3d', label: '3D block' },
+  { id: 'texture', label: 'Texture' },
+];
+export const NOTE_SHAPES: { id: NoteShape; label: string }[] = [
+  { id: 'bar', label: 'Bar' }, { id: 'pill', label: 'Pill' }, { id: 'gem', label: 'Gem' }, { id: 'drop', label: 'Drop' },
+];
+
+/** Built-in note textures (CC0, ambientCG). A custom texture is 'file:' + the image's path on this computer. */
+export const NOTE_TEXTURES: { id: string; label: string; credit: string }[] = [
+  { id: 'ice', label: 'Ice', credit: 'Ice004 · ambientCG (CC0)' },
+  { id: 'onyx', label: 'Onyx', credit: 'Onyx007 · ambientCG (CC0)' },
+  { id: 'marble', label: 'Marble', credit: 'Marble016 · ambientCG (CC0)' },
+  { id: 'foil', label: 'Gold foil', credit: 'Foil002 · ambientCG (CC0)' },
+];
+export type TexMode = 'tint' | 'natural' | 'glow';
+export const TEX_MODES: TexMode[] = ['tint', 'natural', 'glow'];
+
 export type PaletteId = 'teal' | 'swan' | 'ember' | 'neon' | 'aurora' | 'rainbow' | 'mono' | 'hands';
 
 export interface Look {
@@ -22,6 +43,15 @@ export interface Look {
   noteRim: number; // bright rim
   noteRound: number; // corner roundness 0..1
   noteFade: number; // fade in near the frame edge 0..1
+  noteStyle: NoteStyle;
+  noteShape: NoteShape;
+  noteDepth: number; // 3D block depth
+  noteTexture: string; // built-in id or 'file:<path>'
+  texMode: TexMode; // tint by note colour, natural colours, or glow where the texture is bright
+  texScale: number; // texture size relative to the note width
+  texRelief: number; // strength of the surface bumps
+  texShine: number; // highlights
+  texSolid: number; // 0 = see-through, 1 = solid
   // saber
   saberBright: number;
   saberThick: number;
@@ -68,7 +98,8 @@ export interface Look {
 
 export const DEFAULT_LOOK: Look = {
   palette: 'teal', colorA: '#3c6eff', colorB: '#78ffaa', splitNote: 60,
-  noteAngle: null, noteSpeed: 680, noteWidth: 1, noteVelocity: 1, noteBright: 1, noteGlow: 1, noteFill: 1, noteRim: 1, noteRound: 1, noteFade: 1,
+  noteAngle: null, noteSpeed: 680, noteWidth: 1, noteVelocity: 1, noteBright: 1, noteGlow: 1, noteFill: 1, noteRim: 1, noteRound: 1, noteFade: 1, noteStyle: 'glass', noteShape: 'bar', noteDepth: 1,
+  noteTexture: 'ice', texMode: 'tint', texScale: 1, texRelief: 1, texShine: 1, texSolid: 0.85,
   saberBright: 1, saberThick: 1, saberFlicker: 1, saberReact: 1, saberTint: 1,
   flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3,
   keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
@@ -145,8 +176,9 @@ export function saberBase(look: Look): RGB {
 export type LayerId = 'colors' | 'notes' | 'saber' | 'impact' | 'particles' | 'lighting' | 'background' | 'finish';
 
 export type Control =
-  | { key: keyof Look; kind: 'slider'; label: string; min: number; max: number; step: number; unit?: string; fmt?: (v: number) => string; hint?: string }
-  | { key: keyof Look; kind: 'select'; label: string; options: { value: string; label: string }[] }
+  | { key: keyof Look; kind: 'slider'; label: string; min: number; max: number; step: number; unit?: string; fmt?: (v: number) => string; hint?: string; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'select'; label: string; options: { value: string; label: string }[]; when?: (l: Look) => boolean; segmented?: boolean }
+  | { key: keyof Look; kind: 'texture'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'color'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'toggle'; label: string; hint?: string }
   | { key: keyof Look; kind: 'note'; label: string; when?: (l: Look) => boolean };
@@ -156,6 +188,7 @@ export interface Section { title: string; controls: Control[] }
 const pct = (v: number) => `${Math.round(v * 100)}`;
 const x = (v: number) => `${v.toFixed(2)}×`;
 const s1 = (v: number) => `${v.toFixed(1)} s`;
+const tex = (l: Look) => l.noteStyle === 'texture';
 
 export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
   colors: [
@@ -176,10 +209,19 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
       { key: 'noteRound', kind: 'slider', label: 'Rounded corners', min: 0, max: 1.6, step: 0.01, fmt: pct },
       { key: 'noteVelocity', kind: 'slider', label: 'Louder notes bigger', min: 0, max: 2, step: 0.01, fmt: pct },
     ] },
+    { title: 'Material', controls: [
+      { key: 'noteStyle', kind: 'select', label: 'Material', segmented: true, options: [{ value: 'glass', label: 'Glass' }, { value: 'texture', label: 'Texture' }] },
+      { key: 'noteTexture', kind: 'texture', label: 'Texture', when: tex },
+      { key: 'texMode', kind: 'select', label: 'Colour', segmented: true, when: tex, options: [{ value: 'tint', label: 'Tinted' }, { value: 'natural', label: 'Natural' }, { value: 'glow', label: 'Glow' }] },
+      { key: 'texScale', kind: 'slider', label: 'Texture size', min: 0.25, max: 4, step: 0.01, fmt: x, when: tex },
+      { key: 'texRelief', kind: 'slider', label: 'Bumps', min: 0, max: 3, step: 0.01, fmt: pct, when: tex, hint: 'How strongly the surface detail catches the light' },
+      { key: 'texShine', kind: 'slider', label: 'Shine', min: 0, max: 3, step: 0.01, fmt: pct, when: tex },
+      { key: 'texSolid', kind: 'slider', label: 'Solid', min: 0, max: 1, step: 0.01, fmt: pct, when: tex, hint: 'Low lets the video show through the notes' },
+    ] },
     { title: 'Look', controls: [
       { key: 'noteBright', kind: 'slider', label: 'Brightness', min: 0.2, max: 2, step: 0.01, fmt: pct },
       { key: 'noteRim', kind: 'slider', label: 'Rim light', min: 0, max: 2, step: 0.01, fmt: pct },
-      { key: 'noteFill', kind: 'slider', label: 'Glass body', min: 0, max: 3, step: 0.01, fmt: pct },
+      { key: 'noteFill', kind: 'slider', label: 'Body', min: 0, max: 3, step: 0.01, fmt: pct },
       { key: 'noteGlow', kind: 'slider', label: 'Glow', min: 0, max: 3, step: 0.01, fmt: pct },
       { key: 'noteFade', kind: 'slider', label: 'Fade in', min: 0, max: 1, step: 0.01, fmt: pct, hint: 'How softly notes appear at the edge of the frame' },
     ] },

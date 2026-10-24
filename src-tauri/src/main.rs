@@ -3,6 +3,7 @@
 
 mod media;
 mod projects;
+mod textures;
 
 /// Write a project file to the path the user picked in the save dialog.
 #[tauri::command]
@@ -22,6 +23,9 @@ fn main() {
             media::allow_media,
             media::converter_ready,
             media::convert_video,
+            textures::import_texture,
+            textures::list_textures,
+            textures::delete_texture,
             projects::list_projects,
             projects::save_project,
             projects::load_project,

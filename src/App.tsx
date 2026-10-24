@@ -1,3 +1,4 @@
+import { userTextureFiles } from './ui/textureStore';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_LAYERS, Layers, Renderer } from './engine/renderer';
 import { CalibratedProject, testNotes } from './engine/calibration';
@@ -79,6 +80,7 @@ export default function App() {
       .then((r) => {
         if (cancelled) return;
         rendererRef.current = r;
+        r.userFiles = userTextureFiles;
         setGpuName(r.adapterName);
         (window as unknown as { pianoverse: unknown }).pianoverse = { renderer: r };
       })
@@ -118,6 +120,8 @@ export default function App() {
   useEffect(() => {
     if (previewing && renderProject && rendererRef.current) { rendererRef.current.setProject(renderProject); draw(); }
   }, [renderProject, gpuName, draw, previewing]);
+  // a note texture finished loading: show it even while paused
+  useEffect(() => { const r = rendererRef.current; if (r) r.onTexture = () => { if (previewing) draw(); }; }, [gpuName, draw, previewing]);
   useEffect(() => { rendererRef.current?.setScale(scale); if (previewing) draw(); }, [scale, gpuName, draw, previewing]);
   useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (previewing) draw(); } }, [layers, draw, previewing]);
   const attachPreview = useCallback((c: HTMLCanvasElement | null) => {

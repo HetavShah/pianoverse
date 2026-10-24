@@ -13,17 +13,19 @@ page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) console.log('[console]', m.text()); });
 await page.addInitScript(() => { window.__pvHeadless = true; });
 await page.goto('http://localhost:4173/'); await page.waitForTimeout(800);
-await page.setInputFiles('.row-actions input[type=file]', 'samples/interstellar-take1.pvproj.json');
+const PROJ = process.env.PROJ ?? 'samples/interstellar-take1.pvproj.json';
+await page.setInputFiles('.row-actions input[type=file]', PROJ);
 await page.waitForTimeout(600);
 await page.setInputFiles('.file-card .actions input[type=file]', CLIP);
 await page.waitForTimeout(1500);
-const proj = JSON.parse(readFileSync('samples/interstellar-take1.pvproj.json', 'utf8'));
+const proj = JSON.parse(readFileSync(PROJ, 'utf8'));
 if (LOOK) proj.look = { ...(proj.look ?? {}), ...LOOK };
 for (const t of TIMES) {
   const url = await page.evaluate(async ({ proj, t, scale }) => {
     const r = window.pianoverse.renderer;
     r.setScale(scale);
     r.setProject(proj);
+    await r.texturesReady?.();
     const v = document.querySelector('video');
     v.currentTime = t; await new Promise((res) => v.addEventListener('seeked', res, { once: true }));
     const fc = document.createElement('canvas'); fc.width = v.videoWidth; fc.height = v.videoHeight; fc.getContext('2d').drawImage(v, 0, 0);

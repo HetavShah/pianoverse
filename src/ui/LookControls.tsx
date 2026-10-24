@@ -1,12 +1,59 @@
 // Controls for one layer of the look, generated from LOOK_SCHEMA.
 import { noteName } from '../engine/calibration';
-import { Control, LayerId, Look, LOOK_SCHEMA, noteColor, PALETTES, PaletteId, toHex } from '../engine/look';
+import { useEffect, useState } from 'react';
+import { Control, LayerId, Look, LOOK_SCHEMA, NOTE_TEXTURES, noteColor, PALETTES, PaletteId, toHex } from '../engine/look';
+import { deleteTexture, importTexture, textureThumb, UserTexture, useUserTextures } from './textureStore';
 
 const swatch = (look: Look, id: PaletteId) => {
   const l = { ...look, palette: id };
   const stops = [40, 52, 63, 74, 86].map((p) => toHex(noteColor(l, p)));
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 };
+
+function UserThumb({ t }: { t: UserTexture }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => { textureThumb(t).then(setUrl).catch(() => {}); }, [t]);
+  return url ? <img src={url} alt="" /> : <span className="tex-blank" />;
+}
+
+/** built-in textures, the user's own, and an Upload button */
+function TexturePicker({ value, set }: { value: string; set: (v: string) => void }) {
+  const mine = useUserTextures();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const base = import.meta.env.BASE_URL ?? '/';
+  const upload = async () => {
+    setErr(''); setBusy(true);
+    try {
+      const t = await importTexture();
+      if (t) set('user:' + t.id);
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="ctl">
+      <div className="tex-grid">
+        {NOTE_TEXTURES.map((t) => (
+          <button key={t.id} type="button" className={'tex' + (value === t.id ? ' on' : '')} onClick={() => set(t.id)} title={t.credit}>
+            <img src={`${base}textures/${t.id}/thumb.jpg`} alt="" /><span>{t.label}</span>
+          </button>
+        ))}
+        {mine.map((t) => (
+          <div key={t.id} className={'tex mine' + (value === 'user:' + t.id ? ' on' : '')} title={t.name + (t.files.normal ? ' · with normal map' : '')}>
+            <button type="button" className="tex-pick" onClick={() => set('user:' + t.id)}><UserThumb t={t} /><span>{t.name}</span></button>
+            <button type="button" className="tex-del" aria-label={`Remove ${t.name}`} title="Remove from your textures"
+              onClick={async () => { if (value === 'user:' + t.id) set(NOTE_TEXTURES[0].id); await deleteTexture(t.id); }}>×</button>
+          </div>
+        ))}
+        <button type="button" className="tex add" onClick={upload} disabled={busy} title="Use your own image. Picking a *_Color file from ambientCG or Poly Haven also brings in its normal and roughness maps.">
+          <span className="plus">+</span><span>{busy ? 'Adding…' : 'Upload'}</span>
+        </button>
+      </div>
+      {err && <small className="danger-text">{err}</small>}
+    </div>
+  );
+}
 
 function Row({ c, look, base, set }: { c: Control; look: Look; base: Look; set: (k: keyof Look, v: unknown) => void }) {
   const v = look[c.key];
@@ -51,7 +98,19 @@ function Row({ c, look, base, set }: { c: Control; look: Look; base: Look; set: 
         </label>
       );
     }
+    case 'texture':
+      return <TexturePicker value={v as string} set={(x) => set(c.key, x)} />;
     case 'select':
+      if (c.segmented) {
+        return (
+          <div className="ctl">
+            {c.label !== 'Material' && <div className="ctl-head"><span>{c.label}</span>{reset}</div>}
+            <div className="seg full">
+              {c.options.map((o) => <button key={o.value} type="button" className={String(v) === o.value ? 'on' : ''} onClick={() => set(c.key, o.value)}>{o.label}</button>)}
+            </div>
+          </div>
+        );
+      }
       if (c.key === 'palette') {
         return (
           <div className="palettes">

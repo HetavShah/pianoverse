@@ -8,7 +8,7 @@ struct Frame {
   grain: f32,
   // look (see look.ts; 1 = the original approved look)
   noteBright: f32, noteGlow: f32, noteFill: f32, noteRim: f32,
-  noteRound: f32, lpad0: f32, lpad1: f32, lpad2: f32,
+  noteRound: f32, noteStyle: f32, noteShape: f32, noteDepth: f32,
   saberBright: f32, saberThick: f32, saberFlicker: f32, saberReact: f32,
   saberTint: f32, lpad3: f32, lpad4: f32, lpad5: f32,
   saberBase: vec4f,

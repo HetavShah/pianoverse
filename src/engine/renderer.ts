@@ -1,8 +1,9 @@
 // WebGPU renderer: video frame + glass notes + saber + key glow + impact sprites + particle plumes + bloom.
 import commonSrc from './shaders/common.wgsl?raw';
 import { fallUp } from './direction';
-import { DEFAULT_LOOK, Look, resolveLook, saberBase } from './look';
+import { DEFAULT_LOOK, Look, NOTE_SHAPES, NOTE_STYLES, resolveLook, saberBase } from './look';
 import glassSrc from './shaders/glass.wgsl?raw';
+import { loadTexSet, placeholder, TexSet, UserFiles } from './noteTextures';
 import keysSrc from './shaders/keys.wgsl?raw';
 import spritesSrc from './shaders/sprites.wgsl?raw';
 import saberSrc from './shaders/saber.wgsl?raw';
@@ -92,6 +93,15 @@ export class Renderer {
   private compPipeOff: GPURenderPipeline;
   private offTex: GPUTexture | null = null;
 
+  // note texture (the Texture note style)
+  private texSampler: GPUSampler;
+  private texUni: GPUBuffer;
+  private tex: TexSet;
+  private texWant = '';
+  private texLoad: Promise<void> = Promise.resolve();
+  /** reads the user's own textures (set by the app) */
+  userFiles: UserFiles | null = null;
+
   private videoTex: GPUTexture | null = null;
   private lightTex!: GPUTexture;
   private b1a!: GPUTexture;
@@ -126,6 +136,9 @@ export class Renderer {
     const U = GPUBufferUsage;
     this.sampler = d.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
     this.frameBuf = buf(192, U.UNIFORM | U.COPY_DST);
+    this.texSampler = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
+    this.texUni = buf(48, U.UNIFORM | U.COPY_DST);
+    this.tex = placeholder(d);
     this.glassBuf = buf(MAX_GLASS * 48, U.VERTEX | U.COPY_DST);
     this.keysBuf = buf(MAX_KEYS * 6 * 28, U.VERTEX | U.COPY_DST);
     this.spriteBuf = buf(MAX_SPRITES * 48, U.VERTEX | U.COPY_DST);
@@ -421,7 +434,8 @@ export class Renderer {
     const sb = saberBase(lk);
     q.writeBuffer(this.frameBuf, 0, new Float32Array([
       this.srcW, this.srcH, this.rtW, this.rtH, this.scale, t, bass, Math.floor(t * 24),
-      lk.noteBright, lk.noteGlow, lk.noteFill, lk.noteRim, lk.noteRound, 0, 0, 0,
+      lk.noteBright, lk.noteGlow, lk.noteFill, lk.noteRim, lk.noteRound,
+      Math.max(0, NOTE_STYLES.findIndex((x) => x.id === lk.noteStyle)), Math.max(0, NOTE_SHAPES.findIndex((x) => x.id === lk.noteShape)), lk.noteDepth,
       lk.saberBright, lk.saberThick, lk.saberFlicker, lk.saberReact, lk.saberTint, 0, 0, 0,
       sb[0], sb[1], sb[2], 0,
       lk.partSize, lk.partHaze, 0, 0,
@@ -429,6 +443,8 @@ export class Renderer {
       lk.bassPulse, 0, 0, 0,
     ]));
     if (glass.length) q.writeBuffer(this.glassBuf, 0, new Float32Array(glass));
+    if (lk.noteStyle === 'texture') this.wantTexture(lk.noteTexture);
+    q.writeBuffer(this.texUni, 0, new Float32Array([['tint', 'natural', 'glow'].indexOf(lk.texMode), lk.texScale, lk.texRelief, lk.texShine, lk.texSolid, this.tex.size, this.tex.lo, this.tex.hi, this.tex.metal, this.tex.tile, 0, 0]));
     if (keys.length) q.writeBuffer(this.keysBuf, 0, new Float32Array(keys));
     if (sprites.length) q.writeBuffer(this.spriteBuf, 0, new Float32Array(sprites));
     if (lights.length) q.writeBuffer(this.lightsBuf, 0, new Float32Array(lights));
@@ -490,6 +506,16 @@ export class Renderer {
     if (glass.length) {
       lp.setPipeline(this.glassPipe);
       lp.setBindGroup(0, frameGroup('glass', this.glassPipe));
+      lp.setBindGroup(1, this.group('tex-' + this.tex.key, () => d.createBindGroup({
+        layout: this.glassPipe.getBindGroupLayout(1),
+        entries: [
+          { binding: 0, resource: this.texSampler },
+          { binding: 1, resource: this.tex.color.createView() },
+          { binding: 2, resource: this.tex.normal.createView() },
+          { binding: 3, resource: this.tex.rough.createView() },
+          { binding: 4, resource: { buffer: this.texUni } },
+        ],
+      })));
       lp.setVertexBuffer(0, this.glassBuf);
       lp.draw(4, glass.length / 12);
     }
@@ -603,6 +629,30 @@ export class Renderer {
     rb.unmap();
     rb.destroy();
     return { width: w, height: h, data };
+  }
+
+  /** start loading a note texture if it isn't the one in use */
+  private wantTexture(key: string) {
+    if (!key || key === this.texWant) return;
+    this.texWant = key;
+    this.texLoad = loadTexSet(this.device, key, this.userFiles).then((set) => {
+      if (this.texWant !== key) { set?.color.destroy(); set?.normal.destroy(); set?.rough.destroy(); return; }
+      if (!set) { console.warn('[texture] could not load', key); return; }
+      const old = this.tex;
+      this.tex = set;
+      for (const k of Object.keys(this.groups)) if (k.startsWith('tex-')) delete this.groups[k];
+      if (old.key) { old.color.destroy(); old.normal.destroy(); old.rough.destroy(); }
+      this.onTexture?.();
+    });
+  }
+
+  /** called when a texture finishes loading, so a paused preview can redraw */
+  onTexture: (() => void) | null = null;
+
+  /** resolves once the current look's texture has loaded (for tests and export) */
+  async texturesReady(): Promise<void> {
+    if (this.look.noteStyle === 'texture') this.wantTexture(this.look.noteTexture);
+    await this.texLoad;
   }
 
   /** resolves once the GPU has finished all submitted work (for tests and export) */
