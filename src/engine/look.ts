@@ -15,7 +15,8 @@ export const NOTE_3D: { id: Note3D; label: string }[] = [
 export const KEY_NAMES = ['C', 'C♯ / D♭', 'D', 'E♭', 'E', 'F', 'F♯ / G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
 /** Built-in note textures (CC0, ambientCG). A custom texture is 'file:' + the image's path on this computer. */
-export const NOTE_TEXTURES: { id: string; label: string; credit: string }[] = [
+export const NOTE_TEXTURES: { id: string; label: string; credit: string; video?: boolean }[] = [
+  { id: 'crystal', label: 'Crystal flow', credit: 'Moving video texture made from Ice004 · ambientCG (CC0)', video: true },
   { id: 'ice', label: 'Ice', credit: 'Ice004 · ambientCG (CC0)' },
   { id: 'onyx', label: 'Onyx', credit: 'Onyx007 · ambientCG (CC0)' },
   { id: 'marble', label: 'Marble', credit: 'Marble016 · ambientCG (CC0)' },

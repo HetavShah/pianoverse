@@ -25,6 +25,7 @@ const MAPS: [(&str, &[&str]); 3] = [
     ("metal", &["Metalness", "metalness", "metallic", "metal"]),
 ];
 const EXTS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "bmp"];
+const VIDEO_EXTS: [&str; 4] = ["mp4", "webm", "mov", "m4v"];
 
 /// "Foil002_1K-PNG_Color.png" -> ("…/Foil002_1K-PNG", "Foil002 1K-PNG") when it follows the usual naming
 fn stem_of(path: &Path) -> Option<(PathBuf, String)> {
@@ -75,11 +76,11 @@ fn read_one(d: &Path, id: &str) -> Option<UserTexture> {
     for e in std::fs::read_dir(d).ok()?.flatten() {
         let p = e.path();
         let Some(stem) = p.file_stem().and_then(|s| s.to_str()) else { continue };
-        if ["color", "normal", "rough", "metal"].contains(&stem) {
+        if ["color", "video", "normal", "rough", "metal"].contains(&stem) {
             files.insert(stem.to_string(), p.to_string_lossy().to_string());
         }
     }
-    files.contains_key("color").then(|| UserTexture { id: id.to_string(), name: name.trim().to_string(), files })
+    (files.contains_key("color") || files.contains_key("video")).then(|| UserTexture { id: id.to_string(), name: name.trim().to_string(), files })
 }
 
 /// Copy an image (and its normal / roughness / metalness maps if they sit next to it) into the library.
@@ -90,8 +91,9 @@ pub fn import_texture(app: AppHandle, path: String) -> Result<UserTexture, Strin
         return Err(format!("Could not find {path}"));
     }
     let size = std::fs::metadata(&src).map_err(|e| e.to_string())?.len();
+    let is_video = VIDEO_EXTS.contains(&ext(&src).as_str());
     if size > 64 * 1024 * 1024 {
-        return Err("That image is too large to use as a texture (over 64 MB).".into());
+        return Err(if is_video { "That video is too large to use as a texture (over 64 MB). A short loop of a few seconds works best." } else { "That image is too large to use as a texture (over 64 MB)." }.into());
     }
     let (stem, name) = stem_of(&src).unwrap_or_else(|| {
         let n = src.file_stem().and_then(|s| s.to_str()).unwrap_or("Texture").to_string();
@@ -102,8 +104,12 @@ pub fn import_texture(app: AppHandle, path: String) -> Result<UserTexture, Strin
     let d = dir(&app, &id)?;
     std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
     let copy = |from: &Path, to: &str| std::fs::copy(from, d.join(format!("{to}.{}", ext(from)))).map_err(|e| e.to_string());
-    copy(&src, "color")?;
-    if stem_of(&src).is_some() {
+    if is_video {
+        copy(&src, "video")?;
+    } else {
+        copy(&src, "color")?;
+    }
+    if !is_video && stem_of(&src).is_some() {
         for (to, names) in MAPS {
             if let Some(p) = find_map(&stem, names) {
                 copy(&p, to)?;

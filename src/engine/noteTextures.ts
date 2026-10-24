@@ -10,11 +10,17 @@ export interface TexSet {
   metal: number;
   /** how large the texture is drawn by default, relative to the note width */
   tile: number;
+  /** video textures: the playing video, redrawn into the colour map every frame */
+  video?: HTMLVideoElement;
+  frame?: OffscreenCanvas;
 }
+
+/** built-in textures that are videos */
+const VIDEO_IDS = new Set(['crystal']);
 
 const METAL: Record<string, number> = { foil: 1 };
 // fine patterns (marble's hairline veins, foil's crinkles) need to be drawn larger to read on a narrow note
-const TILE: Record<string, number> = { ice: 1.3, onyx: 1.6, marble: 3.5, foil: 2.5 };
+const TILE: Record<string, number> = { ice: 1.3, onyx: 1.6, marble: 3.5, foil: 2.5, crystal: 1.6 };
 
 function levels(c: ImageData): [number, number] {
   const hist = new Uint32Array(256);
@@ -29,7 +35,7 @@ function levels(c: ImageData): [number, number] {
 }
 
 /** the image files of one of the user's textures (the app reads them from its texture library) */
-export type UserFiles = (id: string) => Promise<{ color: Blob; normal?: Blob; rough?: Blob; metal?: Blob } | null>;
+export type UserFiles = (id: string) => Promise<{ color?: Blob; video?: Blob; normal?: Blob; rough?: Blob; metal?: Blob } | null>;
 
 const SIZE = 512;
 
@@ -111,7 +117,76 @@ function deriveRough(c: ImageData): ImageData {
   return out;
 }
 
+function openVideo(src: string): Promise<HTMLVideoElement | null> {
+  return new Promise((resolve) => {
+    const v = document.createElement('video');
+    v.muted = true; v.loop = true; v.playsInline = true; v.crossOrigin = 'anonymous'; v.preload = 'auto';
+    const done = (ok: boolean) => { v.onloadeddata = null; v.onerror = null; resolve(ok ? v : null); };
+    v.onloadeddata = () => done(true);
+    v.onerror = () => done(false);
+    v.src = src;
+    setTimeout(() => done(v.readyState >= 2), 15000);
+  });
+}
+
+/** draw the video's current frame into the colour map (with mipmaps) */
+export function refreshVideo(device: GPUDevice, set: TexSet) {
+  const v = set.video;
+  if (!v || v.readyState < 2 || !v.videoWidth) return;
+  const c = set.frame ?? (set.frame = new OffscreenCanvas(SIZE, SIZE));
+  const g = c.getContext('2d')!;
+  const sz = Math.min(v.videoWidth, v.videoHeight);
+  g.drawImage(v, (v.videoWidth - sz) / 2, (v.videoHeight - sz) / 2, sz, sz, 0, 0, SIZE, SIZE);
+  mipsFrom(device, set.color, c);
+}
+
+/** wait until the video shows the frame for time t (loops) — for exact, repeatable frames in export */
+export async function seekVideo(set: TexSet, t: number) {
+  const v = set.video;
+  if (!v || !v.duration || !isFinite(v.duration)) return;
+  const want = ((t % v.duration) + v.duration) % v.duration;
+  if (Math.abs(v.currentTime - want) < 1 / 120) return;
+  v.pause();
+  await new Promise<void>((res) => { const f = () => { v.removeEventListener('seeked', f); res(); }; v.addEventListener('seeked', f); v.currentTime = want; setTimeout(res, 3000); });
+}
+
+function mipsFrom(device: GPUDevice, tex: GPUTexture, src0: OffscreenCanvas) {
+  let src = src0;
+  for (let l = 0, s = SIZE; l < tex.mipLevelCount; l++, s = Math.max(1, s >> 1)) {
+    let lvl = src;
+    if (l > 0) {
+      lvl = new OffscreenCanvas(s, s);
+      lvl.getContext('2d')!.drawImage(src, 0, 0, s, s);
+      src = lvl;
+    }
+    device.queue.copyExternalImageToTexture({ source: lvl }, { texture: tex, mipLevel: l }, [s, s]);
+  }
+}
+
+const flat = (device: GPUDevice, r: number, g: number, b: number) => {
+  const c = new ImageData(SIZE, SIZE);
+  for (let i = 0; i < c.data.length; i += 4) { c.data[i] = r; c.data[i + 1] = g; c.data[i + 2] = b; c.data[i + 3] = 255; }
+  return upload(device, c);
+};
+
+async function loadVideoSet(device: GPUDevice, key: string, src: string, tile: number): Promise<TexSet | null> {
+  const v = await openVideo(src);
+  if (!v) return null;
+  v.play().catch(() => {});
+  const set: TexSet = {
+    key, size: SIZE, lo: 0.05, hi: 0.95, metal: 0, tile,
+    color: flat(device, 0, 0, 0), normal: flat(device, 128, 128, 255), rough: flat(device, 90, 90, 90), video: v,
+  };
+  refreshVideo(device, set);
+  return set;
+}
+
 export async function loadTexSet(device: GPUDevice, key: string, userFiles: UserFiles | null): Promise<TexSet | null> {
+  if (VIDEO_IDS.has(key)) return loadVideoSet(device, key, `${import.meta.env?.BASE_URL ?? '/'}textures/${key}/video.webm`, TILE[key] ?? 1.6);
+  if (key.startsWith('user:')) {
+    const f = userFiles ? await userFiles(key.slice(5)) : null;
+    if (f?.video) return loadVideoSet(device, key, URL.createObjectURL(f.video), 1.6);
+  }
   let color: ImageBitmap | null, normal: ImageBitmap | null = null, rough: ImageBitmap | null = null;
   let metal = METAL[key] ?? 0;
   if (key.startsWith('user:')) {

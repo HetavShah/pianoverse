@@ -4,7 +4,7 @@ import { fallUp } from './direction';
 import { DEFAULT_LOOK, Look, NOTE_2D, NOTE_3D, resolveLook, saberBase } from './look';
 import glassSrc from './shaders/glass.wgsl?raw';
 import labelsSrc from './shaders/labels.wgsl?raw';
-import { loadTexSet, placeholder, TexSet, UserFiles } from './noteTextures';
+import { loadTexSet, placeholder, refreshVideo, seekVideo, TexSet, UserFiles } from './noteTextures';
 import keysSrc from './shaders/keys.wgsl?raw';
 import spritesSrc from './shaders/sprites.wgsl?raw';
 import saberSrc from './shaders/saber.wgsl?raw';
@@ -529,7 +529,13 @@ export class Renderer {
     ]));
     if (glass.length) q.writeBuffer(this.glassBuf, 0, new Float32Array(glass));
     if (labels.length) q.writeBuffer(this.labelBuf, 0, new Float32Array(labels));
-    if (lk.texOn) this.wantTexture(lk.noteTexture);
+    if (lk.texOn) {
+      this.wantTexture(lk.noteTexture);
+      if (this.tex.video) {
+        if (!offscreen && this.tex.video.paused) this.tex.video.play().catch(() => {});
+        refreshVideo(this.device, this.tex);
+      }
+    }
     q.writeBuffer(this.noteUni, 0, this.noteParams(lk));
     q.writeBuffer(this.texUni, 0, new Float32Array([['tint', 'natural', 'glow'].indexOf(lk.texMode), lk.texScale, lk.texRelief, lk.texShine, lk.texSolid, this.tex.size, this.tex.lo, this.tex.hi, this.tex.metal, this.tex.tile, lk.texReflect ? 1 : 0, lk.texLive]));
     if (keys.length) q.writeBuffer(this.keysBuf, 0, new Float32Array(keys));
@@ -713,6 +719,8 @@ export class Renderer {
 
   /** Renders one frame offscreen and returns its RGBA pixels (used by export and tests). */
   async capture(source: FrameSource | null, t: number): Promise<{ width: number; height: number; data: Uint8Array }> {
+    // video textures show exactly the frame for this moment (export must be repeatable)
+    if (this.look.texOn && this.tex.video) await seekVideo(this.tex, t);
     this.render(source, t, true);
     const w = this.rtW, h = this.rtH;
     const bpr = Math.ceil((w * 4) / 256) * 256;
@@ -757,12 +765,12 @@ export class Renderer {
     if (!key || key === this.texWant) return;
     this.texWant = key;
     this.texLoad = loadTexSet(this.device, key, this.userFiles).then((set) => {
-      if (this.texWant !== key) { set?.color.destroy(); set?.normal.destroy(); set?.rough.destroy(); return; }
+      if (this.texWant !== key) { set?.video?.pause(); set?.color.destroy(); set?.normal.destroy(); set?.rough.destroy(); return; }
       if (!set) { console.warn('[texture] could not load', key); return; }
       const old = this.tex;
       this.tex = set;
       for (const k of Object.keys(this.groups)) if (k.startsWith('tex-')) delete this.groups[k];
-      if (old.key) { old.color.destroy(); old.normal.destroy(); old.rough.destroy(); }
+      if (old.key) { old.video?.pause(); old.color.destroy(); old.normal.destroy(); old.rough.destroy(); }
       this.onTexture?.();
     });
   }
