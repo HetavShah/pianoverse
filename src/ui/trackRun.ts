@@ -34,6 +34,7 @@ export function startTracking(opts: {
   let cancelled = false;
   const v = document.createElement('video') as RVFC;
   v.muted = true;
+  v.crossOrigin = 'anonymous';
   v.playsInline = true;
   v.preload = 'auto';
   v.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';

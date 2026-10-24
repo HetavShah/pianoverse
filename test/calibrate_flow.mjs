@@ -19,7 +19,7 @@ const ins = await page.$$('.start input[type=file]');
 await ins[0].setInputFiles(process.env.CLIP ?? '/home/claude/sample15.webm'); // a WebM copy of the sample (headless Chromium has no H.264)
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${OUT}/0-video-picked.png` });
-await page.click('text=Set up this video');
+if (await page.$('text=Set up this video')) await page.click('text=Set up this video'); // older flow
 await page.waitForSelector('.calib-wrap canvas');
 await page.waitForTimeout(800);
 await page.screenshot({ path: `${OUT}/1-calibrate-start.png` });

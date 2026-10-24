@@ -19,12 +19,16 @@
         "minWidth": 1000,
         "minHeight": 640,
         "backgroundColor": "#0B0D10",
-        "dragDropEnabled": false,
+        "dragDropEnabled": true,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --force_high_performance_gpu"
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
     }
   },
   "bundle": {

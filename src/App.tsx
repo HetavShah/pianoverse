@@ -6,6 +6,25 @@ import CalibrateCanvas from './ui/CalibrateCanvas';
 import CalibratePanel, { QualityStrip } from './ui/CalibratePanel';
 import { calibrationFromTracking, newProject, useCalibration } from './ui/useCalibration';
 import { saveProject } from './ui/saveProject';
+import { ConvertProgress, convertVideo, inTauri, onNativeDrop, openFiles, Picked, PickedVideo, pickNative } from './ui/media';
+
+type VideoIssue =
+  | { kind: 'unsupported' }
+  | { kind: 'converting'; progress: ConvertProgress | null }
+  | { kind: 'error'; message: string };
+
+/** A file-open control: the native dialog in the desktop app, a file input in a browser. */
+function PickButton(props: { what: 'video' | 'project' | 'any'; className: string; children: React.ReactNode; onPick: (what: 'video' | 'project' | 'any') => void; onFiles: (f: FileList | null) => void }) {
+  const { what, className, children, onPick, onFiles } = props;
+  if (inTauri()) return <button type="button" className={className} onClick={() => onPick(what)}>{children}</button>;
+  const accept = what === 'video' ? 'video/*,.mp4,.mov,.webm,.mkv' : what === 'project' ? '.json,application/json' : 'video/*,.mp4,.mov,.webm,.mkv,.json,application/json';
+  return (
+    <label className={className}>
+      {children}
+      <input type="file" multiple={what === 'any'} accept={accept} hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
+    </label>
+  );
+}
 
 const LAYER_LABELS: [keyof Layers, string][] = [
   ['notes', 'Notes'],
@@ -52,6 +71,8 @@ export default function App() {
   const [saveMsg, setSaveMsg] = useState('');
   const frameTimes = useRef<number[]>([]);
   const wantNewProject = useRef(false);
+  const [videoSrc, setVideoSrc] = useState<PickedVideo | null>(null);
+  const [videoIssue, setVideoIssue] = useState<VideoIssue | null>(null);
 
   const calib = useCalibration({ project, setProject, time, videoUrl });
   // test hook: lets automated checks read the current project
@@ -83,7 +104,7 @@ export default function App() {
   const draw = useCallback((t?: number) => {
     const r = rendererRef.current;
     const v = videoRef.current;
-    if (!r || !v || v.readyState < 2) return;
+    if (!r || !v || v.readyState < 2 || !v.videoWidth) return;
     if ((window as unknown as { __pvHeadless?: boolean }).__pvHeadless) return; // automated tests capture offscreen
     r.render(v, t ?? v.currentTime);
     const now = performance.now();
@@ -156,19 +177,20 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [togglePlay, seek, project?.video.fps]);
 
-  const onVideoFile = (f: File | undefined, createProject = false) => {
-    if (!f) return;
-    if (videoUrl) URL.revokeObjectURL(videoUrl);
-    setVideoUrl(URL.createObjectURL(f));
-    setVideoName(f.name);
+  // ---------- opening videos and projects ----------
+  const loadVideo = (v: PickedVideo, createProject: boolean) => {
+    if (videoUrl?.startsWith('blob:') && videoUrl !== v.url) URL.revokeObjectURL(videoUrl);
+    setVideoSrc(v);
+    setVideoUrl(v.url);
+    setVideoName(v.name);
     setPlaying(false);
+    setVideoIssue(null);
     wantNewProject.current = createProject;
   };
 
-  const onProjectFile = async (f: File | undefined) => {
-    if (!f) return;
+  const applyProjectText = (text: string) => {
     try {
-      const data = JSON.parse(await f.text()) as CalibratedProject;
+      const data = JSON.parse(text) as CalibratedProject;
       if (data.format !== 'pianoverse-project') throw new Error('Not a Pianoverse project file.');
       wantNewProject.current = false;
       setProject(data);
@@ -178,16 +200,31 @@ export default function App() {
     }
   };
 
-  const onFiles = (files: FileList | null | undefined) => {
-    if (!files) return;
-    const list = Array.from(files);
-    const hasProject = list.some((f) => f.name.toLowerCase().endsWith('.json'));
-    for (const f of list) {
-      const name = f.name.toLowerCase();
-      if (name.endsWith('.json')) onProjectFile(f);
-      else if (f.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|mkv)$/.test(name)) onVideoFile(f, !hasProject);
+  const openItems = (items: Picked[]) => {
+    const hasProject = items.some((i) => i.kind === 'project');
+    for (const i of items) {
+      if (i.kind === 'project') applyProjectText(i.text);
+      else loadVideo(i, !hasProject);
     }
   };
+  const openItemsRef = useRef(openItems);
+  openItemsRef.current = openItems;
+
+  const onFiles = (files: FileList | null | undefined) => {
+    if (files?.length) openFiles(Array.from(files)).then(openItems);
+  };
+  const pick = (what: 'video' | 'project' | 'any') => {
+    pickNative(what).then(openItems).catch((e) => alert(String(e?.message ?? e)));
+  };
+
+  // native drag and drop in the desktop app (gives file paths, so videos can be converted)
+  useEffect(() => {
+    if (!inTauri()) return;
+    let un: (() => void) | undefined;
+    let gone = false;
+    onNativeDrop((items) => openItemsRef.current(items)).then((u) => { if (gone) u(); else un = u; });
+    return () => { gone = true; un?.(); };
+  }, []);
 
   const startNewProject = useCallback(() => {
     const v = videoRef.current;
@@ -197,6 +234,18 @@ export default function App() {
     setProject(newProject(base, videoName, v.videoWidth, v.videoHeight, v.duration || 0));
     setMode('calibrate');
   }, [videoName]);
+
+  const convert = async () => {
+    if (!videoSrc) return;
+    const createProject = wantNewProject.current || !project || project.video.file !== videoSrc.name;
+    setVideoIssue({ kind: 'converting', progress: null });
+    try {
+      const copy = await convertVideo(videoSrc, (progress) => setVideoIssue({ kind: 'converting', progress }));
+      loadVideo(copy, createProject);
+    } catch (e) {
+      setVideoIssue({ kind: 'error', message: String((e as Error)?.message ?? e) });
+    }
+  };
 
   const enterCalibrate = () => {
     if (!project) return;
@@ -237,10 +286,7 @@ export default function App() {
         <div className="open-buttons">
           {saveMsg && <span className="saved">{saveMsg}</span>}
           {project && <button type="button" className="btn" onClick={doSave}>Save project…</button>}
-          <label className="btn">
-            Open files…
-            <input type="file" multiple accept="video/*,.mp4,.mov,.webm,.json,application/json" hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
-          </label>
+          <PickButton what="any" className="btn" onPick={pick} onFiles={onFiles}>Open files…</PickButton>
         </div>
         <span className="gpu">{gpuError ? 'WebGPU unavailable' : gpuName}</span>
       </header>
@@ -282,38 +328,58 @@ export default function App() {
 
         <main className="stage">
           {gpuError && <div className="notice">This window can't use the graphics card: {gpuError}</div>}
-          {!gpuError && !ready && (
+          {videoIssue && (
+            <div className="start issue">
+              <h1>{videoIssue.kind === 'converting' ? 'Making an editing copy…' : 'This video needs converting'}</h1>
+              <p>
+                <b>{videoName}</b> is in a format Pianoverse's player can't read. Phones usually record HEVC (H.265).
+                Pianoverse makes an H.264 copy once, on your graphics card when it can. Your original file isn't changed.
+              </p>
+              {videoIssue.kind === 'converting' && (
+                <div className="track-run">
+                  <div className="bar"><div style={{ width: `${videoIssue.progress && videoIssue.progress.total ? Math.min(100, (videoIssue.progress.done / videoIssue.progress.total) * 100) : 0}%` }} /></div>
+                  <small>
+                    {!videoIssue.progress ? 'Starting…'
+                      : videoIssue.progress.phase === 'download'
+                        ? `${videoIssue.progress.detail} · ${(videoIssue.progress.done / 1048576).toFixed(0)} of ${(videoIssue.progress.total / 1048576).toFixed(0)} MB`
+                        : `${videoIssue.progress.detail} · ${videoIssue.progress.total ? Math.round((videoIssue.progress.done / videoIssue.progress.total) * 100) : 0}%`}
+                  </small>
+                </div>
+              )}
+              {videoIssue.kind === 'error' && <pre className="error-box">{videoIssue.message}</pre>}
+              {videoIssue.kind !== 'converting' && (videoSrc?.path ? (
+                <>
+                  <button type="button" className="btn primary" onClick={convert}>{videoIssue.kind === 'error' ? 'Try again' : 'Convert video'}</button>
+                  <small className="dim">The first time, Pianoverse downloads its video converter (about 90 MB).</small>
+                </>
+              ) : (
+                <p>Open the video with <b>Open files…</b> in the desktop app to convert it, or convert it to H.264 first.</p>
+              ))}
+            </div>
+          )}
+          {!gpuError && !ready && !videoIssue && (
             <div className="start">
               <h1>Open your performance</h1>
               <p>Pick a video to set up, or a video together with its saved project. You can also drop files anywhere on this window.</p>
               <div className={'step' + (videoName ? ' done' : '')}>
                 <span className="dot">{videoName ? '✓' : '1'}</span>
                 <span className="what"><b>Video</b><small>{videoName || 'mp4, mov or webm'}</small></span>
-                <label className="btn">
-                  {videoName ? 'Change' : 'Choose video'}
-                  <input type="file" accept="video/*,.mp4,.mov,.webm" hidden onChange={(e) => { onVideoFile(e.target.files?.[0]); e.target.value = ''; }} />
-                </label>
+                <PickButton what="video" className="btn" onPick={pick} onFiles={onFiles}>{videoName ? 'Change' : 'Choose video'}</PickButton>
               </div>
               <div className={'step' + (project ? ' done' : '')}>
                 <span className="dot">{project ? '✓' : '2'}</span>
                 <span className="what"><b>Project</b><small>{project ? project.name : 'a saved .pvproj.json (optional)'}</small></span>
-                <label className="btn">
-                  Open project
-                  <input type="file" accept=".json,application/json" hidden onChange={(e) => { onProjectFile(e.target.files?.[0]); e.target.value = ''; }} />
-                </label>
+                <PickButton what="project" className="btn" onPick={pick} onFiles={onFiles}>Open project</PickButton>
               </div>
               {videoName && !project ? (
                 <button type="button" className="btn primary" onClick={startNewProject}>Set up this video</button>
               ) : (
-                <label className="btn primary">
-                  Choose files…
-                  <input type="file" multiple accept="video/*,.mp4,.mov,.webm,.json,application/json" hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
-                </label>
+                <PickButton what="any" className="btn primary" onPick={pick} onFiles={onFiles}>Choose files…</PickButton>
               )}
             </div>
           )}
-          <canvas ref={canvasRef} className="preview" style={{ visibility: ready && mode === 'preview' ? 'visible' : 'hidden' }} />
-          {calibrating && project && calib.corners && (
+          <canvas ref={canvasRef} className="preview" style={{ visibility: ready && mode === 'preview' && !videoIssue ? 'visible' : 'hidden' }} />
+          {calibrating && !videoIssue && project && calib.corners && (
             <CalibrateCanvas
               video={videoRef.current}
               videoW={project.video.width}
@@ -354,13 +420,18 @@ export default function App() {
       <video
         ref={videoRef}
         src={videoUrl ?? undefined}
+        crossOrigin="anonymous"
         preload="auto"
         playsInline
         style={{ display: 'none' }}
         onLoadedMetadata={(e) => {
-          setDuration(e.currentTarget.duration);
-          if (wantNewProject.current && !project) startNewProject();
+          const v = e.currentTarget;
+          // a video track the player can't decode shows up as 0 x 0 (audio only)
+          if (!v.videoWidth) { setVideoIssue({ kind: 'unsupported' }); return; }
+          setDuration(v.duration);
+          if (wantNewProject.current && (!project || project.video.file !== videoName)) startNewProject();
         }}
+        onError={() => { if (videoUrl) setVideoIssue((cur) => cur ?? { kind: 'unsupported' }); }}
         onLoadedData={() => redraw()}
         onSeeked={() => redraw()}
         onEnded={() => setPlaying(false)}
