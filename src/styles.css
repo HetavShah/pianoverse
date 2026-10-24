@@ -411,8 +411,8 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .ex-save { display: flex; gap: 10px; }
 .ex-save input { flex: 1; height: 40px; font-size: 13px; }
 .ex-side { gap: 14px; }
-.ex-thumb { align-self: center; width: 100%; max-height: 300px; max-width: 100%; border-radius: 10px; overflow: hidden; background: #08090b; display: flex; align-items: center; justify-content: center; }
-.ex-thumb img { width: 100%; height: 100%; display: block; }
+.ex-thumb { align-self: center; height: 300px; width: auto; max-width: 100%; border-radius: 10px; overflow: hidden; background: #08090b; display: flex; align-items: center; justify-content: center; }
+.ex-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .ex-stats { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; margin: 0; font-size: 13px; }
 .ex-stats dt { color: var(--dim); }
 .ex-stats dd { margin: 0; text-align: right; }
