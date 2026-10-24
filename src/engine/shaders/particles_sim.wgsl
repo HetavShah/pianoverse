@@ -231,16 +231,16 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let cnt = P.w;
   let n = abs(cnt);
   let dir = select(1.0, E.count, cnt > 0.0);     // +1 clockwise, -1 anticlockwise (open lines always run forwards)
-  let tRise = (0.5 + 0.2 * rnd(st)) / max(PP.speed, 0.1);
-  let pace = 0.82 + 0.36 * rnd(st);               // sparks travel at their own speeds, so the swarm stretches out
-  let tTrace = 2.4 * E.pad1 * (n / f32(PP.nShape) * 0.5 + 0.5) / max(PP.speed, 0.1) / pace;
+  let tRise = (1.1 + 0.4 * rnd(st)) / max(PP.speed, 0.1);
+  let pace = 0.88 + 0.24 * rnd(st);               // sparks travel at their own speeds, so the swarm stretches out
+  let tTrace = 6.5 * E.pad1 * (n / f32(PP.nShape) * 0.5 + 0.5) / max(PP.speed, 0.1) / pace;
   let reach = min(1.0, 0.45 + 0.7 * rnd(st) + 0.2 * E.vn);   // how far round this spark gets before burning out
   let ph = rnd(st) * 6.2831853;
   let side = gaussR(st);
   let isDust = rnd(st) < 0.5;
   let rel = rnd(st) * reach;                      // dust: where along the trip it is shed
-  let dlife = (0.5 + 0.9 * rnd(st)) * PP.lifeMul;
-  let drift = vec2f(gaussR(st), gaussR(st) - 0.6) * size * 0.05;
+  let dlife = (0.8 + 1.2 * rnd(st)) * PP.lifeMul;
+  let drift = vec2f(gaussR(st), gaussR(st) - 0.6) * size * 0.03;
   let age = t - ts;
   let home = E.vel + shape[start].xy * size;
   var pos: vec2f;
@@ -269,7 +269,7 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let p2 = home - normalize(ahead - home + vec2f(1e-4)) * size * (0.12 + 0.1 * rnd(st));
     let m = 1.0 - e;
     pos = m * m * m * p0 + 3.0 * m * m * e * p1 + 3.0 * m * e * e * p2 + e * e * e * home;
-    pos += vec2f(sin(age * 9.0 + ph), cos(age * 7.0 + ph)) * size * 0.006;
+    pos += vec2f(sin(age * 4.0 + ph), cos(age * 3.0 + ph)) * size * 0.006;
     vel = (home - p0) / tRise;
     b = smoothstep(0.0, 0.2, u);
   } else {
@@ -282,11 +282,11 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let T = normalize(c2 - c + vec2f(1e-5));
     let Nn = vec2f(-T.y, T.x);
     // off the line: a fixed lane per spark plus a slow waver, growing a little as it travels
-    let lane = (side * 0.012 + sin(age * 4.5 + ph) * 0.008) * (0.6 + 0.8 * u);
+    let lane = (side * 0.012 + sin(age * 2.0 + ph) * 0.008) * (0.6 + 0.8 * u);
     pos = E.vel + c * size + Nn * lane * size + turbVel(E.vel + c * size, t) * 0.03 * PP.swirl * u;
     vel = T * size * n / tTrace * 0.01;
     // burn out: sparks that stop early fade quickly; the ones that make it all the way vanish at the start
-    b = (1.0 - smoothstep(reach - 0.08, reach, u)) * (0.75 + 0.25 * sin(age * 11.0 + ph));
+    b = (1.0 - smoothstep(reach - 0.08, reach, u)) * (0.75 + 0.25 * sin(age * 5.0 + ph));
   }
   var o: Particle;
   let twPh = rnd(st) * 6.2831853;

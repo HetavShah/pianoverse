@@ -400,8 +400,8 @@ export class Renderer {
           const size = Math.min(this.srcW * 0.8, Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) * 0.75) * lk.partShapeSize;
           const cy = Math.max(size * 0.55, Math.min(...ends.map((e) => e[1]), c0[1]) - tg.unit * 2.5 - size * 0.5);
           const cx = Math.min(this.srcW - size * 0.55, Math.max(size * 0.55, c0[0]));
-          const rate = 700 * (0.6 + 0.8 * vv) * lk.partAmount;
-          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.15 + (0.9 + 4 * lk.partShapeHold) / Math.max(0.1, lk.partSpeed) + 1.5 * lk.partLife, data: [n.s, 0.15, rate, lk.partShapeDir === 'ccw' ? -1 : 1, tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
+          const rate = 450 * (0.6 + 0.8 * vv) * lk.partAmount;
+          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.15 + (1.6 + 7.5 * lk.partShapeHold) / Math.max(0.1, lk.partSpeed) + 2.1 * lk.partLife, data: [n.s, 0.15, rate, lk.partShapeDir === 'ccw' ? -1 : 1, tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
         } else {
           const mid = this.whiteKeys / 2;
           const c0 = kb.P(mid, kb.edgeY(mid));
