@@ -1,5 +1,5 @@
 // Project data model + keyboard geometry (ported from the approved Python pipeline).
-import { noteColor } from './look';
+import { noteColor, noteColorTop } from './look';
 
 export interface RawNote {
   s: number; e: number; p: number; v: number;
@@ -43,6 +43,7 @@ export interface Note {
   v: number;
   vn: number; // loudness 0..1
   col: RGB; // pitch colour
+  col2: RGB | null; // colour at the note's top end (gradients along the notes)
   h: number; // end including the sustain pedal
   k: number; c: number; // track, channel
 }
@@ -90,6 +91,7 @@ export function prepareNotes(raw: RawNote[], lowest: number, keys: number, look?
       idx: out.length, s: n.s, e: n.e, p: n.p, v: n.v, h: Math.max(n.e, n.h ?? n.e), k: n.k ?? 0, c: n.c ?? 0,
       vn: Math.min(1, Math.max(0, (n.v - 0.3) / 0.3)),
       col: look ? noteColor(look, n.p, { idx: out.length, s: n.s, v: n.v, k: n.k ?? 0, c: n.c ?? 0 }) : pal(n.p),
+      col2: look ? noteColorTop(look, n.p, { idx: out.length, s: n.s, v: n.v, k: n.k ?? 0, c: n.c ?? 0 }) : null,
     });
   }
   return out;

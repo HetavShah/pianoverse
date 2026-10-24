@@ -107,6 +107,7 @@ export class Renderer {
   private saberMap: GPUBuffer;
   private heatBuf: GPUBuffer;
   private simUni: GPUBuffer;
+  private partDrawUni: GPUBuffer;
   private emitBuf: GPUBuffer;
   private flowBuf: GPUBuffer;
   private partBuf: GPUBuffer;
@@ -133,6 +134,12 @@ export class Renderer {
   private texSampler: GPUSampler;
   private texUni: GPUBuffer;
   private noteUni: GPUBuffer;
+  private bgUni: GPUBuffer;
+  private bgTex: GPUTexture;
+  private bgKey = '';
+  private bgAspect = 1;
+  private bgVideo: HTMLVideoElement | null = null;
+  private bgCanvas: OffscreenCanvas | null = null;
   private tex: TexSet;
   private texWant = '';
   private texLoad: Promise<void> = Promise.resolve();
@@ -176,19 +183,22 @@ export class Renderer {
     this.texSampler = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
     this.texUni = buf(48, U.UNIFORM | U.COPY_DST);
     this.noteUni = buf(144, U.UNIFORM | U.COPY_DST);
+    this.bgUni = buf(112, U.UNIFORM | U.COPY_DST);
+    this.bgTex = d.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
     this.tex = placeholder(d);
-    this.glassBuf = buf(MAX_GLASS * 48, U.VERTEX | U.COPY_DST);
+    this.glassBuf = buf(MAX_GLASS * 64, U.VERTEX | U.COPY_DST);
     this.keysBuf = buf(MAX_KEYS * 6 * 28, U.VERTEX | U.COPY_DST);
     this.spriteBuf = buf(MAX_SPRITES * 48, U.VERTEX | U.COPY_DST);
     this.labelBuf = buf(MAX_GLASS * 48, U.VERTEX | U.COPY_DST);
     this.atlas = makeAtlas(d);
-    this.saberUni = buf(48, U.UNIFORM | U.COPY_DST);
+    this.saberUni = buf(64, U.UNIFORM | U.COPY_DST);
     this.saberMap = buf(64 * 8, U.STORAGE | U.COPY_DST);
     this.heatBuf = buf(40 * 16, U.STORAGE | U.COPY_DST);
-    this.simUni = buf(64, U.UNIFORM | U.COPY_DST);
+    this.simUni = buf(112, U.UNIFORM | U.COPY_DST);
+    this.partDrawUni = buf(32, U.UNIFORM | U.COPY_DST);
     this.emitBuf = buf(MAX_EMIT * 64, U.STORAGE | U.COPY_DST);
     this.flowBuf = buf(20 * 16, U.STORAGE | U.COPY_DST);
-    this.partBuf = buf(MAX_EMIT * PER_EMIT * 32, U.STORAGE);
+    this.partBuf = buf(MAX_EMIT * PER_EMIT * 48, U.STORAGE);
     this.lightsBuf = buf(MAX_LIGHTS * 32, U.STORAGE | U.COPY_DST);
     for (let i = 0; i < 7; i++) this.postUni.push(buf(32, U.UNIFORM | U.COPY_DST));
     this.writeFlow();
@@ -203,11 +213,12 @@ export class Renderer {
     const lightTarget: GPUColorTargetState[] = [{ format: LIGHT_FMT, blend: additive }];
     const v4 = (loc: number, off: number): GPUVertexAttribute => ({ shaderLocation: loc, offset: off, format: 'float32x4' });
     const inst3: GPUVertexBufferLayout = { arrayStride: 48, stepMode: 'instance', attributes: [v4(0, 0), v4(1, 16), v4(2, 32)] };
+    const inst4: GPUVertexBufferLayout = { arrayStride: 64, stepMode: 'instance', attributes: [v4(0, 0), v4(1, 16), v4(2, 32), v4(3, 48)] };
 
     const glassM = mod(glassSrc);
     this.glassPipe = d.createRenderPipeline({
       layout: 'auto',
-      vertex: { module: glassM, entryPoint: 'vs', buffers: [inst3] },
+      vertex: { module: glassM, entryPoint: 'vs', buffers: [inst4] },
       fragment: { module: glassM, entryPoint: 'fs', targets: lightTarget },
       primitive: { topology: 'triangle-strip' },
     });
@@ -363,11 +374,13 @@ export class Renderer {
       const streams = 1 + (rnd() < 0.35 + 0.4 * vv ? 1 : 0);
       for (let j = 0; j < streams; j++) {
         const a = gauss(rnd, -Math.PI / 2, 0.32);
-        const sp = (170 + 100 * rnd()) * (0.8 + 0.5 * vv) * lk.partRise;
+        const sp = (170 + 100 * rnd()) * (0.8 + 0.5 * vv) * lk.partRise * lk.partSpeed;
         const life = (0.9 + 0.7 * rnd()) * (0.8 + 0.5 * vv) * lk.partLife;
         const rate = (330 + 190 * rnd()) * (0.6 + 0.8 * vv) * lk.partAmount;
         if (rate <= 0) continue;
-        rows.push({ start: n.s, end: n.s + life + 2.6 * lk.partLife, data: [n.s, life, rate, 0, tg.x, tg.y, Math.cos(a) * sp, Math.sin(a) * sp, ...n.col, vv, n.idx * 16 + j, 0, 0, 0] });
+        let ex = tg.x, ey = tg.y;
+        if (lk.partSpread > 0) { ex += gauss(rnd, 0, tg.unit * 0.8 * lk.partSpread); ey += gauss(rnd, 0, tg.unit * 0.3 * lk.partSpread); }
+        rows.push({ start: n.s, end: n.s + life + 2.6 * lk.partLife, data: [n.s, life, rate, 0, ex, ey, Math.cos(a) * sp, Math.sin(a) * sp, ...n.col, vv, n.idx * 16 + j, 0, 0, 0] });
       }
       const burst = Math.floor((24 + 30 * vv) * lk.partAmount);
       if (burst > 0) rows.push({ start: n.s, end: n.s + 1.4 * lk.partLife, data: [n.s, 0, 0, burst, tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 8, 1, 0, 0] });
@@ -443,9 +456,11 @@ export class Renderer {
       const sT = sB + len;
       const sMax = exitDist(tg.x, tg.y, U, this.srcW, this.srcH);
       const at = (d: number): [number, number] => [tg.x + U[0] * d, tg.y + U[1] * d];
-      if (L.notes && sT > 0 && sB < sMax + 40 && glass.length / 12 < MAX_GLASS) {
+      if (L.notes && sT > 0 && sB < sMax + 40 && glass.length / 16 < MAX_GLASS) {
         const fade = lk.noteFade > 0 ? Math.min(1, Math.max(0, (sMax - sB + 60) / (220 * lk.noteFade))) : 1;
-        glass.push(tg.x, tg.y, sB, sT, w, fade * (0.85 + 0.3 * vn * lk.noteVelocity), fade, U[0], col[0], col[1], col[2], U[1]);
+        const c2 = n.col2;
+        glass.push(tg.x, tg.y, sB, sT, w, fade * (0.85 + 0.3 * vn * lk.noteVelocity), fade, U[0], col[0], col[1], col[2], U[1],
+          c2 ? c2[0] : 0, c2 ? c2[1] : 0, c2 ? c2[2] : 0, c2 ? 1 : 0);
         if (lk.labels && sT - Math.max(sB, 0) > w * 0.75 && labels.length / 12 < MAX_GLASS) {
           const sl = Math.max(sB, 0) + w * 0.7;
           let lx = tg.x + U[0] * sl, ly = tg.y + U[1] * sl, half = w * 0.48 * lk.labelSize;
@@ -537,6 +552,8 @@ export class Renderer {
       }
     }
     q.writeBuffer(this.noteUni, 0, this.noteParams(lk));
+    q.writeBuffer(this.bgUni, 0, this.bgParams(lk));
+    if (lk.bgImageOn && lk.bgImage) { this.wantBackground(lk.bgImage); if (this.bgVideo) { if (!offscreen && this.bgVideo.paused) this.bgVideo.play().catch(() => {}); this.refreshBgVideo(); } }
     q.writeBuffer(this.texUni, 0, new Float32Array([['tint', 'natural', 'glow'].indexOf(lk.texMode), lk.texScale, lk.texRelief, lk.texShine, lk.texSolid, this.tex.size, this.tex.lo, this.tex.hi, this.tex.metal, this.tex.tile, lk.texReflect ? 1 : 0, lk.texLive]));
     if (keys.length) q.writeBuffer(this.keysBuf, 0, new Float32Array(keys));
     if (sprites.length) q.writeBuffer(this.spriteBuf, 0, new Float32Array(sprites));
@@ -564,7 +581,11 @@ export class Renderer {
     q.writeBuffer(this.simUni, 16, new Float32Array([
       0, -1, 0, 0, // glitter rises straight up the screen
       lk.partSwirl, lk.partWind, lk.partGravity, lk.partLife, lk.partRise, lk.partTwinkle, lk.partStars, lk.partColor,
+      lk.partSpeed, lk.partTurbX, lk.partTurbY, lk.partTurbZ,
+      lk.partTurbFreq, lk.partTurbEvo, Math.round(lk.partOctaves), lk.partOctScale,
+      lk.partOctMul, lk.partSpread, lk.partRays ? 1 : 0, lk.partRayLen,
     ]));
+    q.writeBuffer(this.partDrawUni, 0, new Float32Array([lk.partRays ? 1 : 0, lk.partRayLen, lk.partOpacity, lk.partAlphaF, lk.partAdditive, lk.partBright, lk.partTurbZ, 0]));
 
     const enc = d.createCommandEncoder();
     if (nEmit) {
@@ -611,7 +632,7 @@ export class Renderer {
         ],
       })));
       lp.setVertexBuffer(0, this.glassBuf);
-      lp.draw(4, glass.length / 12);
+      lp.draw(4, glass.length / 16);
     }
     if (labels.length) {
       lp.setPipeline(this.labelPipe);
@@ -646,7 +667,7 @@ export class Renderer {
       lp.setPipeline(this.partPipe);
       lp.setBindGroup(0, frameGroup('parts', this.partPipe));
       lp.setBindGroup(1, this.group('parts1', () => d.createBindGroup({
-        layout: this.partPipe.getBindGroupLayout(1), entries: [{ binding: 0, resource: { buffer: this.partBuf } }],
+        layout: this.partPipe.getBindGroupLayout(1), entries: [{ binding: 0, resource: { buffer: this.partBuf } }, { binding: 1, resource: { buffer: this.partDrawUni } }],
       })));
       lp.draw(4, nEmit * PER_EMIT);
     }
@@ -708,6 +729,8 @@ export class Renderer {
           { binding: 4, resource: this.b1a.createView() },
           { binding: 5, resource: this.b2a.createView() },
           { binding: 6, resource: { buffer: this.lightsBuf } },
+          { binding: 7, resource: this.bgTex.createView() },
+          { binding: 8, resource: { buffer: this.bgUni } },
         ],
       })));
       cp.draw(3);
@@ -721,6 +744,7 @@ export class Renderer {
   async capture(source: FrameSource | null, t: number): Promise<{ width: number; height: number; data: Uint8Array }> {
     // video textures show exactly the frame for this moment (export must be repeatable)
     if (this.look.texOn && this.tex.video) await seekVideo(this.tex, t);
+    if (this.bgVideo && this.look.bgImageOn) await seekVideo({ video: this.bgVideo } as TexSet, t);
     this.render(source, t, true);
     const w = this.rtW, h = this.rtH;
     const bpr = Math.ceil((w * 4) / 256) * 256;
@@ -760,6 +784,70 @@ export class Renderer {
     ]);
   }
 
+  /** background and video placement settings the composite reads (BG in post.wgsl) */
+  private bgParams(lk: Look): Float32Array {
+    const xform = lk.footScale !== 1 || lk.footX !== 0 || lk.footY !== 0 || lk.footRot !== 0 || lk.footCropT > 0 || lk.footCropB > 0 || lk.footCropL > 0 || lk.footCropR > 0;
+    const img = lk.bgImageOn && !!lk.bgImage && this.bgKey === lk.bgImage;
+    const active = xform || lk.footOpacity < 1 || lk.footBright !== 0 || lk.footHue !== 0 || lk.bgColorOn || img;
+    const c = hexRGB(lk.bgColor);
+    const rad = Math.PI / 180;
+    return new Float32Array([
+      lk.footScale, lk.footX, lk.footY, lk.footRot * rad,
+      lk.footOpacity, lk.footCropT, lk.footCropB, lk.footCropL,
+      lk.footCropR, lk.footBright, lk.footHue * rad, lk.bgColorOn ? 1 : 0,
+      c[0], c[1], c[2], img ? 1 : 0,
+      lk.bgImgOpacity, lk.bgImgScale, lk.bgImgX, lk.bgImgY,
+      lk.bgImgRot * rad, lk.bgImgBright, lk.bgImgContrast, lk.bgImgHue * rad,
+      lk.bgImgSat, this.bgAspect, xform ? 1 : 0, active ? 1 : 0,
+    ]);
+  }
+
+  /** load a background image or video from the texture library */
+  private wantBackground(key: string) {
+    if (key === this.bgKey || key === this.bgWant) return;
+    this.bgWant = key;
+    this.bgLoad = (async () => {
+      const files = key.startsWith('user:') && this.userFiles ? await this.userFiles(key.slice(5)) : null;
+      if (this.bgWant !== key || !files) return;
+      const MAX = 1920;
+      let w = 1, h = 1;
+      let source: ImageBitmap | null = null;
+      let video: HTMLVideoElement | null = null;
+      if (files.video) {
+        video = document.createElement('video');
+        video.muted = true; video.loop = true; video.playsInline = true; video.src = URL.createObjectURL(files.video);
+        await new Promise<void>((res) => { video!.onloadeddata = () => res(); video!.onerror = () => res(); setTimeout(res, 15000); });
+        if (!video.videoWidth) return;
+        w = video.videoWidth; h = video.videoHeight;
+        video.play().catch(() => {});
+      } else if (files.color) {
+        source = await createImageBitmap(files.color);
+        w = source.width; h = source.height;
+      } else return;
+      if (this.bgWant !== key) return;
+      const k = Math.min(1, MAX / Math.max(w, h));
+      const tw = Math.max(1, Math.round(w * k)), th = Math.max(1, Math.round(h * k));
+      const tex = this.device.createTexture({ size: [tw, th], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+      const cv = new OffscreenCanvas(tw, th);
+      if (source) { cv.getContext('2d')!.drawImage(source, 0, 0, tw, th); this.device.queue.copyExternalImageToTexture({ source: cv }, { texture: tex }, [tw, th]); }
+      this.bgVideo?.pause();
+      this.bgTex.destroy();
+      this.bgTex = tex; this.bgCanvas = cv; this.bgVideo = video; this.bgAspect = w / h; this.bgKey = key;
+      delete this.groups['comp1-on']; delete this.groups['comp1-off'];
+      if (video) this.refreshBgVideo();
+      this.onTexture?.();
+    })().catch((e) => console.warn('[background]', e));
+  }
+  private bgWant = '';
+  private bgLoad: Promise<void> = Promise.resolve();
+
+  private refreshBgVideo() {
+    const v = this.bgVideo, cv = this.bgCanvas;
+    if (!v || !cv || v.readyState < 2) return;
+    cv.getContext('2d')!.drawImage(v, 0, 0, cv.width, cv.height);
+    this.device.queue.copyExternalImageToTexture({ source: cv }, { texture: this.bgTex }, [cv.width, cv.height]);
+  }
+
   /** start loading a note texture if it isn't the one in use */
   private wantTexture(key: string) {
     if (!key || key === this.texWant) return;
@@ -781,7 +869,9 @@ export class Renderer {
   /** resolves once the current look's texture has loaded (for tests and export) */
   async texturesReady(): Promise<void> {
     if (this.look.texOn) this.wantTexture(this.look.noteTexture);
+    if (this.look.bgImageOn && this.look.bgImage) this.wantBackground(this.look.bgImage);
     await this.texLoad;
+    await this.bgLoad;
   }
 
   /** resolves once the GPU has finished all submitted work (for tests and export) */
@@ -810,15 +900,19 @@ export class Renderer {
     const kb = this.kb;
     const nK = this.whiteKeys;
     const x0p = -0.2, x1p = nK + 0.2;
-    const A = kb.P(x0p, kb.edgeY(x0p));
-    const B = kb.P(x1p, kb.edgeY(x1p));
+    // the saber can sit above or below the back edge of the keys
+    const Uv = this.up;
+    const off = this.look.saberOffset * kb.unit(nK / 2, kb.edgeY(nK / 2));
+    const P0 = (px: number): [number, number] => { const q = kb.P(px, kb.edgeY(px)); return [q[0] + Uv[0] * off, q[1] + Uv[1] * off]; };
+    const A = P0(x0p);
+    const B = P0(x1p);
     if (Math.abs(B[0] - A[0]) < 4) return false;
     // dense plane-x samples -> screen x, then resample evenly along the screen line
     const N = 400;
     const us: number[] = [], ps: number[] = [], units: number[] = [];
     for (let i = 0; i <= N; i++) {
       const px = x0p + (x1p - x0p) * (i / N);
-      us.push(kb.P(px, kb.edgeY(px))[0]);
+      us.push(P0(px)[0]);
       ps.push(px);
       units.push(kb.unit(px, kb.edgeY(px)));
     }
@@ -834,10 +928,12 @@ export class Renderer {
       uMax = Math.max(uMax, map[i * 2 + 1]);
     }
     const scMax = uMax / 30;
-    const tall = Math.max(1, this.look.saberFlicker) * Math.max(1, this.look.saberThick);
-    const box = [Math.min(A[0], B[0]) - 4, Math.min(A[1], B[1]) - 140 * scMax * tall - 10, Math.max(A[0], B[0]) + 4, Math.max(A[1], B[1]) + 30 * Math.max(1, this.look.saberThick)];
+    const sty = this.look.saberStyle;
+    const tall = Math.max(1, this.look.saberFlicker) * Math.max(1, this.look.saberThick) * (sty === 'flame' ? 2.8 : sty === 'soft' ? 2.5 : sty === 'electric' ? 2.4 : 1);
+    const box = [Math.min(A[0], B[0]) - 4, Math.min(A[1], B[1]) - 140 * scMax * tall - 10, Math.max(A[0], B[0]) + 4, Math.max(A[1], B[1]) + 30 * Math.max(1, this.look.saberThick) * (sty === 'soft' ? 3 : 1)];
     const q = this.device.queue;
-    q.writeBuffer(this.saberUni, 0, new Float32Array([A[0], A[1], B[0], B[1], ...box, bass, t, nK, 0]));
+    const st = ['plasma', 'straight', 'electric', 'soft', 'flame'].indexOf(this.look.saberStyle);
+    q.writeBuffer(this.saberUni, 0, new Float32Array([A[0], A[1], B[0], B[1], ...box, bass, t, nK, Math.max(0, st), this.look.saberOpacity, 0, 0, 0]));
     q.writeBuffer(this.saberMap, 0, map);
     q.writeBuffer(this.heatBuf, 0, heat);
     return true;

@@ -57,12 +57,73 @@ fn hashU(p: vec2u, s: u32) -> f32 {
   return f32(h) / 4294967296.0;
 }
 
+@group(1) @binding(7) var bgTex: texture_2d<f32>;
+struct BG {
+  fScale: f32, fX: f32, fY: f32, fRot: f32,
+  fOpacity: f32, cropT: f32, cropB: f32, cropL: f32,
+  cropR: f32, fBright: f32, fHue: f32, colorOn: f32,
+  colR: f32, colG: f32, colB: f32, imgOn: f32,
+  iOpacity: f32, iScale: f32, iX: f32, iY: f32,
+  iRot: f32, iBright: f32, iContrast: f32, iHue: f32,
+  iSat: f32, iAspect: f32, xform: f32, on: f32,
+};
+@group(1) @binding(8) var<uniform> BGU: BG;
+
+fn hueRot(c: vec3f, a: f32) -> vec3f {
+  let k = vec3f(0.57735);
+  let ca = cos(a);
+  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+}
+
+// the background behind the video: a colour and/or an image (covering the frame, then moved / scaled / turned)
+fn background(uv0: vec2f) -> vec3f {
+  var bg = vec3f(0.0);
+  if (BGU.colorOn > 0.5) { bg = vec3f(BGU.colR, BGU.colG, BGU.colB); }
+  if (BGU.imgOn > 0.5) {
+    let ar = F.srcSize.x / F.srcSize.y;
+    var q = uv0 - vec2f(0.5) - vec2f(BGU.iX, BGU.iY);
+    q.x *= ar;
+    let cs = cos(-BGU.iRot);
+    let sn = sin(-BGU.iRot);
+    q = vec2f(q.x * cs - q.y * sn, q.x * sn + q.y * cs) / BGU.iScale;
+    // cover: at scale 1 the image just fills the frame
+    let hImg = max(1.0, ar / BGU.iAspect);
+    let u = vec2f(q.x / (BGU.iAspect * hImg), q.y / hImg) + vec2f(0.5);
+    let ins = step(0.0, u.x) * step(u.x, 1.0) * step(0.0, u.y) * step(u.y, 1.0);
+    var c = textureSampleLevel(bgTex, samp, clamp(u, vec2f(0.0), vec2f(1.0)), 0.0).rgb;
+    c = (c - 0.5) * BGU.iContrast + 0.5 + BGU.iBright;
+    if (BGU.iHue != 0.0) { c = hueRot(c, BGU.iHue); }
+    let l = dot(c, vec3f(0.2126, 0.7152, 0.0722));
+    c = clamp(mix(vec3f(l), c, BGU.iSat), vec3f(0.0), vec3f(1.0));
+    bg = mix(bg, c, BGU.iOpacity * ins);
+  }
+  return bg;
+}
+
 @fragment
 fn fsComposite(i: VOut) -> @location(0) vec4f {
-  let uv = i.uv;
+  var uv = i.uv;
+  var inside = 1.0;
+  if (BGU.xform > 0.5) {
+    // the video (with its notes and effects) can be moved, scaled, turned and cropped
+    let ar = F.srcSize.x / F.srcSize.y;
+    var q = i.uv - vec2f(0.5) - vec2f(BGU.fX, BGU.fY);
+    q.x *= ar;
+    let cs = cos(-BGU.fRot);
+    let sn = sin(-BGU.fRot);
+    q = vec2f(q.x * cs - q.y * sn, q.x * sn + q.y * cs) / BGU.fScale;
+    q.x /= ar;
+    uv = q + vec2f(0.5);
+    inside = step(BGU.cropL, uv.x) * step(uv.x, 1.0 - BGU.cropR) * step(BGU.cropT, uv.y) * step(uv.y, 1.0 - BGU.cropB);
+  }
   let srcPx = uv * F.srcSize;
   // footage: darker, contrasty, vignetted
-  let src = textureSampleLevel(srcTex, samp, uv, 0.0).rgb;
+  var src = textureSampleLevel(srcTex, samp, uv, 0.0).rgb;
+  if (BGU.on > 0.5) {
+    src = src + BGU.fBright;
+    if (BGU.fHue != 0.0) { src = hueRot(src, BGU.fHue); }
+    src = clamp(src, vec3f(0.0), vec3f(1.0));
+  }
   let lift = 0.07 * F.contrast;
   let x = clamp((src - vec3f(lift)) / (1.0 - lift), vec3f(0.0), vec3f(1.0));
   var base = pow(x, vec3f(1.0 + 0.45 * F.darken)) * (1.0 - 0.08 * F.darken);
@@ -71,7 +132,8 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   let vig = 1.0 - 0.5 * F.vignette * (sq((srcPx.x - 0.56 * F.srcSize.x) / (0.8 * F.srcSize.x)) + sq((srcPx.y - 0.5 * F.srcSize.y) / (0.62 * F.srcSize.y)));
   base *= clamp(vig, max(1.0 - 0.82 * F.vignette, 0.0), 1.0);
 
-  let L = textureSampleLevel(lightTex, samp, uv, 0.0);
+  var L = textureSampleLevel(lightTex, samp, uv, 0.0);
+  if (BGU.on > 0.5) { L *= inside; }
   base *= 1.0 - clamp(L.a, 0.0, 0.8);
 
   // coloured light from impacts falling on hands and keys
@@ -93,6 +155,10 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   light.r = textureSampleLevel(lightTex, samp, uv - vec2f(px.x, 0.0), 0.0).r;
   light.b = textureSampleLevel(lightTex, samp, uv + vec2f(px.x, 0.0), 0.0).b;
   light += (textureSampleLevel(bloom1, samp, uv, 0.0).rgb * 0.45 + textureSampleLevel(bloom2, samp, uv, 0.0).rgb * 0.4) * F.bloom;
+  if (BGU.on > 0.5) {
+    light *= inside;
+    base = mix(background(i.uv), base, inside * BGU.fOpacity);
+  }
   let Lc = 0.98 * (vec3f(1.0) - exp(-light * 1.545));   // soft knee: light never burns the hands out
   var out = base + Lc * (vec3f(1.0) - base * 0.55);
 

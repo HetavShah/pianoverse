@@ -21,10 +21,10 @@ await setRange('Glow', 2.2); await setRange('Width', 1.3);
 console.log('notes changed:', JSON.stringify(await look()));
 console.log('reset arrows shown:', await page.$$eval('.reset', (e) => e.length), '| preset says changed:', await page.$eval('.preset-bar', (e) => e.textContent.includes('Changed')));
 await page.click('.layer-row >> text=Particles'); await page.waitForTimeout(200);
-await setRange('Amount', 2); await setRange('Gravity', 0.5);
+await setRange('Particle count', 2); await page.click('button.fold >> text=Particle turbulence'); await setRange('Gravity', 0.5);
 await page.screenshot({ path: `${OUT}/2-particles-panel.png` });
 await page.click('.layer-row >> text=Colours'); await page.waitForTimeout(200);
-await page.click('.by >> text=Left / right'); await page.waitForTimeout(200);
+await page.click('.by >> text=Divide'); await page.waitForTimeout(200);
 await page.screenshot({ path: `${OUT}/3-colours-panel.png` });
 console.log('colour by:', (await look()).colorBy);
 // save as a preset

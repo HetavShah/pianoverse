@@ -6,7 +6,9 @@ struct Saber {
   bass: f32,
   time: f32,
   keys: f32,       // white keys on the keyboard
-  pad: f32,
+  style: f32,      // 0 plasma, 1 straight, 2 electric, 3 soft beam, 4 flame
+  opacity: f32,
+  p0: f32, p1: f32, p2: f32,
 };
 @group(1) @binding(0) var<uniform> S: Saber;
 @group(1) @binding(1) var<storage, read> smap: array<vec2f>;  // 64 samples along the line: plane x, px per key
@@ -75,21 +77,56 @@ fn fs(@builtin(position) fp: vec4f) -> @location(0) vec4f {
   let n2 = fbm(vec2f((src.x * 3.5 - warp * 1.4) / 60.0 + 31.7, (src.y * 2.6 + t * 260.0) / 192.0 + 11.3));
   let turb = n1 * 0.65 + n2 * 0.35;
 
+  let style = u32(S.style + 0.5);
   var plume = 0.0;
   var haze = 0.0;
-  if (dy > -1.5) {
-    plume = exp(-above / h) * pow(max((turb - 0.30 * pow(above / h, 0.7)) * 1.9, 0.0), 1.6);
-    haze = exp(-above / (h * 0.45));
+  var thick = F.saberThick;
+  var coreK = 1.25;
+  var arcs = 0.0;
+  if (style == 0u) {
+    if (dy > -1.5) {
+      plume = exp(-above / h) * pow(max((turb - 0.30 * pow(above / h, 0.7)) * 1.9, 0.0), 1.6);
+      haze = exp(-above / (h * 0.45));
+    }
+  } else if (style == 2u) {
+    // electric: thin crackling arcs that jump about above the line
+    let hk2 = h * 2.2;
+    let tq = floor(t * 18.0);                       // the arcs re-strike 18 times a second
+    for (var k = 0; k < 3; k++) {
+      let fk = f32(k);
+      let yk = hk2 * (0.35 + 0.9 * vnoise(vec2f(src.x / (38.0 + fk * 13.0) + fk * 7.1, tq * 0.37 + fk)))
+             + 6.0 * (vnoise(vec2f(src.x / 6.0, tq + fk * 3.0)) - 0.5) * sc;
+      let on = step(0.35, vnoise(vec2f(src.x / 90.0 + fk * 2.3, tq * 0.5 + fk * 5.0)));
+      arcs += on * exp(-sq((above - yk) / max(1.1, 1.4 * sc))) * select(0.0, 1.0, dy > 0.0) * (1.0 - smoothstep(0.0, hk2 * 1.4, above));
+    }
+    haze = exp(-abs(dy) / (h * 0.3)) * 0.5;
+    coreK = 1.5;
+  } else if (style == 3u) {
+    // soft beam: a broad, smooth glow
+    thick = F.saberThick * 3.2;
+    coreK = 0.35;
+    haze = exp(-abs(dy) / (h * 0.9)) * 0.8;
+  } else if (style == 4u) {
+    // flame: tall, fast-rising tongues, hotter at the base
+    if (dy > -1.5) {
+      let hf = h * 2.6;
+      let fl = fbm(vec2f((src.x * 1.6 + warp * 1.6) / 45.0, (src.y * 1.4 + t * 330.0) / 150.0));
+      plume = exp(-above / hf) * pow(max((fl - 0.32 * pow(above / hf, 0.6)) * 2.3, 0.0), 1.3) * 1.8;
+      haze = exp(-above / (hf * 0.35));
+    }
   }
-  let coreW = max(1.15, 0.9 / F.scale) * F.saberThick;
+  let coreW = max(1.15, 0.9 / F.scale) * thick;
   let core = exp(-sq(dy / coreW));
-  let inner = exp(-sq(dy / (max(3.2, 1.2 / F.scale) * F.saberThick)));
-  let outer = exp(-abs(dy) / (9.0 * F.saberThick));
+  let inner = exp(-sq(dy / (max(3.2, 1.2 / F.scale) * thick)));
+  let outer = exp(-abs(dy) / (9.0 * thick));
+  var flameCol = lighten(colc, 0.4);
+  if (style == 4u) { flameCol = mix(vec3f(1.0, 0.92, 0.75), colc * 1.2, clamp(above / (h * 1.8), 0.0, 1.0)); }
 
-  let rgb = (vec3f(core * 1.25)
+  let rgb = (vec3f(core * coreK)
            + inner * lighten(colc, 0.55) * 0.75
            + outer * colc * 0.22
            + haze * colc * 0.30
-           + plume * lighten(colc, 0.4)) * I;
+           + plume * flameCol
+           + arcs * lighten(colc, 0.75) * 1.6) * I * S.opacity;
   return vec4f(rgb, 0.0);
 }

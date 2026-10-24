@@ -20,6 +20,14 @@ await page.setInputFiles('.file-card .actions input[type=file]', CLIP);
 await page.waitForTimeout(1500);
 const proj = JSON.parse(readFileSync(PROJ, 'utf8'));
 if (LOOK) proj.look = { ...(proj.look ?? {}), ...LOOK };
+// optional background / texture image for 'user:test'
+const EXTRA = process.env.USERIMG ? readFileSync(process.env.USERIMG).toString('base64') : null;
+const EXTRA_TYPE = process.env.USERIMG?.endsWith('.webm') ? 'video/webm' : process.env.USERIMG?.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
+if (EXTRA) await page.evaluate(({ b64, type }) => {
+  const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const blob = new Blob([bin], { type });
+  window.pianoverse.renderer.userFiles = async (id) => (id === 'test' ? (type.startsWith('video') ? { video: blob } : { color: blob }) : null);
+}, { b64: EXTRA, type: EXTRA_TYPE });
 for (const t of TIMES) {
   const url = await page.evaluate(async ({ proj, t, scale }) => {
     const r = window.pianoverse.renderer;

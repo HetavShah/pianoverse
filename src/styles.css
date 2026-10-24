@@ -361,3 +361,19 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .tex .tex-blank.none { display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 22px; }
 .more-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; }
 .more-toggle:hover { color: var(--text); border-color: var(--border2); }
+
+/* foldable sections, colour chips, H/S/L boxes */
+.section-label.fold { display: flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font: inherit; }
+.section-label.fold .chev { width: 10px; color: var(--faint); }
+.section-label.fold .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); margin-left: 4px; }
+.swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.swatches.twelve { grid-template-columns: repeat(4, 1fr); }
+.swatch { height: 34px; border-radius: 7px; border: 2px solid transparent; cursor: pointer; display: flex; align-items: flex-end; justify-content: flex-start; padding: 2px 5px; }
+.swatch span { font-size: 11px; font-weight: 600; color: #fff; text-shadow: 0 1px 2px #000a; }
+.swatch.on { border-color: #fff; box-shadow: 0 0 0 1px #000; }
+.grad-preview { height: 12px; border-radius: 4px; }
+.sw-count { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.hsl-row { display: flex; gap: 4px; }
+.hsl-box { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--dim); }
+.hsl-box input { width: 36px; height: 22px; padding: 0 3px; font-size: 11px; }
+.hsl-row { flex-wrap: wrap; }

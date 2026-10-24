@@ -6,12 +6,15 @@ struct Emitter {
   col: vec3f, vn: f32,
   seed: f32, kind: f32, pad0: f32, pad1: f32,
 };
-struct Particle { pos: vec2f, b: f32, star: f32, col: vec4f };
+struct Particle { pos: vec2f, vel: vec2f, b: f32, star: f32, z: f32, pad: f32, col: vec4f };
 struct Params {
   time: f32, nEmit: u32, perEmit: u32, pad: u32, up: vec2f, pad2: vec2f,
   // physics and look (1 / 0 = the original approved look)
   swirl: f32, wind: f32, gravity: f32, lifeMul: f32,
   rise: f32, twinkle: f32, stars: f32, colorMix: f32,
+  speed: f32, turbX: f32, turbY: f32, turbZ: f32,
+  freq: f32, evo: f32, octaves: f32, octScale: f32,
+  octMul: f32, spread: f32, rays: f32, rayLen: f32,
 };
 
 @group(0) @binding(0) var<uniform> PP: Params;
@@ -42,14 +45,31 @@ fn flowVel(p: vec2f, t: f32) -> vec2f {
   return v;
 }
 
+// the turbulence: the air current at the chosen size and speed, with finer layers on top (octaves)
+fn turbVel(p: vec2f, t: f32) -> vec2f {
+  var v = flowVel(p * PP.freq, t * PP.evo);
+  let n = u32(PP.octaves + 0.5);
+  var f = PP.freq;
+  var a = 1.0;
+  for (var o = 1u; o < n; o++) {
+    f *= PP.octScale;
+    a *= PP.octMul;
+    v += flowVel(p * f + vec2f(37.0 * f32(o), 11.0 * f32(o)), t * PP.evo * (1.0 + 0.35 * f32(o))) * a;
+  }
+  return v * vec2f(PP.turbX, PP.turbY);
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let id = gid.x;
   if (id >= arrayLength(&parts)) { return; }
   var o: Particle;
   o.pos = vec2f(-10000.0);
+  o.vel = vec2f(0.0);
   o.b = 0.0;
   o.star = 0.0;
+  o.z = 0.0;
+  o.pad = 0.0;
   o.col = vec4f(0.0);
   let e = id / PP.perEmit;
   let k = id % PP.perEmit;
@@ -79,7 +99,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     var et = E.start;
     while (et < ts) {
       let dt = min(1.0 / 60.0, ts - et);
-      let f = flowVel(ep, et);
+      let f = turbVel(ep, et);
       ev.x += (f.x * 0.9 * PP.swirl + PP.wind * 70.0 - ev.x) * 1.4 * dt;
       ev.y += (f.y * 1.6 * PP.swirl - 95.0 * PP.rise + PP.gravity * 150.0 - ev.y) * 0.9 * dt;
       ep += ev * dt;
@@ -98,7 +118,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     plife = (0.4 + 0.9 * rnd(&st)) * PP.lifeMul;
     if (t - ts > plife) { parts[id] = o; return; }
     let a = -1.5707963 + 0.9 * gaussR(&st);
-    let sp = (30.0 + 130.0 * rnd(&st)) * PP.rise;
+    let sp = (30.0 + 130.0 * rnd(&st)) * PP.rise * PP.speed;
     pos = E.pos + vec2f(gaussR(&st) * 3.0, gaussR(&st) * 2.0);
     vel = vec2f(cos(a), sin(a)) * sp;
     bright = 0.7 + 0.6 * rnd(&st);
@@ -111,7 +131,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var pt = ts;
   while (pt < t) {
     let dt = min(1.0 / 40.0, t - pt);
-    let f = flowVel(pos, pt);
+    let f = turbVel(pos, pt);
     // drift with the air current and rise back along the notes' lane
     let goal = vec2f(f.x * 0.55, f.y * 0.8) * PP.swirl + PP.up * 42.0 * PP.rise + vec2f(PP.wind * 50.0, PP.gravity * 110.0);
     vel += (goal - vel) * 2.2 * dt;
@@ -123,7 +143,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let s1 = sin(age * tf + twPh);
   let tw = max(mix(1.0, 0.55 + 0.45 * s1 * s1, PP.twinkle), 0.0);
   o.pos = pos;
+  o.vel = vel;
   o.b = env * tw * bright;
+  if (PP.turbZ > 0.0) {
+    // drifting towards and away from you: size and brightness breathe
+    let zph = fract(f32(k) * 0.618034 + E.seed * 0.1373) * 6.2831853;
+    o.z = sin(age * (1.3 + 1.7 * fract(f32(k) * 0.37)) * PP.evo + zph) * PP.turbZ;
+    o.b *= max(0.0, 1.0 + 0.45 * o.z);
+  }
   if (pos.y < -30.0) { o.b = 0.0; }
   o.star = star;
   o.col = vec4f(col, tw);

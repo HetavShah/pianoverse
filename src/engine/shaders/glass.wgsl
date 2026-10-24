@@ -9,7 +9,14 @@ struct VOut {
   @location(2) @interpolate(flat) col: vec3f,
   @location(3) along: f32,                      // distance above the landing point, along the fall direction
   @location(4) @interpolate(flat) seed: f32,    // per note: which part of a texture it shows
+  @location(5) @interpolate(flat) col2: vec4f,  // colour at the note's top end, w = 1 when it differs
 };
+
+// the note's colour here: a gradient from the landing end up to the top when the colours run along the notes
+fn noteCol(i: VOut, py: f32, by: f32) -> vec3f {
+  if (i.col2.w < 0.5) { return i.col; }
+  return mix(i.col2.xyz, i.col, clamp(0.5 + py / (2.0 * by), 0.0, 1.0));
+}
 
 // note texture: colour, surface normals (OpenGL convention), roughness
 @group(1) @binding(0) var texSamp: sampler;
@@ -36,7 +43,8 @@ struct NoteParams {
 fn vs(@builtin(vertex_index) vi: u32,
       @location(0) a0: vec4f,   // landing x, landing y, bottom (distance along U), top (distance along U)
       @location(1) a1: vec4f,   // width, gain, absorb gain, U.x
-      @location(2) a2: vec4f) -> VOut {  // colour, U.y
+      @location(2) a2: vec4f,   // colour, U.y
+      @location(3) a3: vec4f) -> VOut {  // top colour, has top colour
   let w = a1.x;
   let pad = 1.3 * w;
   let U = vec2f(a1.w, a2.w);
@@ -57,6 +65,7 @@ fn vs(@builtin(vertex_index) vi: u32,
   o.local = vec2f(x, (a0.z + a0.w) * 0.5 - s);
   o.dims = vec4f(w, a0.w - a0.z, a1.y, a1.z);
   o.col = a2.xyz;
+  o.col2 = a3;
   o.along = s;
   o.seed = fract(sin(a0.x * 12.9898 + a0.y * 78.233) * 43758.5453);
   return o;
@@ -208,7 +217,7 @@ fn fs(i: VOut) -> @location(0) vec4f {
   let gx = px + bx - r * 0.75;
   let gy = py + by - r * 0.75;
   let glint = exp(-(gx * gx + gy * gy) / sq(rimT * 1.3));
-  let col = i.col;
+  let col = noteCol(i, py, by);
   let rgb = (rim * lighten(col, 0.6) * 1.15 * rimLit
           + rim2 * lighten(col, 0.35) * 0.55) * F.noteRim
           + bevel * lighten(col, 0.3) * 0.75
@@ -242,7 +251,7 @@ fn styled(i: VOut) -> vec4f {
     g = normalize(vec2f(sdBar(p + vec2f(e, 0.0), bx, by, r) - sdBar(p - vec2f(e, 0.0), bx, by, r),
                         sdBar(p + vec2f(0.0, e), bx, by, r) - sdBar(p - vec2f(0.0, e), bx, by, r)) + vec2f(1e-6));
   }
-  let col = i.col;
+  let col = noteCol(i, p.y, by);
   let inside = 1.0 / (1.0 + exp(clamp(d / 0.7, -50.0, 50.0)));
   let edgeW = max(1.5, w * select(0.16, 0.3, dim3) * NP.edge);
   let inset = clamp(-d / edgeW, 0.0, 1.0);            // 0 at the outline, 1 once past the edge

@@ -19,7 +19,7 @@ const panel = (name) => page.screenshot({ path: `${OUT}/${name}`, clip: { x: 114
 await page.click('.layer-row >> text=Colours'); await page.waitForTimeout(300);
 await page.click('.pal >> text=Synthwave'); await page.waitForTimeout(200);
 await panel('1-colours-gradient.png');
-await page.click('.by >> text=One colour'); await page.waitForTimeout(200);
+await page.click('.by >> text=1 colour'); await page.waitForTimeout(200);
 const w = await page.$('.wheel'); const bb = await w.boundingBox();
 await page.mouse.click(bb.x + bb.width * 0.8, bb.y + bb.height * 0.3); await page.waitForTimeout(200);
 await panel('2-colours-wheel.png');

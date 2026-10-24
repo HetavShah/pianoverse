@@ -3,6 +3,7 @@ import { noteName } from '../engine/calibration';
 import { useEffect, useRef, useState } from 'react';
 import { COLOR_BY, Control, GRADIENTS, hexToHsv, hsvToHex, LayerId, Look, LOOK_SCHEMA, NOTE_STYLE_CARDS, NOTE_TEXTURES, noteColor, PaletteId, toHex } from '../engine/look';
 import { deleteTexture, importTexture, textureThumb, UserTexture, useUserTextures } from './textureStore';
+import { sameValue } from '../engine/look';
 
 type Set = (k: keyof Look, v: unknown) => void;
 type Patch = (p: Partial<Look>) => void;
@@ -90,15 +91,116 @@ function ColorWheel({ value, onChange }: { value: string; onChange: (hex: string
         <input type="range" min={0.15} max={1} step={0.01} value={v} aria-label="Brightness" className="tint-track"
           style={{ background: `linear-gradient(90deg, #000, ${hsvToHex(h, s, 1)})` }}
           onChange={(e) => onChange(hsvToHex(h, s, Number(e.target.value)))} />
+        <HslInputs value={value} onChange={onChange} />
         <label className="wheel-exact"><input type="color" value={value} onChange={(e) => onChange(e.target.value)} /> Exact colour</label>
       </div>
     </div>
   );
 }
 
+const hexToHsl = (hex: string): [number, number, number] => {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  let h = 0;
+  if (d > 1e-6) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  const s = d < 1e-6 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  return [Math.round(((h * 60) + 360) % 360), Math.round(s * 100), Math.round(l * 100)];
+};
+const hslToHex = (h: number, s: number, l: number) => {
+  s /= 100; l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return '#' + [f(0), f(8), f(4)].map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('');
+};
+
+/** H / S / L number boxes, like SeeMusic's colour editor */
+function HslInputs({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+  const [h, s, l] = hexToHsl(value);
+  const box = (label: string, v: number, max: number, set: (n: number) => void) => (
+    <label className="hsl-box"><span>{label}</span>
+      <input type="number" min={0} max={max} value={v} onChange={(e) => set(Math.min(max, Math.max(0, Number(e.target.value) || 0)))} /></label>
+  );
+  return (
+    <div className="hsl-row">
+      {box('H', h, 360, (n) => onChange(hslToHex(n, s, l)))}
+      {box('S', s, 100, (n) => onChange(hslToHex(h, n, l)))}
+      {box('L', l, 100, (n) => onChange(hslToHex(h, s, n)))}
+    </div>
+  );
+}
+
+/** a row of colour chips (12 note colours, track colours, gradient stops); the picked one is edited below */
+function Swatches({ c, look, set }: { c: Extract<Control, { kind: 'swatches' }>; look: Look; set: Set }) {
+  const list = (look[c.key] as string[]) ?? [];
+  const [sel, setSel] = useState(0);
+  const i = Math.min(sel, Math.max(0, list.length - 1));
+  const edit = (hex: string) => { const next = [...list]; next[i] = hex; set(c.key, next); };
+  const growable = !!c.count;
+  return (
+    <div className="ctl">
+      <div className="ctl-head"><span>{c.label}</span>
+        {growable && <span className="sw-count">
+          <button type="button" className="reset" disabled={list.length <= 2} onClick={() => set(c.key, list.slice(0, -1))} aria-label="Fewer colours">−</button>
+          <span className="mono">{list.length}</span>
+          <button type="button" className="reset" disabled={list.length >= (c.count ?? 6)} onClick={() => set(c.key, [...list, list[list.length - 1] ?? '#ffffff'])} aria-label="More colours">+</button>
+        </span>}
+      </div>
+      {growable && <div className="grad-preview" style={{ background: `linear-gradient(90deg, ${list.join(', ')})` }} />}
+      <div className={'swatches' + (c.names && c.names.length === 12 ? ' twelve' : '')}>
+        {list.map((hex, k) => (
+          <button key={k} type="button" className={'swatch' + (k === i ? ' on' : '')} style={{ background: hex }} onClick={() => setSel(k)} title={c.names?.[k] ?? `Colour ${k + 1}`}>
+            <span>{c.names?.[k] ?? k + 1}</span>
+          </button>
+        ))}
+      </div>
+      <ColorWheel value={list[i] ?? '#ffffff'} onChange={edit} />
+    </div>
+  );
+}
+
+/** picture-free preset cards (saber styles, particle presets) */
+function Cards({ c, look, patch }: { c: Extract<Control, { kind: 'cards' }>; look: Look; patch: Patch }) {
+  const cur = c.cards.find((k) => Object.entries(k.set).every(([key, v]) => sameValue(look[key as keyof Look], v)))?.id;
+  return (
+    <div className="by-grid">
+      {c.cards.map((k) => <button key={k.id} type="button" className={'by' + (cur === k.id ? ' on' : '')} onClick={() => patch(k.set)}>{k.label}</button>)}
+    </div>
+  );
+}
+
+/** background image or video from the texture library */
+function BgPicker({ look, patch }: { look: Look; patch: Patch }) {
+  const mine = useUserTextures();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const upload = async () => {
+    setErr(''); setBusy(true);
+    try { const t = await importTexture(); if (t) patch({ bgImage: 'user:' + t.id, bgImageOn: true }); }
+    catch (e) { setErr(String((e as Error)?.message ?? e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="ctl">
+      <div className="tex-grid">
+        {mine.map((t) => (
+          <button key={t.id} type="button" className={'tex' + (look.bgImage === 'user:' + t.id ? ' on' : '')} onClick={() => patch({ bgImage: 'user:' + t.id, bgImageOn: true })} title={t.name}>
+            <UserThumb t={t} /><span>{t.name}</span>
+          </button>
+        ))}
+        <button type="button" className="tex add" onClick={upload} disabled={busy} title="Pick an image or a video for the background">
+          <span className="plus">+</span><span>{busy ? 'Adding…' : 'Upload'}</span>
+        </button>
+      </div>
+      {err && <small className="danger-text">{err}</small>}
+    </div>
+  );
+}
+
 function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look; set: Set; patch: Patch }) {
   const v = look[c.key];
-  const changed = v !== base[c.key];
+  const changed = !sameValue(v, base[c.key]);
   const reset = changed ? (
     <button type="button" className="reset" onClick={() => set(c.key, base[c.key])} title="Back to the preset's value" aria-label={`Reset ${c.label}`}>↺</button>
   ) : null;
@@ -156,6 +258,12 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
       );
     case 'texture':
       return <TexturePicker look={look} patch={patch} />;
+    case 'swatches':
+      return <Swatches c={c} look={look} set={set} />;
+    case 'cards':
+      return <Cards c={c} look={look} patch={patch} />;
+    case 'bgImage':
+      return <BgPicker look={look} patch={patch} />;
     case 'noteStyle': {
       const base = import.meta.env.BASE_URL ?? '/';
       const cur = NOTE_STYLE_CARDS.find((c) => Object.entries(c.set).every(([k, val]) => look[k as keyof Look] === val))?.id;
@@ -205,19 +313,25 @@ const visible = (c: Control, look: Look) => !('when' in c && c.when && !c.when(l
 
 export default function LookControls({ layer, look, base, set, patch }: { layer: LayerId; look: Look; base: Look; set: Set; patch: Patch }) {
   const [more, setMore] = useState(false);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const all = LOOK_SCHEMA[layer];
   const section = (sec: (typeof all)[number]) => {
     const rows = sec.controls.filter((c) => visible(c, look));
     if (!rows.length) return null;
+    const id = layer + '/' + sec.title;
+    const isOpen = open[id] ?? !sec.fold;
+    const changed = rows.some((c) => !sameValue(look[c.key], base[c.key]));
     return (
       <div key={sec.title} className="ctl-section">
-        <span className="section-label">{sec.title}</span>
-        {rows.map((c, i) => <Row key={c.key + c.kind + i} c={c} look={look} base={base} set={set} patch={patch} />)}
+        <button type="button" className="section-label fold" onClick={() => setOpen({ ...open, [id]: !isOpen })} aria-expanded={isOpen}>
+          <span className="chev">{isOpen ? '▾' : '▸'}</span>{sec.title}{!isOpen && changed ? <span className="dot" title="Changed" /> : null}
+        </button>
+        {isOpen && rows.map((c, i) => <Row key={c.key + c.kind + i} c={c} look={look} base={base} set={set} patch={patch} />)}
       </div>
     );
   };
   const extra = all.filter((sec) => sec.more);
-  const extraChanged = extra.some((sec) => sec.controls.some((c) => look[c.key] !== base[c.key]));
+  const extraChanged = extra.some((sec) => sec.controls.some((c) => !sameValue(look[c.key], base[c.key])));
   return (
     <>
       {all.filter((sec) => !sec.more).map(section)}

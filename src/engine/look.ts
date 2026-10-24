@@ -21,6 +21,18 @@ export const NOTE_STYLE_CARDS: { id: string; label: string; set: Partial<Look> }
   { id: 'outline', label: 'Outline', set: { noteDim: '2d', note2d: 'hollow' } },
   { id: 'soft', label: 'Soft glow', set: { noteDim: '2d', note2d: 'soft' } },
 ];
+/** SeeMusic-style particle presets: each sets the particle physics and look */
+export const PARTICLE_PRESETS: { id: string; label: string; set: Partial<Look> }[] = [
+  { id: 'default', label: 'Default', set: { partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
+  { id: 'explode', label: 'Explode', set: { partAmount: 1.6, partSpeed: 2.6, partSwirl: 0.4, partLife: 0.7, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0.4, partGravity: 0.35, partWind: 0, partRise: 1 } },
+  { id: 'fast', label: 'Fast playing', set: { partAmount: 0.7, partSpeed: 1.4, partSwirl: 0.8, partLife: 0.55, partSize: 0.85, partRays: false, partOctaves: 1, partTurbFreq: 1.3, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.2 } },
+  { id: 'count', label: 'High count', set: { partAmount: 2.8, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 0.75, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0.2, partGravity: 0, partWind: 0, partRise: 1 } },
+  { id: 'turb', label: 'High turbulence', set: { partAmount: 1.2, partSpeed: 1, partSwirl: 2.6, partLife: 1.3, partSize: 1, partRays: false, partOctaves: 3, partTurbFreq: 1.4, partSpread: 0, partGravity: 0, partWind: 0, partRise: 0.8 } },
+  { id: 'streaks', label: 'Long streaklets', set: { partAmount: 0.9, partSpeed: 1.6, partSwirl: 0.6, partLife: 1.1, partSize: 0.9, partRays: true, partRayLen: 2.2, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.2 } },
+  { id: 'straight', label: 'Straight out', set: { partAmount: 1, partSpeed: 1.8, partSwirl: 0.05, partLife: 1, partSize: 1, partRays: true, partRayLen: 1, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1.6 } },
+  { id: 'twirl', label: 'Twirl', set: { partAmount: 1.2, partSpeed: 0.8, partSwirl: 2.2, partLife: 1.6, partSize: 1, partRays: false, partOctaves: 2, partTurbFreq: 0.6, partSpread: 0, partGravity: 0, partWind: 0.2, partRise: 0.7 } },
+];
+
 export const KEY_NAMES = ['C', 'C♯ / D♭', 'D', 'E♭', 'E', 'F', 'F♯ / G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
 /** Built-in note textures (CC0, ambientCG). A custom texture is 'file:' + the image's path on this computer. */
@@ -34,19 +46,30 @@ export const NOTE_TEXTURES: { id: string; label: string; credit: string; video?:
 export type TexMode = 'tint' | 'natural' | 'glow';
 export const TEX_MODES: TexMode[] = ['tint', 'natural', 'glow'];
 
-export type PaletteId = 'teal' | 'swan' | 'ember' | 'neon' | 'aurora' | 'synthwave' | 'sunset' | 'ocean' | 'candy' | 'forest' | 'gold' | 'spectrum'
+export type PaletteId = 'custom' | 'teal' | 'swan' | 'ember' | 'neon' | 'aurora' | 'synthwave' | 'sunset' | 'ocean' | 'candy' | 'forest' | 'gold' | 'spectrum'
   | 'rainbow' | 'mono' | 'hands'; // the last three are older names, now colour modes (see resolveLook)
-/** how notes take their colour */
-export type ColorBy = 'pitch' | 'single' | 'random' | 'hands' | 'loudness' | 'time' | 'noteName';
+/** how notes take their colour (the first seven are offered; the rest are older names, see resolveLook) */
+export type ColorBy = 'single' | 'twelve' | 'gradient' | 'tracks' | 'channels' | 'hands' | 'random'
+  | 'pitch' | 'loudness' | 'time' | 'noteName';
 export const COLOR_BY: { id: ColorBy; label: string; hint: string }[] = [
-  { id: 'pitch', label: 'By pitch', hint: 'Low notes take one end of the gradient, high notes the other' },
-  { id: 'single', label: 'One colour', hint: 'Every note the same colour' },
-  { id: 'random', label: 'Random', hint: 'Each note gets its own colour from the gradient' },
-  { id: 'hands', label: 'Left / right', hint: 'One colour for each hand, split at a note' },
-  { id: 'loudness', label: 'By loudness', hint: 'Soft notes take one end of the gradient, loud notes the other' },
-  { id: 'time', label: 'Over time', hint: 'Colours drift through the gradient as the piece plays' },
-  { id: 'noteName', label: 'Note names', hint: 'Every C one colour, every G the next, round the colour wheel' },
+  { id: 'single', label: '1 colour', hint: 'Every note the same colour' },
+  { id: 'twelve', label: '12 colours', hint: 'One colour for each note name: every C, every C♯ …' },
+  { id: 'gradient', label: 'Gradient', hint: 'Colours blend across the keyboard, along each note, by loudness or over time' },
+  { id: 'tracks', label: 'Tracks', hint: 'One colour per MIDI track' },
+  { id: 'channels', label: 'Channels', hint: 'One colour per MIDI channel' },
+  { id: 'hands', label: 'Divide', hint: 'One colour below a dividing key, another above it' },
+  { id: 'random', label: 'Random', hint: 'Each note gets its own colour' },
 ];
+export type GradMap = 'pitch' | 'loudness' | 'time';
+export type GradDir = 'across' | 'up' | 'diagUp' | 'diagDown';
+export const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+export type SaberStyle = 'plasma' | 'straight' | 'electric' | 'soft' | 'flame';
+export const SABER_STYLES: { id: SaberStyle; label: string }[] = [
+  { id: 'plasma', label: 'Plasma' }, { id: 'straight', label: 'Straight' }, { id: 'electric', label: 'Electric' }, { id: 'soft', label: 'Soft beam' }, { id: 'flame', label: 'Flame' },
+];
+/** saber styles as picture-free cards */
+export const SABER_CARDS = SABER_STYLES.map((s0) => ({ id: s0.id, label: s0.label, set: { saberStyle: s0.id } as Partial<Look> }));
 
 export interface Look {
   // colours
@@ -55,6 +78,13 @@ export interface Look {
   colorB: string; // right hand
   splitNote: number; // hands: notes below go to colour A
   colorBy: ColorBy;
+  gradMap: GradMap; // what the gradient follows
+  gradDir: GradDir; // across the keyboard, up each note, or both
+  gradColors: string[]; // the custom gradient's colours (palette 'custom')
+  twelveColors: string[]; // C, C♯ … B
+  trackColors: string[];
+  channelColors: string[];
+  randomFrom: 'gradient' | 'any';
   hueShift: number; // degrees, turns every colour round the colour wheel
   colorSat: number; // colour strength
   colorCycle: number; // 'Over time': seconds for one trip through the gradient
@@ -125,6 +155,11 @@ export interface Look {
   saberFlicker: number; // plasma fringe height
   saberReact: number; // flare where you play
   saberTint: number; // 0 = palette colour, 1 = note colours where you play
+  saberStyle: SaberStyle;
+  saberOpacity: number;
+  saberOffset: number; // moves the saber up (+) or down (-) from the back edge of the keys, in key widths
+  saberCustom: boolean; // use saberColor instead of the palette
+  saberColor: string;
   // impact
   flashSize: number;
   flashBright: number;
@@ -151,11 +186,32 @@ export interface Look {
   partStars: number; // star glints
   partColor: number; // 0 = white, 1 = note colour
   partVelocity: boolean; // louder notes, bigger plumes
+  partSpeed: number; // launch speed
+  partTurbX: number; partTurbY: number; partTurbZ: number; // turbulence strength per direction (Z: in and out of the screen)
+  partTurbFreq: number; // size of the swirls (higher = smaller, busier)
+  partTurbEvo: number; // how fast the swirls change
+  partOctaves: number; // layers of finer swirls
+  partOctScale: number; // each layer this much finer
+  partOctMul: number; // each layer this much weaker
+  partSpread: number; // how widely particles start round the hit point
+  partOpacity: number;
+  partAlphaF: number; // how much particles darken what is behind them
+  partAdditive: number; // how much light they add
+  partBright: number;
+  partRays: boolean; // particles stretch along their motion
+  partRayLen: number;
   // background
   bgDarken: number;
   bgContrast: number;
   bgSaturation: number;
   bgVignette: number;
+  footOpacity: number; footScale: number; footX: number; footY: number; footRot: number;
+  footCropT: number; footCropB: number; footCropL: number; footCropR: number;
+  footBright: number; footHue: number;
+  bgColorOn: boolean; bgColor: string;
+  bgImageOn: boolean; bgImage: string; // texture library key
+  bgImgOpacity: number; bgImgScale: number; bgImgX: number; bgImgY: number; bgImgRot: number;
+  bgImgBright: number; bgImgContrast: number; bgImgHue: number; bgImgSat: number;
   // finish
   bloom: number;
   bloomWide: number;
@@ -163,8 +219,18 @@ export interface Look {
   grain: number;
 }
 
+function hsvEarly(h: number, s: number, v: number): [number, number, number] {
+  const f = (n: number) => { const k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return [f(5), f(3), f(1)];
+}
+const toHexEarly = (c: [number, number, number]) => '#' + c.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('');
+
 export const DEFAULT_LOOK: Look = {
-  colorBy: 'pitch', hueShift: 0, colorSat: 1, colorCycle: 20,
+  colorBy: 'gradient', hueShift: 0, colorSat: 1, colorCycle: 20,
+  gradMap: 'pitch', gradDir: 'across', gradColors: ['#3c6eff', '#14d7be', '#78ffaa'], randomFrom: 'any',
+  twelveColors: Array.from({ length: 12 }, (_, i) => toHexEarly(hsvEarly((i * 7) % 12 / 12, 0.75, 1))),
+  trackColors: ['#2e9bff', '#3ccf3c', '#a35cff', '#ff8a2e', '#ff4f9a', '#2ee0d0', '#ffd23c', '#e8e8e8'],
+  channelColors: ['#2e9bff', '#3ccf3c', '#a35cff', '#ff8a2e', '#ff4f9a', '#2ee0d0', '#ffd23c', '#e8e8e8'],
   palette: 'teal', colorA: '#3c6eff', colorB: '#78ffaa', splitNote: 60,
   noteAngle: null, noteSpeed: 680, noteWidth: 1, noteLength: 1, noteVelocity: 1, noteBright: 1, noteGlow: 1, noteFill: 1, noteOpacity: 1, noteRim: 1, noteRound: 1, noteFade: 1, noteDim: '3d', note2d: 'filled', note3d: 'glass', noteEdge: 1, noteDepth: 1,
   noteMinLen: 1.4, noteBWRatio: 1, noteDistort: 0, noteSustain: false,
@@ -177,10 +243,16 @@ export const DEFAULT_LOOK: Look = {
   texMirror: false, texOpacity: 1, texBlend: 1, texBright: 0, texContrast: 1, texHue: 0, texSat: 1,
   texEmboss: false, texEmbossDepth: 1, texRgbOpacity: 0, texCutOn: false, texCutThresh: 0.5, texCutOpacity: 0,
   saberBright: 1, saberThick: 1, saberFlicker: 1, saberReact: 1, saberTint: 1,
+  saberStyle: 'plasma', saberOpacity: 1, saberOffset: 0, saberCustom: false, saberColor: '#8cf5e1',
   flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3,
   keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
   partAmount: 1, partRise: 1, partSwirl: 1, partWind: 0, partGravity: 0, partLife: 1, partSize: 1, partTwinkle: 1, partHaze: 1, partStars: 1, partColor: 1, partVelocity: true,
+  partSpeed: 1, partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
+  partSpread: 0, partOpacity: 1, partAlphaF: 0, partAdditive: 1, partBright: 1, partRays: false, partRayLen: 1,
   bgDarken: 1, bgContrast: 1, bgSaturation: 1, bgVignette: 1,
+  footOpacity: 1, footScale: 1, footX: 0, footY: 0, footRot: 0, footCropT: 0, footCropB: 0, footCropL: 0, footCropR: 0, footBright: 0, footHue: 0,
+  bgColorOn: false, bgColor: '#000000', bgImageOn: false, bgImage: '',
+  bgImgOpacity: 1, bgImgScale: 1, bgImgX: 0, bgImgY: 0, bgImgRot: 0, bgImgBright: 0, bgImgContrast: 1, bgImgHue: 0, bgImgSat: 1,
   bloom: 1, bloomWide: 1, fringe: 1, grain: 1,
 };
 
@@ -198,6 +270,10 @@ export function resolveLook(partial: Partial<Look> | undefined | null): Look {
   if (l.palette === 'mono') { l.palette = 'teal'; l.colorBy = 'single'; }
   else if (l.palette === 'hands') { l.palette = 'teal'; l.colorBy = 'hands'; }
   else if (l.palette === 'rainbow') { l.palette = 'spectrum'; l.colorBy = 'noteName'; }
+  // older colour modes are now gradient settings or 12 colours
+  if (l.colorBy === 'pitch' || l.colorBy === 'loudness' || l.colorBy === 'time') { l.gradMap = l.colorBy; l.colorBy = 'gradient'; }
+  else if (l.colorBy === 'noteName') l.colorBy = 'twelve';
+  if (l.colorBy === 'random' && !('randomFrom' in old)) l.randomFrom = 'gradient';
   return l;
 }
 
@@ -226,6 +302,7 @@ function hsvc(h: number, s: number, v: number): RGB {
 }
 
 export const PALETTES: { id: PaletteId; label: string; stops?: [number, RGB][] }[] = [
+  { id: 'custom', label: 'Custom' },
   { id: 'teal', label: 'Interstellar teal', stops: [[0, rgb(60, 110, 255)], [0.45, rgb(20, 215, 190)], [1, rgb(120, 255, 170)]] },
   { id: 'swan', label: 'Swan white', stops: [[0, rgb(120, 150, 255)], [0.5, rgb(200, 215, 255)], [1, rgb(255, 255, 255)]] },
   { id: 'ember', label: 'Ember', stops: [[0, rgb(255, 60, 40)], [0.5, rgb(255, 140, 30)], [1, rgb(255, 225, 120)]] },
@@ -255,8 +332,10 @@ export function rgbToHsv([r, g, b]: RGB): [number, number, number] {
 export const hsvToHex = (h: number, s: number, v: number) => toHex(hsv(h, s, v));
 export const hexToHsv = (h: string) => rgbToHsv(hex(h));
 
+const evenStops = (cols: string[]): [number, RGB][] => (cols.length ? cols : ['#ffffff']).map((c, i, a) => [a.length > 1 ? i / (a.length - 1) : 0, hex(c)] as [number, RGB]);
 const gradientAt = (look: Look, x: number): RGB => {
-  const pal = PALETTES.find((q) => q.id === look.palette && q.stops) ?? PALETTES[0];
+  if (look.palette === 'custom') { const st = evenStops(look.gradColors); return st.length > 1 ? ramp(st, x) : st[0][1]; }
+  const pal = PALETTES.find((q) => q.id === look.palette && q.stops) ?? PALETTES[1];
   return ramp(pal.stops!, x);
 };
 const hash01 = (i: number) => { let t = (i * 0x9e3779b1) >>> 0; t ^= t >>> 15; t = Math.imul(t, 0x85ebca77) >>> 0; t ^= t >>> 13; return (t >>> 0) / 4294967296; };
@@ -264,26 +343,50 @@ const hash01 = (i: number) => { let t = (i * 0x9e3779b1) >>> 0; t ^= t >>> 15; t
 /** what a note's colour can depend on besides its pitch */
 export interface NoteInfo { idx: number; s: number; v: number; k?: number; c?: number }
 
-/** the colour of a note under a look */
+const adjust = (look: Look, c: RGB): RGB => {
+  if (look.hueShift === 0 && look.colorSat === 1) return c;
+  const [h, s, v] = rgbToHsv(c);
+  return hsv(((h + look.hueShift / 360) % 1 + 1) % 1, Math.min(1, s * look.colorSat), v);
+};
+
+/** where on the gradient a note sits (0..1) */
+function gradPos(look: Look, p: number, n?: NoteInfo): number {
+  if (look.gradMap === 'loudness') return n ? (n.v - 0.3) / 0.45 : 0.5;
+  if (look.gradMap === 'time') { const ph = n ? (n.s / Math.max(1, look.colorCycle)) % 1 : 0.5; return 1 - Math.abs(ph * 2 - 1); }
+  return (p - LO_P) / (HI_P - LO_P);
+}
+
+/** the colour of a note under a look (at its landing end) */
 export function noteColor(look: Look, p: number, n?: NoteInfo): RGB {
   let c: RGB;
   switch (look.colorBy) {
     case 'single': c = hex(look.colorA); break;
     case 'hands': c = p < look.splitNote ? hex(look.colorA) : hex(look.colorB); break;
-    case 'noteName': c = hsv(((((p % 12) + 12) % 12) * 7 % 12) / 12, 0.75, 1); break; // circle of fifths around the wheel
-    case 'random': c = gradientAt(look, n ? hash01(n.idx + 1) : 0.5); break;
-    case 'loudness': c = gradientAt(look, n ? (n.v - 0.3) / 0.45 : 0.5); break;
-    case 'time': { const ph = n ? (n.s / Math.max(1, look.colorCycle)) % 1 : 0.5; c = gradientAt(look, 1 - Math.abs(ph * 2 - 1)); break; }
-    default: c = gradientAt(look, (p - LO_P) / (HI_P - LO_P));
+    case 'twelve': case 'noteName': c = hex(look.twelveColors[((p % 12) + 12) % 12] ?? '#ffffff'); break;
+    case 'tracks': c = hex(look.trackColors[(n?.k ?? 0) % look.trackColors.length] ?? '#ffffff'); break;
+    case 'channels': c = hex(look.channelColors[(n?.c ?? 0) % look.channelColors.length] ?? '#ffffff'); break;
+    case 'random': c = look.randomFrom === 'any' ? hsv(n ? hash01(n.idx + 1) : 0.5, 0.75, 1) : gradientAt(look, n ? hash01(n.idx + 1) : 0.5); break;
+    default: {
+      const x = gradPos(look, p, n);
+      c = gradientAt(look, look.gradDir === 'up' ? 0 : x);
+    }
   }
-  if (look.hueShift === 0 && look.colorSat === 1) return c;
-  const [h, s, v] = rgbToHsv(c);
-  return hsv(((h + look.hueShift / 360) % 1 + 1) % 1, Math.min(1, s * look.colorSat), v);
+  return adjust(look, c);
+}
+
+/** the colour at a note's far (top) end when the gradient runs along the notes; null = same as noteColor */
+export function noteColorTop(look: Look, p: number, n?: NoteInfo): RGB | null {
+  const g = look.colorBy === 'gradient' || look.colorBy === 'pitch' || look.colorBy === 'loudness' || look.colorBy === 'time';
+  if (!g || look.gradDir === 'across') return null;
+  const x = gradPos(look, p, n);
+  const top = look.gradDir === 'up' ? 1 : look.gradDir === 'diagUp' ? x + 0.4 : x - 0.4;
+  return adjust(look, gradientAt(look, Math.min(1, Math.max(0, top))));
 }
 
 /** the saber's resting colour: the palette's middle */
 export function saberBase(look: Look): RGB {
-  if (look.palette === 'teal' && look.colorBy === 'pitch' && look.hueShift === 0 && look.colorSat === 1) return rgb(140, 245, 225); // exact original
+  if (look.saberCustom) return hex(look.saberColor);
+  if (look.palette === 'teal' && look.colorBy === 'gradient' && look.gradMap === 'pitch' && look.gradDir === 'across' && look.hueShift === 0 && look.colorSat === 1) return rgb(140, 245, 225); // exact original
   const c = noteColor(look, 64);
   return [0.35 + 0.65 * c[0], 0.35 + 0.65 * c[1], 0.35 + 0.65 * c[2]];
 }
@@ -299,11 +402,14 @@ export type Control =
   | { key: keyof Look; kind: 'select'; label: string; options: { value: string; label: string }[]; when?: (l: Look) => boolean; segmented?: boolean }
   | { key: keyof Look; kind: 'texture'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'noteStyle'; label: string; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'swatches'; label: string; count?: number; names?: string[]; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'cards'; label: string; cards: { id: string; label: string; set: Partial<Look> }[]; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'bgImage'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'color'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'toggle'; label: string; hint?: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'note'; label: string; when?: (l: Look) => boolean };
 
-export interface Section { title: string; controls: Control[]; /** hidden under "More settings" */ more?: boolean }
+export interface Section { title: string; controls: Control[]; /** hidden under "More settings" */ more?: boolean; /** starts folded */ fold?: boolean }
 
 const pct = (v: number) => `${Math.round(v * 100)}`;
 const x = (v: number) => `${v.toFixed(2)}×`;
@@ -311,24 +417,31 @@ const s1 = (v: number) => `${v.toFixed(1)} s`;
 const tex = (l: Look) => l.texOn;
 const is2d = (l: Look) => l.noteDim === '2d';
 const is3d = (l: Look) => l.noteDim === '3d';
-const usesGradient = (l: Look) => ['pitch', 'random', 'loudness', 'time'].includes(l.colorBy);
+const isGrad = (l: Look) => l.colorBy === 'gradient';
 
 export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
   colors: [
-    { title: 'Colour notes', controls: [
+    { title: 'Colour mode', controls: [
       { key: 'colorBy', kind: 'colorBy', label: 'Colour by' },
     ] },
-    { title: 'Palette', controls: [
-      { key: 'palette', kind: 'select', label: 'Gradient', when: usesGradient, options: GRADIENTS.map((p) => ({ value: p.id, label: p.label })) },
+    { title: 'Colours', controls: [
       { key: 'colorA', kind: 'wheel', label: 'Colour', when: (l) => l.colorBy === 'single' },
-      { key: 'colorA', kind: 'wheel', label: 'Left hand', when: (l) => l.colorBy === 'hands' },
-      { key: 'colorB', kind: 'wheel', label: 'Right hand', when: (l) => l.colorBy === 'hands' },
-      { key: 'splitNote', kind: 'note', label: 'Split at', when: (l) => l.colorBy === 'hands' },
-      { key: 'colorCycle', kind: 'slider', label: 'Seconds per cycle', min: 4, max: 120, step: 1, fmt: (v) => `${Math.round(v)} s`, when: (l) => l.colorBy === 'time' },
+      { key: 'twelveColors', kind: 'swatches', label: 'Note colours', names: NOTE_NAMES, when: (l) => l.colorBy === 'twelve' },
+      { key: 'gradMap', kind: 'select', label: 'Gradient follows', segmented: true, when: isGrad, options: [{ value: 'pitch', label: 'Pitch' }, { value: 'loudness', label: 'Loudness' }, { value: 'time', label: 'Time' }] },
+      { key: 'gradDir', kind: 'select', label: 'Direction', segmented: true, when: isGrad, options: [{ value: 'across', label: '→' }, { value: 'up', label: '↑' }, { value: 'diagUp', label: '↗' }, { value: 'diagDown', label: '↘' }] },
+      { key: 'palette', kind: 'select', label: 'Gradient', when: (l) => isGrad(l) || (l.colorBy === 'random' && l.randomFrom === 'gradient'), options: GRADIENTS.map((p) => ({ value: p.id, label: p.label })) },
+      { key: 'gradColors', kind: 'swatches', label: 'Custom gradient colours', count: 6, when: (l) => (isGrad(l) || l.colorBy === 'random') && l.palette === 'custom' },
+      { key: 'colorCycle', kind: 'slider', label: 'Seconds per cycle', min: 4, max: 120, step: 1, fmt: (v) => `${Math.round(v)} s`, when: (l) => isGrad(l) && l.gradMap === 'time' },
+      { key: 'trackColors', kind: 'swatches', label: 'Track colours', names: ['Track 1', 'Track 2', 'Track 3', 'Track 4', 'Track 5', 'Track 6', 'Track 7', 'Track 8'], when: (l) => l.colorBy === 'tracks' },
+      { key: 'channelColors', kind: 'swatches', label: 'Channel colours', names: ['Ch 1', 'Ch 2', 'Ch 3', 'Ch 4', 'Ch 5', 'Ch 6', 'Ch 7', 'Ch 8'], when: (l) => l.colorBy === 'channels' },
+      { key: 'colorA', kind: 'wheel', label: 'Below the dividing key', when: (l) => l.colorBy === 'hands' },
+      { key: 'colorB', kind: 'wheel', label: 'From the dividing key up', when: (l) => l.colorBy === 'hands' },
+      { key: 'splitNote', kind: 'note', label: 'Dividing key', when: (l) => l.colorBy === 'hands' },
+      { key: 'randomFrom', kind: 'select', label: 'Random from', segmented: true, when: (l) => l.colorBy === 'random', options: [{ value: 'any', label: 'Any colour' }, { value: 'gradient', label: 'A gradient' }] },
     ] },
     { title: 'Adjust', controls: [
       { key: 'hueShift', kind: 'slider', label: 'Hue', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°`, hue: true, hint: 'Turns every colour round the colour wheel' },
-      { key: 'colorSat', kind: 'slider', label: 'Colour strength', min: 0, max: 1.5, step: 0.01, fmt: pct },
+      { key: 'colorSat', kind: 'slider', label: 'Saturation', min: 0, max: 1.5, step: 0.01, fmt: pct },
     ] },
   ],
   notes: [
@@ -409,12 +522,23 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     ] },
   ],
   saber: [
+    { title: 'Saber style', controls: [
+      { key: 'saberStyle', kind: 'cards', label: 'Style', cards: SABER_CARDS },
+    ] },
     { title: 'Saber', controls: [
       { key: 'saberBright', kind: 'slider', label: 'Brightness', min: 0, max: 2.5, step: 0.01, fmt: pct },
-      { key: 'saberThick', kind: 'slider', label: 'Thickness', min: 0.3, max: 3, step: 0.01, fmt: x },
-      { key: 'saberFlicker', kind: 'slider', label: 'Plasma height', min: 0, max: 3, step: 0.01, fmt: pct },
+      { key: 'saberOpacity', kind: 'slider', label: 'Opacity', min: 0, max: 1, step: 0.01, fmt: pct },
+      { key: 'saberOffset', kind: 'slider', label: 'Position', min: -1.5, max: 1.5, step: 0.01, fmt: (v) => v.toFixed(2), hint: 'Moves the saber above (+) or below (−) the back edge of the keys' },
+      { key: 'saberThick', kind: 'slider', label: 'Scale', min: 0.3, max: 3, step: 0.01, fmt: x },
+    ] },
+    { title: 'Colour', controls: [
+      { key: 'saberCustom', kind: 'toggle', label: 'Custom colour' },
+      { key: 'saberColor', kind: 'wheel', label: 'Saber colour', when: (l) => l.saberCustom },
+      { key: 'saberTint', kind: 'slider', label: 'Take note colours', min: 0, max: 1, step: 0.01, fmt: pct, hint: 'Where you play, the saber takes on the notes\' colours' },
+    ] },
+    { title: 'Motion', fold: true, controls: [
+      { key: 'saberFlicker', kind: 'slider', label: 'Flame height', min: 0, max: 3, step: 0.01, fmt: pct, when: (l) => l.saberStyle !== 'straight' && l.saberStyle !== 'soft' },
       { key: 'saberReact', kind: 'slider', label: 'Flare where you play', min: 0, max: 2.5, step: 0.01, fmt: pct },
-      { key: 'saberTint', kind: 'slider', label: 'Take note colours', min: 0, max: 1, step: 0.01, fmt: pct },
     ] },
   ],
   impact: [
@@ -429,21 +553,44 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     ] },
   ],
   particles: [
-    { title: 'Motion', controls: [
-      { key: 'partAmount', kind: 'slider', label: 'Amount', min: 0, max: 3, step: 0.01, fmt: pct },
-      { key: 'partRise', kind: 'slider', label: 'Rise height', min: 0, max: 2.5, step: 0.01, fmt: pct },
-      { key: 'partSwirl', kind: 'slider', label: 'Swirl', min: 0, max: 3, step: 0.01, fmt: pct },
+    { title: 'Presets', controls: [
+      { key: 'partAmount', kind: 'cards', label: 'Preset', cards: PARTICLE_PRESETS },
+    ] },
+    { title: 'Main particles', controls: [
+      { key: 'partSize', kind: 'slider', label: 'Particle size', min: 0.3, max: 3, step: 0.01, fmt: x },
+      { key: 'partAmount', kind: 'slider', label: 'Particle count', min: 0, max: 3, step: 0.01, fmt: pct },
+      { key: 'partSpeed', kind: 'slider', label: 'Particle speed', min: 0, max: 3, step: 0.01, fmt: x },
+      { key: 'partLife', kind: 'slider', label: 'Particle lifetime', min: 0.3, max: 3, step: 0.01, fmt: x },
+    ] },
+    { title: 'Particle turbulence', fold: true, controls: [
+      { key: 'partSwirl', kind: 'slider', label: 'Turbulence', min: 0, max: 3, step: 0.01, fmt: pct },
+      { key: 'partTurbX', kind: 'slider', label: 'Turbulence X', min: 0, max: 3, step: 0.01, fmt: x },
+      { key: 'partTurbY', kind: 'slider', label: 'Turbulence Y', min: 0, max: 3, step: 0.01, fmt: x },
+      { key: 'partTurbZ', kind: 'slider', label: 'Turbulence Z', min: 0, max: 2, step: 0.01, fmt: x, hint: 'Particles drift towards and away from you: they grow, shrink and flicker' },
+      { key: 'partTurbFreq', kind: 'slider', label: 'Turbulence frequency', min: 0.2, max: 4, step: 0.01, fmt: x },
+      { key: 'partTurbEvo', kind: 'slider', label: 'Evolution speed', min: 0, max: 4, step: 0.01, fmt: x },
+      { key: 'partOctaves', kind: 'slider', label: 'Turbulence octaves', min: 1, max: 3, step: 1, fmt: (v) => String(Math.round(v)) },
+      { key: 'partOctScale', kind: 'slider', label: 'Octave scale', min: 1.2, max: 4, step: 0.01, fmt: x, when: (l) => l.partOctaves > 1 },
+      { key: 'partOctMul', kind: 'slider', label: 'Octave multiplier', min: 0, max: 1, step: 0.01, fmt: (v) => v.toFixed(2), when: (l) => l.partOctaves > 1 },
+      { key: 'partSpread', kind: 'slider', label: 'Particle spread', min: 0, max: 2, step: 0.01, fmt: x },
       { key: 'partWind', kind: 'slider', label: 'Sideways drift', min: -1, max: 1, step: 0.01, fmt: (v) => `${Math.round(v * 100)}` },
       { key: 'partGravity', kind: 'slider', label: 'Gravity', min: -1, max: 1, step: 0.01, fmt: (v) => `${Math.round(v * 100)}`, hint: 'Positive pulls glitter down, negative lifts it faster' },
-      { key: 'partLife', kind: 'slider', label: 'Lifetime', min: 0.3, max: 3, step: 0.01, fmt: x },
+      { key: 'partRise', kind: 'slider', label: 'Rise height', min: 0, max: 2.5, step: 0.01, fmt: pct },
     ] },
-    { title: 'Look', controls: [
-      { key: 'partSize', kind: 'slider', label: 'Particle size', min: 0.4, max: 3, step: 0.01, fmt: x },
+    { title: 'Particle look', fold: true, controls: [
+      { key: 'partOpacity', kind: 'slider', label: 'Particle opacity', min: 0, max: 1, step: 0.01, fmt: pct },
+      { key: 'partAlphaF', kind: 'slider', label: 'Alpha factor', min: 0, max: 1, step: 0.01, fmt: (v) => v.toFixed(2), hint: 'How much particles darken what is behind them' },
+      { key: 'partAdditive', kind: 'slider', label: 'Additive factor', min: 0, max: 2, step: 0.01, fmt: (v) => v.toFixed(2), hint: 'How much light particles add' },
+      { key: 'partBright', kind: 'slider', label: 'Particle brightness', min: 0, max: 3, step: 0.01, fmt: pct },
+      { key: 'partColor', kind: 'slider', label: 'Note colour', min: 0, max: 1.5, step: 0.01, fmt: pct, hint: '0 = white glitter' },
       { key: 'partTwinkle', kind: 'slider', label: 'Twinkle', min: 0, max: 1.5, step: 0.01, fmt: pct },
       { key: 'partHaze', kind: 'slider', label: 'Haze', min: 0, max: 3, step: 0.01, fmt: pct },
       { key: 'partStars', kind: 'slider', label: 'Star glints', min: 0, max: 4, step: 0.01, fmt: pct },
-      { key: 'partColor', kind: 'slider', label: 'Note colour', min: 0, max: 1.5, step: 0.01, fmt: pct, hint: '0 = white glitter' },
       { key: 'partVelocity', kind: 'toggle', label: 'Louder notes, bigger plumes' },
+    ] },
+    { title: 'Particle rays', fold: true, controls: [
+      { key: 'partRays', kind: 'toggle', label: 'Particle rays', hint: 'Particles stretch into short streaks along their motion' },
+      { key: 'partRayLen', kind: 'slider', label: 'Ray length', min: 0.2, max: 4, step: 0.01, fmt: x, when: (l) => l.partRays },
     ] },
   ],
   lighting: [
@@ -459,11 +606,41 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     ] },
   ],
   background: [
-    { title: 'Footage', controls: [
+    { title: 'Video', controls: [
+      { key: 'footOpacity', kind: 'slider', label: 'Video opacity', min: 0, max: 1, step: 0.01, fmt: pct, hint: 'Lower lets the background show through your video' },
       { key: 'bgDarken', kind: 'slider', label: 'Darken', min: 0, max: 2, step: 0.01, fmt: pct },
-      { key: 'bgContrast', kind: 'slider', label: 'Contrast', min: 0, max: 2, step: 0.01, fmt: pct },
-      { key: 'bgSaturation', kind: 'slider', label: 'Colour', min: 0, max: 2, step: 0.01, fmt: pct },
+      { key: 'footBright', kind: 'slider', label: 'Video brightness', min: -0.5, max: 0.5, step: 0.01, fmt: (v) => v.toFixed(2) },
+      { key: 'bgContrast', kind: 'slider', label: 'Video contrast', min: 0, max: 2, step: 0.01, fmt: pct },
+      { key: 'footHue', kind: 'slider', label: 'Video hue', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°`, hue: true },
+      { key: 'bgSaturation', kind: 'slider', label: 'Video saturation', min: 0, max: 2, step: 0.01, fmt: pct },
       { key: 'bgVignette', kind: 'slider', label: 'Vignette', min: 0, max: 2, step: 0.01, fmt: pct },
+    ] },
+    { title: 'Video position', fold: true, controls: [
+      { key: 'footScale', kind: 'slider', label: 'Scale', min: 0.3, max: 2, step: 0.01, fmt: x, hint: 'The notes and effects move with the video' },
+      { key: 'footX', kind: 'slider', label: 'Position X', min: -0.5, max: 0.5, step: 0.005, fmt: (v) => v.toFixed(2) },
+      { key: 'footY', kind: 'slider', label: 'Position Y', min: -0.5, max: 0.5, step: 0.005, fmt: (v) => v.toFixed(2) },
+      { key: 'footRot', kind: 'slider', label: 'Rotation', min: -45, max: 45, step: 0.5, fmt: (v) => `${v}°` },
+      { key: 'footCropT', kind: 'slider', label: 'Crop top', min: 0, max: 0.6, step: 0.005, fmt: pct },
+      { key: 'footCropB', kind: 'slider', label: 'Crop bottom', min: 0, max: 0.6, step: 0.005, fmt: pct },
+      { key: 'footCropL', kind: 'slider', label: 'Crop left', min: 0, max: 0.6, step: 0.005, fmt: pct },
+      { key: 'footCropR', kind: 'slider', label: 'Crop right', min: 0, max: 0.6, step: 0.005, fmt: pct },
+    ] },
+    { title: 'Background', controls: [
+      { key: 'bgColorOn', kind: 'toggle', label: 'Background colour' },
+      { key: 'bgColor', kind: 'wheel', label: 'Colour', when: (l) => l.bgColorOn },
+      { key: 'bgImageOn', kind: 'toggle', label: 'Background image or video' },
+      { key: 'bgImage', kind: 'bgImage', label: 'Image', when: (l) => l.bgImageOn },
+    ] },
+    { title: 'Background image', fold: true, controls: [
+      { key: 'bgImgOpacity', kind: 'slider', label: 'Image opacity', min: 0, max: 1, step: 0.01, fmt: pct, when: (l) => l.bgImageOn },
+      { key: 'bgImgScale', kind: 'slider', label: 'Image scale', min: 0.3, max: 3, step: 0.01, fmt: x, when: (l) => l.bgImageOn },
+      { key: 'bgImgX', kind: 'slider', label: 'Image position X', min: -0.5, max: 0.5, step: 0.005, fmt: (v) => v.toFixed(2), when: (l) => l.bgImageOn },
+      { key: 'bgImgY', kind: 'slider', label: 'Image position Y', min: -0.5, max: 0.5, step: 0.005, fmt: (v) => v.toFixed(2), when: (l) => l.bgImageOn },
+      { key: 'bgImgRot', kind: 'slider', label: 'Image rotation', min: -180, max: 180, step: 1, fmt: (v) => `${v}°`, when: (l) => l.bgImageOn },
+      { key: 'bgImgBright', kind: 'slider', label: 'Image brightness', min: -0.5, max: 0.5, step: 0.01, fmt: (v) => v.toFixed(2), when: (l) => l.bgImageOn },
+      { key: 'bgImgContrast', kind: 'slider', label: 'Image contrast', min: 0, max: 3, step: 0.01, fmt: (v) => v.toFixed(2), when: (l) => l.bgImageOn },
+      { key: 'bgImgHue', kind: 'slider', label: 'Image hue', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°`, hue: true, when: (l) => l.bgImageOn },
+      { key: 'bgImgSat', kind: 'slider', label: 'Image saturation', min: 0, max: 2, step: 0.01, fmt: (v) => v.toFixed(2), when: (l) => l.bgImageOn },
     ] },
   ],
   finish: [
@@ -495,10 +672,13 @@ export function applyPreset(current: Partial<Look> | undefined, preset: Preset):
   return { ...preset.look, ...keep };
 }
 
+/** settings compare by value (some are lists of colours) */
+export const sameValue = (a: unknown, b: unknown) => a === b || (Array.isArray(a) && Array.isArray(b) && JSON.stringify(a) === JSON.stringify(b));
+
 /** does the project's look still match the preset exactly? */
 export function matchesPreset(current: Partial<Look> | undefined, preset: Preset): boolean {
   const a = resolveLook(current), b = resolveLook(preset.look);
-  return (Object.keys(DEFAULT_LOOK) as (keyof Look)[]).every((k) => PER_VIDEO_KEYS.includes(k) || a[k] === b[k]);
+  return (Object.keys(DEFAULT_LOOK) as (keyof Look)[]).every((k) => PER_VIDEO_KEYS.includes(k) || sameValue(a[k], b[k]));
 }
 
 /** the look to store in a preset: everything except the settings that belong to one video */
