@@ -202,7 +202,7 @@ export class Renderer {
     this.heatBuf = buf(40 * 16, U.STORAGE | U.COPY_DST);
     this.simUni = buf(112, U.UNIFORM | U.COPY_DST);
     this.partDrawUni = buf(32, U.UNIFORM | U.COPY_DST);
-    this.shapeBuf = buf(MAX_SHAPE_POINTS * 8, U.STORAGE | U.COPY_DST);
+    this.shapeBuf = buf(MAX_SHAPE_POINTS * 16, U.STORAGE | U.COPY_DST);
     this.emitBuf = buf(MAX_EMIT * 64, U.STORAGE | U.COPY_DST);
     this.flowBuf = buf(20 * 16, U.STORAGE | U.COPY_DST);
     this.partBuf = buf(MAX_EMIT * PER_EMIT * 48, U.STORAGE);
@@ -400,8 +400,8 @@ export class Renderer {
           const size = Math.min(this.srcW * 0.8, Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) * 0.75) * lk.partShapeSize;
           const cy = Math.max(size * 0.55, Math.min(...ends.map((e) => e[1]), c0[1]) - tg.unit * 2.5 - size * 0.5);
           const cx = Math.min(this.srcW - size * 0.55, Math.max(size * 0.55, c0[0]));
-          const rate = 450 * (0.6 + 0.8 * vv) * lk.partAmount;
-          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.5 + 4.3 * lk.partLife, data: [n.s, 0.5, rate, 0, tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
+          const rate = 420 * (0.6 + 0.8 * vv) * lk.partAmount;
+          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.15 + (0.7 + 3 * lk.partShapeHold) / Math.max(0.1, lk.partSpeed), data: [n.s, 0.15, rate, lk.partShapeDir === 'ccw' ? -1 : 1, tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
         } else {
           const mid = this.whiteKeys / 2;
           const c0 = kb.P(mid, kb.edgeY(mid));
@@ -911,7 +911,7 @@ export class Renderer {
       const pts = svgToPoints(text);
       if (!pts) { console.warn('[shape] no outline found in', key); return; }
       this.device.queue.writeBuffer(this.shapeBuf, 0, pts);
-      this.nShape = pts.length / 2;
+      this.nShape = pts.length / 4;
       this.shapeKey = key;
       this.onTexture?.();
     })().catch((e) => console.warn('[shape]', e));

@@ -21,7 +21,7 @@ struct Params {
 @group(0) @binding(1) var<storage, read> emitters: array<Emitter>;
 @group(0) @binding(2) var<storage, read> flow: array<vec4f>;   // 0..9: kx, ky, amplitude, omega; 10..19: phase
 @group(0) @binding(3) var<storage, read_write> parts: array<Particle>;
-@group(0) @binding(4) var<storage, read> shape: array<vec2f>;   // outline points of the chosen shape, unit box
+@group(0) @binding(4) var<storage, read> shape: array<vec4f>;   // outline points in drawing order: x, y, outline start, outline count (< 0: open)
 
 fn pcg(v: u32) -> u32 {
   let s = v * 747796405u + 2891336453u;
@@ -200,8 +200,19 @@ fn vortex(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   return finishP(pos, vel, age, plife, bright, star, col, st);
 }
 
-// SHAPE: particles rise from the key, gather on the outline of a picture above the keyboard,
-// hold it for a moment, then float up and fade away
+// a point along an outline, f in points from its start (wraps round closed outlines, stops at the end of open ones)
+fn alongShape(start: u32, cnt: f32, f: f32) -> vec2f {
+  let n = abs(cnt);
+  var g = f;
+  if (cnt > 0.0) { g = f - floor(f / n) * n; } else { g = clamp(f, 0.0, n - 1.001); }
+  let i0 = u32(floor(g));
+  var i1 = i0 + 1u;
+  if (f32(i1) >= n) { i1 = select(i0, 0u, cnt > 0.0); }
+  return mix(shape[start + i0].xy, shape[start + i1].xy, fract(g));
+}
+
+// SHAPE: particles rise from the key to the start of an outline (its lowest point), trace the whole outline
+// once in one direction, and disappear as they get back to where they started
 fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   var off: Particle;
   off.pos = vec2f(-10000.0);
@@ -211,51 +222,51 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   if (f32(k) >= total) { return off; }
   let ts = E.start + (f32(k) + rnd(st)) / max(E.rate, 1.0);
   if (ts > t) { return off; }
-  let plife = (3.0 + 1.2 * rnd(st)) * PP.lifeMul;
-  let age = t - ts;
-  if (age > plife) { return off; }
   let size = E.pad0;
+  // which outline: picked by length (a random point on the drawing, then its outline)
   let idx = min(u32(rnd(st) * f32(PP.nShape)), PP.nShape - 1u);
-  let goal = E.vel + shape[idx] * size + vec2f(gaussR(st), gaussR(st)) * size * 0.006;
-  let a = age / plife;
-  let tArrive = 0.32;
-  let tLeave = tArrive + 0.3 * E.pad1;
+  let P = shape[idx];
+  let start = u32(P.z);
+  let cnt = P.w;
+  let n = abs(cnt);
+  let dir = select(1.0, E.count, cnt > 0.0);     // +1 clockwise, -1 anticlockwise (open lines always run forwards)
+  let tRise = 0.6 / max(PP.speed, 0.1);
+  let tTrace = 2.4 * E.pad1 * (n / f32(PP.nShape) * 0.5 + 0.5) / max(PP.speed, 0.1) * (0.98 + 0.04 * rnd(st));
+  let age = t - ts;
+  if (age > tRise + tTrace) { return off; }
+  let wob = vec2f(gaussR(st), gaussR(st)) * size * 0.005;
+  let home = E.vel + shape[start].xy * size;
   var pos: vec2f;
   var vel: vec2f;
-  let side = gaussR(st) * size * 0.25;
-  if (a < tArrive) {
-    // fly up from the key along a curve and land on the outline
-    let u = a / tArrive;
+  var b = 1.0;
+  if (age < tRise) {
+    // rise from the key and arrive at the start heading along the outline
+    let u = age / tRise;
     let e = u * u * (3.0 - 2.0 * u);
+    let ahead = E.vel + alongShape(start, cnt, 4.0 * dir) * size;
     let p0 = E.pos;
-    let p1 = E.pos + vec2f(side, -size * 0.55);
-    let p2 = goal + vec2f(-side * 0.4, size * 0.25);
-    let p3 = goal;
+    let p1 = E.pos + vec2f(gaussR(st) * size * 0.06, -size * 0.25);
+    let p2 = home - normalize(ahead - home + vec2f(1e-4)) * size * 0.18;
     let m = 1.0 - e;
-    pos = m * m * m * p0 + 3.0 * m * m * e * p1 + 3.0 * m * e * e * p2 + e * e * e * p3;
-    vel = (p3 - p0) / max(tArrive * plife, 0.01);
-  } else if (a < tLeave) {
-    // hold the shape, with a gentle shimmer
-    let ph = rnd(st) * 6.2831853;
-    pos = goal + vec2f(sin(age * 3.1 + ph), cos(age * 2.7 + ph)) * size * 0.004;
-    vel = vec2f(0.0, -5.0);
+    pos = m * m * m * p0 + 3.0 * m * m * e * p1 + 3.0 * m * e * e * p2 + e * e * e * home + wob * e;
+    vel = (home - p0) / tRise;
+    b = smoothstep(0.0, 0.15, u);
   } else {
-    // float up into the sky and fade
-    let u = (a - tLeave) / max(1.0 - tLeave, 0.01);
-    let rise = size * 0.9 * PP.rise * pow(u, 1.5);
-    pos = goal + vec2f(0.0, -rise) + turbVel(goal, t) * u * 0.25 * PP.swirl + vec2f(PP.wind * 80.0 * u, 0.0);
-    vel = vec2f(0.0, -size * 0.9 / plife);
+    // trace the outline once, then vanish as it closes
+    let u = (age - tRise) / tTrace;
+    var f = u * n * dir;
+    if (cnt < 0.0) { f = u * (n - 1.0); }
+    pos = E.vel + alongShape(start, cnt, f) * size + wob;
+    vel = (E.vel + alongShape(start, cnt, f + dir) * size - (pos - wob)) * (n / tTrace);
+    b = 1.0 - smoothstep(0.9, 1.0, u);
   }
   var o: Particle;
   let twPh = rnd(st) * 6.2831853;
   let s1 = sin(age * (6.0 + 14.0 * rnd(st)) + twPh);
   let tw = max(mix(1.0, 0.6 + 0.4 * s1 * s1, PP.twinkle), 0.0);
-  let fadeIn = smoothstep(0.0, 0.04, a);
-  let fadeOut = 1.0 - smoothstep(tLeave, 1.0, a);
-  let atShape = select(0.75, 1.15, a >= tArrive && a < tLeave);
   o.pos = pos;
   o.vel = vel;
-  o.b = (0.8 + 0.5 * rnd(st)) * (0.8 + 0.4 * E.vn) * fadeIn * fadeOut * tw * atShape;
+  o.b = (0.9 + 0.6 * rnd(st)) * (0.8 + 0.4 * E.vn) * b * tw;
   o.star = select(0.0, 1.0, rnd(st) < 0.015 * PP.stars);
   o.z = 0.0;
   o.pad = 0.0;
