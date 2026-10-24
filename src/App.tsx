@@ -141,10 +141,19 @@ export default function App() {
     }
   };
 
+  const onFiles = (files: FileList | null | undefined) => {
+    if (!files) return;
+    for (const f of Array.from(files)) {
+      const name = f.name.toLowerCase();
+      if (name.endsWith('.json')) onProjectFile(f);
+      else if (f.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|mkv)$/.test(name)) onVideoFile(f);
+    }
+  };
+
   const ready = !!project && !!videoUrl;
 
   return (
-    <div className="app">
+    <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); onFiles(e.dataTransfer.files); }}>
       <header className="topbar">
         <div className="brand">
           <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="none" stroke="#2FD3B5" strokeWidth="1.8" /><path d="M8 6.5v7M12 5v9M16 7.5v6" stroke="#2FD3B5" strokeWidth="1.8" strokeLinecap="round" /><path d="M5.5 17.5h13" stroke="#E8EAED" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -153,12 +162,8 @@ export default function App() {
         <span className="project-name">{project?.name ?? 'No project open'}</span>
         <div className="open-buttons">
           <label className="btn">
-            Open video…
-            <input type="file" accept="video/*" hidden onChange={(e) => onVideoFile(e.target.files?.[0])} />
-          </label>
-          <label className="btn">
-            Open project data…
-            <input type="file" accept=".json,application/json" hidden onChange={(e) => onProjectFile(e.target.files?.[0])} />
+            Open files…
+            <input type="file" multiple accept="video/*,.mp4,.mov,.webm,.json,application/json" hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
           </label>
         </div>
         <span className="gpu">{gpuError ? 'WebGPU unavailable' : gpuName}</span>
@@ -185,11 +190,29 @@ export default function App() {
         <main className="stage">
           {gpuError && <div className="notice">This window can't use the graphics card: {gpuError}</div>}
           {!gpuError && !ready && (
-            <div className="notice">
-              Open the video and its project data to start.<br />
-              The sample is in <code>F:\Pianoverse\samples</code>: <code>interstellar-take1.mp4</code> and <code>interstellar-take1.pvproj.json</code>.
-              {videoName && <><br />Video: {videoName}</>}
-              {project && <><br />Project: {project.name}</>}
+            <div className="start">
+              <h1>Open your performance</h1>
+              <p>Select <b>both files</b> together, or drop them anywhere on this window. The sample is in <code>F:\Pianoverse\samples</code>.</p>
+              <div className={'step' + (videoName ? ' done' : '')}>
+                <span className="dot">{videoName ? '✓' : '1'}</span>
+                <span className="what"><b>Video</b><small>{videoName || 'interstellar-take1.mp4'}</small></span>
+                <label className="btn">
+                  {videoName ? 'Change' : 'Choose video'}
+                  <input type="file" accept="video/*,.mp4,.mov,.webm" hidden onChange={(e) => { onVideoFile(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+              </div>
+              <div className={'step' + (project ? ' done' : '')}>
+                <span className="dot">{project ? '✓' : '2'}</span>
+                <span className="what"><b>Project data</b><small>{project ? project.name : 'interstellar-take1.pvproj.json'}</small></span>
+                <label className="btn">
+                  {project ? 'Change' : 'Choose project data'}
+                  <input type="file" accept=".json,application/json" hidden onChange={(e) => { onProjectFile(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+              </div>
+              <label className="btn primary">
+                Select both files…
+                <input type="file" multiple accept="video/*,.mp4,.mov,.webm,.json,application/json" hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
+              </label>
             </div>
           )}
           <canvas ref={canvasRef} className="preview" style={{ visibility: ready ? 'visible' : 'hidden' }} />

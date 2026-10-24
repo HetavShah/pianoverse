@@ -1,6 +1,6 @@
 [package]
 name = "pianoverse"
-version = "0.1.0"
+version = "0.1.1"
 description = "Piano performance visualizer"
 authors = ["Hetav Shah"]
 edition = "2021"
