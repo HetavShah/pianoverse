@@ -59,3 +59,20 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
+
+      # If the build failed, rebuild (fast, cached) and surface the error lines as annotations,
+      # so the cause is visible on the run page without opening the raw log.
+      - name: Show build errors
+        if: failure()
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npm run tauri build > build.log 2>&1 || true
+          sed -i 's/\x1b\[[0-9;]*m//g' build.log
+          grep -nE "error|Error|failed|panicked|warning: unused" build.log | grep -v "^.*Compiling" | head -40 > errs.txt || true
+          tail -25 build.log > tail.txt
+          enc() { sed -e 's/%/%25/g' "$1" | head -c 3500 | awk 'BEGIN{ORS="%0A"}{print}'; }
+          echo "::error title=Build errors::$(enc errs.txt)"
+          echo "::error title=Build log tail::$(enc tail.txt)"
