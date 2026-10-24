@@ -127,6 +127,8 @@ Needs Windows 10 or 11 with a DirectX 12 graphics card (developed on an NVIDIA G
 
 ## Build from source
 
+On Windows, double-click **`setup-dev.cmd`** once (installs Rust and the C++ build tools), then **`dev.cmd`** to run Pianoverse in live mode: edits to the code show up in the open window.
+
 ```bash
 npm install
 npm run tauri dev     # desktop app with hot reload
