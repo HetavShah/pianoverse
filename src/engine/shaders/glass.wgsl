@@ -213,10 +213,12 @@ fn styled(i: VOut, style: u32, shape: u32) -> vec4f {
     absorb = inside * 0.9;
   } else if (style == 5u) {
     // flat: a clean solid gradient bar
-    let fillc = mix(lighten(col, 0.35), col * 0.75, vgrad * 0.7);
-    rgb = inside * fillc * 0.5 * F.noteFill + exp(-sq((d + 1.4) / 1.1)) * lighten(col, 0.5) * 0.5 * F.noteRim
-        + halo * col * 0.45 * F.noteGlow;
-    absorb = inside * 0.88;
+    let sat = col * col * 1.15 + col * 0.12;                 // a little deeper than the note colour
+    let fillc = mix(sat * 1.05, sat * 0.62, vgrad * 0.8);
+    let edgeL = exp(-sq((d + 1.2) / 1.0));
+    rgb = inside * fillc * 0.95 * F.noteOpacity + edgeL * lighten(col, 0.55) * 0.55 * F.noteRim
+        + halo * col * 0.5 * F.noteGlow;
+    absorb = inside * 0.92 * F.noteOpacity;
   } else if (style == 6u) {
     // outline: a thin crisp line only
     let line = exp(-sq((d + 0.9) / max(0.9, w * 0.03)));

@@ -24,9 +24,9 @@ await page.click('.layer-row >> text=Particles'); await page.waitForTimeout(200)
 await setRange('Amount', 2); await setRange('Gravity', 0.5);
 await page.screenshot({ path: `${OUT}/2-particles-panel.png` });
 await page.click('.layer-row >> text=Colours'); await page.waitForTimeout(200);
-await page.click('.pal >> text=Left / right hand'); await page.waitForTimeout(200);
+await page.click('.by >> text=Left / right'); await page.waitForTimeout(200);
 await page.screenshot({ path: `${OUT}/3-colours-panel.png` });
-console.log('palette:', (await look()).palette);
+console.log('colour by:', (await look()).colorBy);
 // save as a preset
 await page.click('text=Save as new preset');
 await page.fill('.preset-actions input[type=text]', 'Pink and gold');
@@ -39,7 +39,7 @@ console.log('after Interstellar Teal:', JSON.stringify(await look()));
 const ours = await page.$eval('select[aria-label="Preset"]', (s) => [...s.options].find((o) => o.text.startsWith('Pink')).value);
 await page.selectOption('select[aria-label="Preset"]', ours); await page.waitForTimeout(300);
 const l2 = await look();
-console.log('after our preset: palette', l2.palette, 'noteGlow', l2.noteGlow, 'partAmount', l2.partAmount, 'partGravity', l2.partGravity);
+console.log('after our preset: colorBy', l2.colorBy, 'noteGlow', l2.noteGlow, 'partAmount', l2.partAmount, 'partGravity', l2.partGravity);
 await page.click('.layer-row >> text=Notes'); await page.waitForTimeout(200);
 await page.screenshot({ path: `${OUT}/4-own-preset.png` });
 await b.close();

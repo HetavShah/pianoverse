@@ -81,7 +81,7 @@ export function prepareNotes(raw: RawNote[], lowest: number, keys: number, look?
     out.push({
       idx: out.length, s: n.s, e: n.e, p: n.p, v: n.v,
       vn: Math.min(1, Math.max(0, (n.v - 0.3) / 0.3)),
-      col: look ? noteColor(look, n.p) : pal(n.p),
+      col: look ? noteColor(look, n.p, { idx: out.length, s: n.s, v: n.v }) : pal(n.p),
     });
   }
   return out;

@@ -1,12 +1,15 @@
 // Controls for one layer of the look, generated from LOOK_SCHEMA.
 import { noteName } from '../engine/calibration';
-import { useEffect, useState } from 'react';
-import { Control, LayerId, Look, LOOK_SCHEMA, NOTE_TEXTURES, noteColor, PALETTES, PaletteId, toHex } from '../engine/look';
+import { useEffect, useRef, useState } from 'react';
+import { COLOR_BY, Control, GRADIENTS, hexToHsv, hsvToHex, LayerId, Look, LOOK_SCHEMA, NOTE_TEXTURES, noteColor, PaletteId, toHex } from '../engine/look';
 import { deleteTexture, importTexture, textureThumb, UserTexture, useUserTextures } from './textureStore';
 
+type Set = (k: keyof Look, v: unknown) => void;
+type Patch = (p: Partial<Look>) => void;
+
 const swatch = (look: Look, id: PaletteId) => {
-  const l = { ...look, palette: id };
-  const stops = [40, 52, 63, 74, 86].map((p) => toHex(noteColor(l, p)));
+  const l: Look = { ...look, palette: id, colorBy: 'pitch' };
+  const stops = [40, 46, 52, 58, 63, 69, 74, 80, 86].map((p) => toHex(noteColor(l, p)));
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 };
 
@@ -16,17 +19,19 @@ function UserThumb({ t }: { t: UserTexture }) {
   return url ? <img src={url} alt="" /> : <span className="tex-blank" />;
 }
 
-/** built-in textures, the user's own, and an Upload button */
-function TexturePicker({ value, set }: { value: string; set: (v: string) => void }) {
+/** Glass first, then the built-in textures, the user's own, and an Upload button */
+function TexturePicker({ look, patch }: { look: Look; patch: Patch }) {
   const mine = useUserTextures();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const base = import.meta.env.BASE_URL ?? '/';
+  const current = look.noteStyle === 'texture' ? look.noteTexture : 'glass';
+  const pick = (id: string) => patch(id === 'glass' ? { noteStyle: 'glass' } : { noteStyle: 'texture', noteTexture: id });
   const upload = async () => {
     setErr(''); setBusy(true);
     try {
       const t = await importTexture();
-      if (t) set('user:' + t.id);
+      if (t) pick('user:' + t.id);
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));
     } finally { setBusy(false); }
@@ -34,16 +39,19 @@ function TexturePicker({ value, set }: { value: string; set: (v: string) => void
   return (
     <div className="ctl">
       <div className="tex-grid">
+        <button type="button" className={'tex' + (current === 'glass' ? ' on' : '')} onClick={() => pick('glass')} title="The original glass notes">
+          <img src={`${base}textures/glass/thumb.jpg`} alt="" /><span>Glass</span>
+        </button>
         {NOTE_TEXTURES.map((t) => (
-          <button key={t.id} type="button" className={'tex' + (value === t.id ? ' on' : '')} onClick={() => set(t.id)} title={t.credit}>
+          <button key={t.id} type="button" className={'tex' + (current === t.id ? ' on' : '')} onClick={() => pick(t.id)} title={t.credit}>
             <img src={`${base}textures/${t.id}/thumb.jpg`} alt="" /><span>{t.label}</span>
           </button>
         ))}
         {mine.map((t) => (
-          <div key={t.id} className={'tex mine' + (value === 'user:' + t.id ? ' on' : '')} title={t.name + (t.files.normal ? ' · with normal map' : '')}>
-            <button type="button" className="tex-pick" onClick={() => set('user:' + t.id)}><UserThumb t={t} /><span>{t.name}</span></button>
+          <div key={t.id} className={'tex mine' + (current === 'user:' + t.id ? ' on' : '')} title={t.name + (t.files.normal ? ' · with normal map' : '')}>
+            <button type="button" className="tex-pick" onClick={() => pick('user:' + t.id)}><UserThumb t={t} /><span>{t.name}</span></button>
             <button type="button" className="tex-del" aria-label={`Remove ${t.name}`} title="Remove from your textures"
-              onClick={async () => { if (value === 'user:' + t.id) set(NOTE_TEXTURES[0].id); await deleteTexture(t.id); }}>×</button>
+              onClick={async () => { if (current === 'user:' + t.id) pick('glass'); await deleteTexture(t.id); }}>×</button>
           </div>
         ))}
         <button type="button" className="tex add" onClick={upload} disabled={busy} title="Use your own image. Picking a *_Color file from ambientCG or Poly Haven also brings in its normal and roughness maps.">
@@ -55,20 +63,53 @@ function TexturePicker({ value, set }: { value: string; set: (v: string) => void
   );
 }
 
-function Row({ c, look, base, set }: { c: Control; look: Look; base: Look; set: (k: keyof Look, v: unknown) => void }) {
+/** a colour wheel: hue round the edge, strength towards the edge; brightness beside it */
+function ColorWheel({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+  const [h, s, v] = hexToHsv(value);
+  const ref = useRef<HTMLDivElement>(null);
+  const pickAt = (e: React.PointerEvent) => {
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const rad = Math.min(1, Math.hypot(dx, dy) / (r.width / 2));
+    const hue = ((Math.atan2(dx, -dy) / (2 * Math.PI)) % 1 + 1) % 1; // 0 at the top, clockwise
+    onChange(hsvToHex(hue, rad, Math.max(v, 0.15)));
+  };
+  const ang = h * 2 * Math.PI;
+  return (
+    <div className="wheel-wrap">
+      <div ref={ref} className="wheel" role="slider" aria-label="Colour wheel" aria-valuenow={Math.round(h * 360)}
+        onPointerDown={(e) => { (e.currentTarget as Element).setPointerCapture(e.pointerId); pickAt(e); }}
+        onPointerMove={(e) => { if (e.buttons) pickAt(e); }}>
+        <div className="wheel-shade" style={{ opacity: 1 - v }} />
+        <span className="wheel-dot" style={{ left: `${50 + 50 * s * Math.sin(ang)}%`, top: `${50 - 50 * s * Math.cos(ang)}%`, background: value }} />
+      </div>
+      <div className="wheel-side">
+        <div className="wheel-hex"><span className="wheel-chip" style={{ background: value }} /><span className="mono">{value.toUpperCase()}</span></div>
+        <span className="wheel-lab">Brightness</span>
+        <input type="range" min={0.15} max={1} step={0.01} value={v} aria-label="Brightness" className="tint-track"
+          style={{ background: `linear-gradient(90deg, #000, ${hsvToHex(h, s, 1)})` }}
+          onChange={(e) => onChange(hsvToHex(h, s, Number(e.target.value)))} />
+        <label className="wheel-exact"><input type="color" value={value} onChange={(e) => onChange(e.target.value)} /> Exact colour</label>
+      </div>
+    </div>
+  );
+}
+
+function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look; set: Set; patch: Patch }) {
   const v = look[c.key];
   const changed = v !== base[c.key];
   const reset = changed ? (
     <button type="button" className="reset" onClick={() => set(c.key, base[c.key])} title="Back to the preset's value" aria-label={`Reset ${c.label}`}>↺</button>
   ) : null;
-  if ('when' in c && c.when && !c.when(look)) return null;
   switch (c.kind) {
     case 'slider': {
       const n = v as number;
       return (
         <div className="ctl" title={c.hint}>
           <div className="ctl-head"><span>{c.label}</span>{reset}<span className="mono val">{c.fmt ? c.fmt(n) : n}</span></div>
-          <input type="range" min={c.min} max={c.max} step={c.step} value={n} onChange={(e) => set(c.key, Number(e.target.value))} onDoubleClick={() => set(c.key, base[c.key])} aria-label={c.label} />
+          <input type="range" min={c.min} max={c.max} step={c.step} value={n} className={c.hue ? 'hue-track' : undefined}
+            onChange={(e) => set(c.key, Number(e.target.value))} onDoubleClick={() => set(c.key, base[c.key])} aria-label={c.label} />
         </div>
       );
     }
@@ -86,6 +127,13 @@ function Row({ c, look, base, set }: { c: Control; look: Look; base: Look; set: 
           <span className="color-pick"><input type="color" value={v as string} onChange={(e) => set(c.key, e.target.value)} /><span className="mono">{String(v).toUpperCase()}</span></span>
         </label>
       );
+    case 'wheel':
+      return (
+        <div className="ctl">
+          <div className="ctl-head"><span>{c.label}</span>{reset}</div>
+          <ColorWheel value={v as string} onChange={(x) => set(c.key, x)} />
+        </div>
+      );
     case 'note': {
       const opts: number[] = [];
       for (let p = 36; p <= 84; p++) opts.push(p);
@@ -98,13 +146,30 @@ function Row({ c, look, base, set }: { c: Control; look: Look; base: Look; set: 
         </label>
       );
     }
+    case 'colorBy':
+      return (
+        <div className="by-grid">
+          {COLOR_BY.map((o) => (
+            <button key={o.id} type="button" className={'by' + (look.colorBy === o.id ? ' on' : '')} onClick={() => set('colorBy', o.id)} title={o.hint}>{o.label}</button>
+          ))}
+        </div>
+      );
+    case 'material': {
+      const solid = look.noteStyle === 'flat';
+      return (
+        <div className="seg full">
+          <button type="button" className={solid ? 'on' : ''} onClick={() => patch({ noteStyle: 'flat' })}>Solid colour</button>
+          <button type="button" className={!solid ? 'on' : ''} onClick={() => { if (solid) patch({ noteStyle: 'glass' }); }}>Texture</button>
+        </div>
+      );
+    }
     case 'texture':
-      return <TexturePicker value={v as string} set={(x) => set(c.key, x)} />;
+      return <TexturePicker look={look} patch={patch} />;
     case 'select':
       if (c.segmented) {
         return (
           <div className="ctl">
-            {c.label !== 'Material' && <div className="ctl-head"><span>{c.label}</span>{reset}</div>}
+            <div className="ctl-head"><span>{c.label}</span>{reset}</div>
             <div className="seg full">
               {c.options.map((o) => <button key={o.value} type="button" className={String(v) === o.value ? 'on' : ''} onClick={() => set(c.key, o.value)}>{o.label}</button>)}
             </div>
@@ -113,9 +178,9 @@ function Row({ c, look, base, set }: { c: Control; look: Look; base: Look; set: 
       }
       if (c.key === 'palette') {
         return (
-          <div className="palettes">
-            {PALETTES.map((p) => (
-              <button key={p.id} type="button" className={'pal' + (look.palette === p.id ? ' on' : '')} onClick={() => set('palette', p.id)}>
+          <div className="palettes grid2">
+            {GRADIENTS.map((p) => (
+              <button key={p.id} type="button" className={'pal' + (look.palette === p.id ? ' on' : '')} onClick={() => set('palette', p.id)} title={p.label}>
                 <span className="strip" style={{ background: swatch(look, p.id) }} />
                 <span>{p.label}</span>
               </button>
@@ -132,15 +197,21 @@ function Row({ c, look, base, set }: { c: Control; look: Look; base: Look; set: 
   }
 }
 
-export default function LookControls({ layer, look, base, set }: { layer: LayerId; look: Look; base: Look; set: (k: keyof Look, v: unknown) => void }) {
+const visible = (c: Control, look: Look) => !('when' in c && c.when && !c.when(look));
+
+export default function LookControls({ layer, look, base, set, patch }: { layer: LayerId; look: Look; base: Look; set: Set; patch: Patch }) {
   return (
     <>
-      {LOOK_SCHEMA[layer].map((sec) => (
-        <div key={sec.title} className="ctl-section">
-          <span className="section-label">{sec.title}</span>
-          {sec.controls.map((c, i) => <Row key={c.key + i} c={c} look={look} base={base} set={set} />)}
-        </div>
-      ))}
+      {LOOK_SCHEMA[layer].map((sec) => {
+        const rows = sec.controls.filter((c) => visible(c, look));
+        if (!rows.length) return null;
+        return (
+          <div key={sec.title} className="ctl-section">
+            <span className="section-label">{sec.title}</span>
+            {rows.map((c, i) => <Row key={c.key + c.kind + i} c={c} look={look} base={base} set={set} patch={patch} />)}
+          </div>
+        );
+      })}
     </>
   );
 }

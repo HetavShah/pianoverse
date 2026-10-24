@@ -7,7 +7,7 @@ export type NoteStyle = 'glass' | 'neon' | 'frosted' | 'crystal' | 'chrome' | 'f
 export type NoteShape = 'bar' | 'pill' | 'gem' | 'drop';
 export const NOTE_STYLES: { id: NoteStyle; label: string }[] = [
   { id: 'glass', label: 'Glass' }, { id: 'neon', label: 'Neon tube' }, { id: 'frosted', label: 'Frosted' }, { id: 'crystal', label: 'Crystal' },
-  { id: 'chrome', label: 'Chrome' }, { id: 'flat', label: 'Flat' }, { id: 'outline', label: 'Outline' }, { id: 'block3d', label: '3D block' },
+  { id: 'chrome', label: 'Chrome' }, { id: 'flat', label: 'Solid colour' }, { id: 'outline', label: 'Outline' }, { id: 'block3d', label: '3D block' },
   { id: 'texture', label: 'Texture' },
 ];
 export const NOTE_SHAPES: { id: NoteShape; label: string }[] = [
@@ -24,7 +24,19 @@ export const NOTE_TEXTURES: { id: string; label: string; credit: string }[] = [
 export type TexMode = 'tint' | 'natural' | 'glow';
 export const TEX_MODES: TexMode[] = ['tint', 'natural', 'glow'];
 
-export type PaletteId = 'teal' | 'swan' | 'ember' | 'neon' | 'aurora' | 'rainbow' | 'mono' | 'hands';
+export type PaletteId = 'teal' | 'swan' | 'ember' | 'neon' | 'aurora' | 'synthwave' | 'sunset' | 'ocean' | 'candy' | 'forest' | 'gold' | 'spectrum'
+  | 'rainbow' | 'mono' | 'hands'; // the last three are older names, now colour modes (see resolveLook)
+/** how notes take their colour */
+export type ColorBy = 'pitch' | 'single' | 'random' | 'hands' | 'loudness' | 'time' | 'noteName';
+export const COLOR_BY: { id: ColorBy; label: string; hint: string }[] = [
+  { id: 'pitch', label: 'By pitch', hint: 'Low notes take one end of the gradient, high notes the other' },
+  { id: 'single', label: 'One colour', hint: 'Every note the same colour' },
+  { id: 'random', label: 'Random', hint: 'Each note gets its own colour from the gradient' },
+  { id: 'hands', label: 'Left / right', hint: 'One colour for each hand, split at a note' },
+  { id: 'loudness', label: 'By loudness', hint: 'Soft notes take one end of the gradient, loud notes the other' },
+  { id: 'time', label: 'Over time', hint: 'Colours drift through the gradient as the piece plays' },
+  { id: 'noteName', label: 'Note names', hint: 'Every C one colour, every G the next, round the colour wheel' },
+];
 
 export interface Look {
   // colours
@@ -32,14 +44,20 @@ export interface Look {
   colorA: string; // mono colour / left hand
   colorB: string; // right hand
   splitNote: number; // hands: notes below go to colour A
+  colorBy: ColorBy;
+  hueShift: number; // degrees, turns every colour round the colour wheel
+  colorSat: number; // colour strength
+  colorCycle: number; // 'Over time': seconds for one trip through the gradient
   // notes
   noteAngle: number | null; // null = automatic
   noteSpeed: number; // video px per second
   noteWidth: number; // x key width
+  noteLength: number; // x the held length
   noteVelocity: number; // 0..1: louder notes wider and brighter
   noteBright: number;
   noteGlow: number; // outer halo
   noteFill: number; // glass body
+  noteOpacity: number; // solid notes: how solid the fill is (0 = just the outline)
   noteRim: number; // bright rim
   noteRound: number; // corner roundness 0..1
   noteFade: number; // fade in near the frame edge 0..1
@@ -97,8 +115,9 @@ export interface Look {
 }
 
 export const DEFAULT_LOOK: Look = {
+  colorBy: 'pitch', hueShift: 0, colorSat: 1, colorCycle: 20,
   palette: 'teal', colorA: '#3c6eff', colorB: '#78ffaa', splitNote: 60,
-  noteAngle: null, noteSpeed: 680, noteWidth: 1, noteVelocity: 1, noteBright: 1, noteGlow: 1, noteFill: 1, noteRim: 1, noteRound: 1, noteFade: 1, noteStyle: 'glass', noteShape: 'bar', noteDepth: 1,
+  noteAngle: null, noteSpeed: 680, noteWidth: 1, noteLength: 1, noteVelocity: 1, noteBright: 1, noteGlow: 1, noteFill: 1, noteOpacity: 1, noteRim: 1, noteRound: 1, noteFade: 1, noteStyle: 'glass', noteShape: 'bar', noteDepth: 1,
   noteTexture: 'ice', texMode: 'tint', texScale: 1, texRelief: 1, texShine: 1, texSolid: 0.85,
   saberBright: 1, saberThick: 1, saberFlicker: 1, saberReact: 1, saberTint: 1,
   flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3,
@@ -110,7 +129,12 @@ export const DEFAULT_LOOK: Look = {
 
 /** project.look may hold only some settings (older projects: just noteAngle) */
 export function resolveLook(partial: Partial<Look> | undefined | null): Look {
-  return { ...DEFAULT_LOOK, ...(partial ?? {}) };
+  const l = { ...DEFAULT_LOOK, ...(partial ?? {}) };
+  // older looks kept the colour mode in the palette
+  if (l.palette === 'mono') { l.palette = 'teal'; l.colorBy = 'single'; }
+  else if (l.palette === 'hands') { l.palette = 'teal'; l.colorBy = 'hands'; }
+  else if (l.palette === 'rainbow') { l.palette = 'spectrum'; l.colorBy = 'noteName'; }
+  return l;
 }
 
 // ---------- colours ----------
@@ -132,6 +156,10 @@ const ramp = (stops: [number, RGB][], x: number): RGB => {
   return stops[stops.length - 1][1];
 };
 const rgb = (r: number, g: number, b: number): RGB => [r / 255, g / 255, b / 255];
+function hsvc(h: number, s: number, v: number): RGB {
+  const f = (n: number) => { const k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return [f(5), f(3), f(1)];
+}
 
 export const PALETTES: { id: PaletteId; label: string; stops?: [number, RGB][] }[] = [
   { id: 'teal', label: 'Interstellar teal', stops: [[0, rgb(60, 110, 255)], [0.45, rgb(20, 215, 190)], [1, rgb(120, 255, 170)]] },
@@ -139,34 +167,59 @@ export const PALETTES: { id: PaletteId; label: string; stops?: [number, RGB][] }
   { id: 'ember', label: 'Ember', stops: [[0, rgb(255, 60, 40)], [0.5, rgb(255, 140, 30)], [1, rgb(255, 225, 120)]] },
   { id: 'neon', label: 'Neon', stops: [[0, rgb(140, 60, 255)], [0.5, rgb(255, 60, 200)], [1, rgb(60, 220, 255)]] },
   { id: 'aurora', label: 'Aurora', stops: [[0, rgb(40, 255, 140)], [0.5, rgb(40, 200, 255)], [1, rgb(180, 110, 255)]] },
-  { id: 'rainbow', label: 'Rainbow (by note name)' },
-  { id: 'mono', label: 'One colour' },
-  { id: 'hands', label: 'Left / right hand' },
+  { id: 'synthwave', label: 'Synthwave', stops: [[0, rgb(255, 40, 140)], [0.5, rgb(170, 60, 255)], [1, rgb(40, 210, 255)]] },
+  { id: 'sunset', label: 'Sunset', stops: [[0, rgb(120, 40, 200)], [0.4, rgb(255, 70, 110)], [0.75, rgb(255, 150, 60)], [1, rgb(255, 220, 110)]] },
+  { id: 'ocean', label: 'Ocean', stops: [[0, rgb(30, 60, 220)], [0.5, rgb(0, 160, 255)], [1, rgb(120, 255, 240)]] },
+  { id: 'candy', label: 'Candy', stops: [[0, rgb(255, 110, 200)], [0.5, rgb(190, 150, 255)], [1, rgb(110, 230, 255)]] },
+  { id: 'forest', label: 'Forest', stops: [[0, rgb(20, 160, 90)], [0.5, rgb(130, 220, 60)], [1, rgb(240, 240, 120)]] },
+  { id: 'gold', label: 'Gold', stops: [[0, rgb(200, 110, 30)], [0.5, rgb(255, 190, 70)], [1, rgb(255, 245, 190)]] },
+  { id: 'spectrum', label: 'Rainbow', stops: [0, 1, 2, 3, 4, 5, 6].map((k) => [k / 6, hsvc(k / 7, 0.8, 1)] as [number, RGB]) },
 ];
+/** the gradients offered in the Colours panel */
+export const GRADIENTS = PALETTES;
 
 const LO_P = 40, HI_P = 86;
 
-function hsv(h: number, s: number, v: number): RGB {
-  const f = (n: number) => { const k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
-  return [f(5), f(3), f(1)];
-}
+const hsv = hsvc;
 
-/** the colour of a pitch under a look */
-export function noteColor(look: Look, p: number): RGB {
-  switch (look.palette) {
-    case 'mono': return hex(look.colorA);
-    case 'hands': return p < look.splitNote ? hex(look.colorA) : hex(look.colorB);
-    case 'rainbow': return hsv(((((p % 12) + 12) % 12) * 7 % 12) / 12, 0.75, 1); // circle of fifths around the wheel
-    default: {
-      const pal = PALETTES.find((x) => x.id === look.palette) ?? PALETTES[0];
-      return ramp(pal.stops!, (p - LO_P) / (HI_P - LO_P));
-    }
+export function rgbToHsv([r, g, b]: RGB): [number, number, number] {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d > 1e-6) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [((h / 6) % 1 + 1) % 1, mx > 0 ? d / mx : 0, mx];
+}
+export const hsvToHex = (h: number, s: number, v: number) => toHex(hsv(h, s, v));
+export const hexToHsv = (h: string) => rgbToHsv(hex(h));
+
+const gradientAt = (look: Look, x: number): RGB => {
+  const pal = PALETTES.find((q) => q.id === look.palette && q.stops) ?? PALETTES[0];
+  return ramp(pal.stops!, x);
+};
+const hash01 = (i: number) => { let t = (i * 0x9e3779b1) >>> 0; t ^= t >>> 15; t = Math.imul(t, 0x85ebca77) >>> 0; t ^= t >>> 13; return (t >>> 0) / 4294967296; };
+
+/** what a note's colour can depend on besides its pitch */
+export interface NoteInfo { idx: number; s: number; v: number }
+
+/** the colour of a note under a look */
+export function noteColor(look: Look, p: number, n?: NoteInfo): RGB {
+  let c: RGB;
+  switch (look.colorBy) {
+    case 'single': c = hex(look.colorA); break;
+    case 'hands': c = p < look.splitNote ? hex(look.colorA) : hex(look.colorB); break;
+    case 'noteName': c = hsv(((((p % 12) + 12) % 12) * 7 % 12) / 12, 0.75, 1); break; // circle of fifths around the wheel
+    case 'random': c = gradientAt(look, n ? hash01(n.idx + 1) : 0.5); break;
+    case 'loudness': c = gradientAt(look, n ? (n.v - 0.3) / 0.45 : 0.5); break;
+    case 'time': { const ph = n ? (n.s / Math.max(1, look.colorCycle)) % 1 : 0.5; c = gradientAt(look, 1 - Math.abs(ph * 2 - 1)); break; }
+    default: c = gradientAt(look, (p - LO_P) / (HI_P - LO_P));
   }
+  if (look.hueShift === 0 && look.colorSat === 1) return c;
+  const [h, s, v] = rgbToHsv(c);
+  return hsv(((h + look.hueShift / 360) % 1 + 1) % 1, Math.min(1, s * look.colorSat), v);
 }
 
 /** the saber's resting colour: the palette's middle */
 export function saberBase(look: Look): RGB {
-  if (look.palette === 'teal') return rgb(140, 245, 225); // exact original
+  if (look.palette === 'teal' && look.colorBy === 'pitch' && look.hueShift === 0 && look.colorSat === 1) return rgb(140, 245, 225); // exact original
   const c = noteColor(look, 64);
   return [0.35 + 0.65 * c[0], 0.35 + 0.65 * c[1], 0.35 + 0.65 * c[2]];
 }
@@ -176,7 +229,10 @@ export function saberBase(look: Look): RGB {
 export type LayerId = 'colors' | 'notes' | 'saber' | 'impact' | 'particles' | 'lighting' | 'background' | 'finish';
 
 export type Control =
-  | { key: keyof Look; kind: 'slider'; label: string; min: number; max: number; step: number; unit?: string; fmt?: (v: number) => string; hint?: string; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'slider'; label: string; min: number; max: number; step: number; unit?: string; fmt?: (v: number) => string; hint?: string; when?: (l: Look) => boolean; hue?: boolean }
+  | { key: keyof Look; kind: 'colorBy'; label: string; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'wheel'; label: string; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'material'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'select'; label: string; options: { value: string; label: string }[]; when?: (l: Look) => boolean; segmented?: boolean }
   | { key: keyof Look; kind: 'texture'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'color'; label: string; when?: (l: Look) => boolean }
@@ -189,40 +245,52 @@ const pct = (v: number) => `${Math.round(v * 100)}`;
 const x = (v: number) => `${v.toFixed(2)}×`;
 const s1 = (v: number) => `${v.toFixed(1)} s`;
 const tex = (l: Look) => l.noteStyle === 'texture';
+const solid = (l: Look) => l.noteStyle === 'flat';
+const usesGradient = (l: Look) => ['pitch', 'random', 'loudness', 'time'].includes(l.colorBy);
 
 export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
   colors: [
+    { title: 'Colour notes', controls: [
+      { key: 'colorBy', kind: 'colorBy', label: 'Colour by' },
+    ] },
     { title: 'Palette', controls: [
-      { key: 'palette', kind: 'select', label: 'Colours', options: PALETTES.map((p) => ({ value: p.id, label: p.label })) },
-      { key: 'colorA', kind: 'color', label: 'Colour', when: (l) => l.palette === 'mono' },
-      { key: 'colorA', kind: 'color', label: 'Left hand', when: (l) => l.palette === 'hands' },
-      { key: 'colorB', kind: 'color', label: 'Right hand', when: (l) => l.palette === 'hands' },
-      { key: 'splitNote', kind: 'note', label: 'Split at', when: (l) => l.palette === 'hands' },
+      { key: 'palette', kind: 'select', label: 'Gradient', when: usesGradient, options: GRADIENTS.map((p) => ({ value: p.id, label: p.label })) },
+      { key: 'colorA', kind: 'wheel', label: 'Colour', when: (l) => l.colorBy === 'single' },
+      { key: 'colorA', kind: 'wheel', label: 'Left hand', when: (l) => l.colorBy === 'hands' },
+      { key: 'colorB', kind: 'wheel', label: 'Right hand', when: (l) => l.colorBy === 'hands' },
+      { key: 'splitNote', kind: 'note', label: 'Split at', when: (l) => l.colorBy === 'hands' },
+      { key: 'colorCycle', kind: 'slider', label: 'Seconds per cycle', min: 4, max: 120, step: 1, fmt: (v) => `${Math.round(v)} s`, when: (l) => l.colorBy === 'time' },
+    ] },
+    { title: 'Adjust', controls: [
+      { key: 'hueShift', kind: 'slider', label: 'Hue', min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°`, hue: true, hint: 'Turns every colour round the colour wheel' },
+      { key: 'colorSat', kind: 'slider', label: 'Colour strength', min: 0, max: 1.5, step: 0.01, fmt: pct },
     ] },
   ],
   notes: [
-    { title: 'Motion', controls: [
-      { key: 'noteSpeed', kind: 'slider', label: 'Fall speed', min: 250, max: 1500, step: 10, fmt: (v) => `${Math.round(v)} px/s`, hint: 'Faster notes are longer for the same held time' },
-    ] },
-    { title: 'Shape', controls: [
-      { key: 'noteWidth', kind: 'slider', label: 'Width', min: 0.4, max: 1.8, step: 0.01, fmt: x },
-      { key: 'noteRound', kind: 'slider', label: 'Rounded corners', min: 0, max: 1.6, step: 0.01, fmt: pct },
-      { key: 'noteVelocity', kind: 'slider', label: 'Louder notes bigger', min: 0, max: 2, step: 0.01, fmt: pct },
-    ] },
     { title: 'Material', controls: [
-      { key: 'noteStyle', kind: 'select', label: 'Material', segmented: true, options: [{ value: 'glass', label: 'Glass' }, { value: 'texture', label: 'Texture' }] },
-      { key: 'noteTexture', kind: 'texture', label: 'Texture', when: tex },
+      { key: 'noteStyle', kind: 'material', label: 'Material' },
+      { key: 'noteTexture', kind: 'texture', label: 'Texture', when: (l) => l.noteStyle !== 'flat' },
+      { key: 'noteOpacity', kind: 'slider', label: 'Fill opacity', min: 0, max: 1, step: 0.01, fmt: pct, when: solid, hint: 'Low leaves just the outline, with the video showing through' },
       { key: 'texMode', kind: 'select', label: 'Colour', segmented: true, when: tex, options: [{ value: 'tint', label: 'Tinted' }, { value: 'natural', label: 'Natural' }, { value: 'glow', label: 'Glow' }] },
       { key: 'texScale', kind: 'slider', label: 'Texture size', min: 0.25, max: 4, step: 0.01, fmt: x, when: tex },
       { key: 'texRelief', kind: 'slider', label: 'Bumps', min: 0, max: 3, step: 0.01, fmt: pct, when: tex, hint: 'How strongly the surface detail catches the light' },
       { key: 'texShine', kind: 'slider', label: 'Shine', min: 0, max: 3, step: 0.01, fmt: pct, when: tex },
       { key: 'texSolid', kind: 'slider', label: 'Solid', min: 0, max: 1, step: 0.01, fmt: pct, when: tex, hint: 'Low lets the video show through the notes' },
     ] },
-    { title: 'Look', controls: [
-      { key: 'noteBright', kind: 'slider', label: 'Brightness', min: 0.2, max: 2, step: 0.01, fmt: pct },
-      { key: 'noteRim', kind: 'slider', label: 'Rim light', min: 0, max: 2, step: 0.01, fmt: pct },
-      { key: 'noteFill', kind: 'slider', label: 'Body', min: 0, max: 3, step: 0.01, fmt: pct },
+    { title: 'Size and shape', controls: [
+      { key: 'noteWidth', kind: 'slider', label: 'Width', min: 0.4, max: 1.8, step: 0.01, fmt: x, hint: 'Note width compared with the key' },
+      { key: 'noteLength', kind: 'slider', label: 'Length', min: 0.3, max: 2.5, step: 0.01, fmt: x, hint: 'Longer or shorter bars; they still land on time' },
+      { key: 'noteRound', kind: 'slider', label: 'Corner rounding', min: 0, max: 1.92, step: 0.01, fmt: pct, hint: 'All the way up makes pill-shaped notes' },
+      { key: 'noteVelocity', kind: 'slider', label: 'Louder notes bigger', min: 0, max: 2, step: 0.01, fmt: pct },
+    ] },
+    { title: 'Light', controls: [
+      { key: 'noteBright', kind: 'slider', label: 'Brightness', min: 0.2, max: 2.5, step: 0.01, fmt: pct },
+      { key: 'noteRim', kind: 'slider', label: 'Edge light', min: 0, max: 2, step: 0.01, fmt: pct },
+      { key: 'noteFill', kind: 'slider', label: 'Body', min: 0, max: 3, step: 0.01, fmt: pct, when: (l) => l.noteStyle !== 'flat' },
       { key: 'noteGlow', kind: 'slider', label: 'Glow', min: 0, max: 3, step: 0.01, fmt: pct },
+    ] },
+    { title: 'Motion', controls: [
+      { key: 'noteSpeed', kind: 'slider', label: 'Fall speed', min: 250, max: 1500, step: 10, fmt: (v) => `${Math.round(v)} px/s`, hint: 'Faster notes are longer for the same held time' },
       { key: 'noteFade', kind: 'slider', label: 'Fade in', min: 0, max: 1, step: 0.01, fmt: pct, hint: 'How softly notes appear at the edge of the frame' },
     ] },
   ],

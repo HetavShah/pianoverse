@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { autoNoteAngle, MAX_TILT } from '../../engine/direction';
 import type { Layers } from '../../engine/renderer';
-import { applyPreset, LayerId, Look, LOOK_SCHEMA, matchesPreset, PALETTES, resolveLook, NOTE_TEXTURES } from '../../engine/look';
+import { applyPreset, LayerId, Look, LOOK_SCHEMA, matchesPreset, PALETTES, resolveLook, NOTE_TEXTURES, COLOR_BY } from '../../engine/look';
 import LookControls from '../LookControls';
 import PresetBar from '../PresetBar';
 import StyleTimeline from '../StyleTimeline';
@@ -11,8 +11,8 @@ const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - 
 
 type Panel = { id: LayerId; label: string; kind: (l: Look) => string; icon: string; toggle?: keyof Layers };
 const PANELS: Panel[] = [
-  { id: 'colors', label: 'Colours', kind: (l) => PALETTES.find((p) => p.id === l.palette)?.label.split(' ')[0] ?? '', icon: 'M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-1-.8-1.4-.8-2.4 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.7-4-8.4-9-8.4zM7.5 11a1 1 0 1 0 0 .1M10 7a1 1 0 1 0 0 .1M15 7.5a1 1 0 1 0 0 .1' },
-  { id: 'notes', label: 'Notes', kind: (l) => (l.noteStyle === 'texture' ? NOTE_TEXTURES.find((t) => t.id === l.noteTexture)?.label ?? 'Texture' : 'Glass'), icon: 'M9 3h6v18H9z', toggle: 'notes' },
+  { id: 'colors', label: 'Colours', kind: (l) => (['pitch', 'random', 'loudness', 'time'].includes(l.colorBy) ? PALETTES.find((p) => p.id === l.palette)?.label.split(' ')[0] ?? '' : COLOR_BY.find((c) => c.id === l.colorBy)?.label ?? ''), icon: 'M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-1-.8-1.4-.8-2.4 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.7-4-8.4-9-8.4zM7.5 11a1 1 0 1 0 0 .1M10 7a1 1 0 1 0 0 .1M15 7.5a1 1 0 1 0 0 .1' },
+  { id: 'notes', label: 'Notes', kind: (l) => (l.noteStyle === 'flat' ? 'Solid' : l.noteStyle === 'texture' ? NOTE_TEXTURES.find((t) => t.id === l.noteTexture)?.label ?? 'Texture' : 'Glass'), icon: 'M9 3h6v18H9z', toggle: 'notes' },
   { id: 'saber', label: 'Saber', kind: () => 'Plasma', icon: 'M3 14h18M6 11c2-2 4-2 6 0s4 2 6 0', toggle: 'saber' },
   { id: 'impact', label: 'Impact', kind: () => 'Flash', icon: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6', toggle: 'impact' },
   { id: 'particles', label: 'Particles', kind: () => 'Plumes', icon: 'M7 17a1 1 0 1 0 0 .1M12 9a1 1 0 1 0 0 .1M16 14a1 1 0 1 0 0 .1M10 5a1 1 0 1 0 0 .1M17 6a1 1 0 1 0 0 .1', toggle: 'particles' },
@@ -166,7 +166,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
             </div>
           </>
         )}
-        <LookControls layer={sel} look={look} base={base} set={setKey} />
+        <LookControls layer={sel} look={look} base={base} set={setKey} patch={setLook} />
         {layerChanged && (
           <button type="button" className="btn small ghost" onClick={() => setLook(Object.fromEntries(layerKeys.map((k) => [k, base[k]])) as Partial<Look>)}>
             Reset {layer.label.toLowerCase()} to “{preset.name}”

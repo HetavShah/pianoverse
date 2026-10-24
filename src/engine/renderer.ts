@@ -381,7 +381,8 @@ export class Renderer {
       const vn = n.vn;
       const dd = n.s - t;
       const w = Math.max(24, tg.unit * 1.05) * (lk.noteVelocity === 1 ? 0.9 + 0.2 * vn : 1 + (0.2 * vn - 0.1) * lk.noteVelocity) * lk.noteWidth;
-      const len = Math.min(300 * (FALL / 680), Math.max(w * 1.4, (n.e - n.s) * FALL * 0.8 - 8));
+      const len0 = Math.min(300 * (FALL / 680), Math.max(w * 1.4, (n.e - n.s) * FALL * 0.8 - 8));
+      const len = lk.noteLength === 1 ? len0 : Math.max(w * 0.6, len0 * lk.noteLength);
       // distances measured from the landing point back along the fall direction
       const sB = dd * FALL;
       const sT = sB + len;
@@ -436,7 +437,7 @@ export class Renderer {
       this.srcW, this.srcH, this.rtW, this.rtH, this.scale, t, bass, Math.floor(t * 24),
       lk.noteBright, lk.noteGlow, lk.noteFill, lk.noteRim, lk.noteRound,
       Math.max(0, NOTE_STYLES.findIndex((x) => x.id === lk.noteStyle)), Math.max(0, NOTE_SHAPES.findIndex((x) => x.id === lk.noteShape)), lk.noteDepth,
-      lk.saberBright, lk.saberThick, lk.saberFlicker, lk.saberReact, lk.saberTint, 0, 0, 0,
+      lk.saberBright, lk.saberThick, lk.saberFlicker, lk.saberReact, lk.saberTint, lk.noteOpacity, 0, 0,
       sb[0], sb[1], sb[2], 0,
       lk.partSize, lk.partHaze, 0, 0,
       lk.bloom, lk.fringe, lk.grain, lk.bgDarken, lk.bgContrast, lk.bgSaturation, lk.bgVignette, lk.relight,
