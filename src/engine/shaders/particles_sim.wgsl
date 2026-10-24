@@ -225,15 +225,20 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let ts = E.start + (f32(k) + rnd(st)) / max(E.rate, 1.0);
   if (ts > t) { return off; }
   let size = E.pad0;
-  let idx = min(u32(rnd(st) * f32(PP.nShape)), PP.nShape - 1u);
+  // which drawing (slot in the table at the front of the buffer) and which way round
+  let slot = u32(abs(E.count) + 0.5) - 1u;
+  let tbl = shape[min(slot, 7u)];
+  if (tbl.y < 2.0) { return off; }
+  // which outline: picked by length (a random point on the drawing, then its outline)
+  let idx = u32(tbl.x) + min(u32(rnd(st) * tbl.y), u32(tbl.y) - 1u);
   let P = shape[idx];
   let start = u32(P.z);
   let cnt = P.w;
   let n = abs(cnt);
-  let dir = select(1.0, E.count, cnt > 0.0);     // +1 clockwise, -1 anticlockwise (open lines always run forwards)
+  let dir = select(1.0, sign(E.count), cnt > 0.0);     // +1 clockwise, -1 anticlockwise (open lines always run forwards)
   let tRise = (0.9 + 0.3 * rnd(st)) / max(PP.speed, 0.1);
   let pace = 0.92 + 0.16 * rnd(st);               // sparks travel at their own speeds, so the swarm stretches out
-  let tTrace = 5.4 * E.pad1 * (n / f32(PP.nShape) * 0.5 + 0.5) / max(PP.speed, 0.1) / pace;
+  let tTrace = 5.4 * E.pad1 * (n / tbl.y * 0.5 + 0.5) / max(PP.speed, 0.1) / pace;
   // how far round this spark gets: most complete the whole outline, a few burn out on the way
   let rr = rnd(st);
   let reach = select(1.0, 0.55 + 0.45 * rnd(st), rr < 0.15);

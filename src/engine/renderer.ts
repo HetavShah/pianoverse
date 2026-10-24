@@ -28,6 +28,7 @@ export interface Layers {
 export const DEFAULT_LAYERS: Layers = { notes: true, keys: true, impact: true, saber: true, particles: true, bloom: true };
 
 const PER_EMIT = 1024;     // particle slots per emitter
+const SHAPE_SLOTS = 8;     // drawings shape particles can use at once
 const MAX_EMIT = 512;
 const MAX_GLASS = 512;
 const MAX_KEYS = 256;
@@ -111,10 +112,12 @@ export class Renderer {
   private simUni: GPUBuffer;
   private partDrawUni: GPUBuffer;
   private shapeBuf: GPUBuffer;
-  private nShape = 0;
-  private shapeKey = '';
+  // shapes for shape particles: up to SHAPE_SLOTS drawings packed in one buffer after a small table
+  private shapeKeys: string[] = [];
+  private shapeLoaded = '';
   private shapeWant = '';
   private shapeLoad: Promise<void> = Promise.resolve();
+  private scenes: import('./project').ParticleScene[] = [];
   private emitBuf: GPUBuffer;
   private flowBuf: GPUBuffer;
   private partBuf: GPUBuffer;
@@ -203,7 +206,7 @@ export class Renderer {
     this.heatBuf = buf(40 * 16, U.STORAGE | U.COPY_DST);
     this.simUni = buf(112, U.UNIFORM | U.COPY_DST);
     this.partDrawUni = buf(32, U.UNIFORM | U.COPY_DST);
-    this.shapeBuf = buf(MAX_SHAPE_POINTS * 16, U.STORAGE | U.COPY_DST);
+    this.shapeBuf = buf((SHAPE_SLOTS + MAX_SHAPE_POINTS) * 16, U.STORAGE | U.COPY_DST);
     this.emitBuf = buf(MAX_EMIT * 64, U.STORAGE | U.COPY_DST);
     this.flowBuf = buf(20 * 16, U.STORAGE | U.COPY_DST);
     this.partBuf = buf(MAX_EMIT * PER_EMIT * 48, U.STORAGE);
@@ -291,6 +294,7 @@ export class Renderer {
     this.whiteKeys = proj.keyboard.whiteKeys;
     this.kb = new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b);
     this.look = resolveLook(proj.look);
+    this.scenes = (proj.particleScenes ?? []).filter((sc) => sc.end > sc.start).slice(0, SHAPE_SLOTS - 1);
     const ns = proj.noteSource;
     this.bars = ns?.bars ? ns.bars.map((b) => b + ns.offset) : [];
     this.notes = prepareNotes(proj.notes, proj.keyboard.lowestNote, proj.keyboard.keys, this.look);
@@ -374,8 +378,15 @@ export class Renderer {
     const kb = new Keyboard(this.kb.lowest, this.kb.edgeA, this.kb.edgeB);
     const lk = this.look;
     const rows: { start: number; end: number; data: number[] }[] = [];
-    const mode = lk.partMode;
+    // shapes in use: slot 0 is the look's own shape (Shape style for the whole video), then one per section
+    this.shapeKeys = [lk.partShape || 'heart', ...this.scenes.map((sc) => sc.shape || 'heart')];
     for (const n of this.notes) {
+      const scene = this.scenes.findIndex((sc) => n.s >= sc.start && n.s < sc.end);
+      const mode = scene >= 0 ? 'shape' : lk.partMode;
+      const sc = scene >= 0 ? this.scenes[scene] : null;
+      const slot = scene >= 0 ? scene + 1 : 0;
+      const shapeDir = (sc ? sc.dir : lk.partShapeDir) === 'ccw' ? -1 : 1;
+      const shapeSize = sc ? sc.size : lk.partShapeSize;
       kb.H = trackingMatrix(this.proj, Math.round(n.s * this.proj.video.fps));
       const tg = kb.target(n.p);
       const rnd = mulberry32(n.idx * 7919 + 101);
@@ -398,11 +409,11 @@ export class Renderer {
           const mid = this.whiteKeys / 2;
           const c0 = kb.P(mid, kb.edgeY(mid));
           const ends = [kb.P(0, kb.edgeY(0)), kb.P(this.whiteKeys, kb.edgeY(this.whiteKeys))];
-          const size = Math.min(this.srcW * 0.8, Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) * 0.75) * lk.partShapeSize;
+          const size = Math.min(this.srcW * 0.8, Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) * 0.75) * shapeSize;
           const cy = Math.max(size * 0.55, Math.min(...ends.map((e) => e[1]), c0[1]) - tg.unit * 2.5 - size * 0.5);
           const cx = Math.min(this.srcW - size * 0.55, Math.max(size * 0.55, c0[0]));
           const rate = 450 * (0.6 + 0.8 * vv) * lk.partAmount;
-          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.15 + (1.6 + 7.5 * lk.partShapeHold) / Math.max(0.1, lk.partSpeed) + 2.1 * lk.partLife, data: [n.s, 0.15, rate, lk.partShapeDir === 'ccw' ? -1 : 1, tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
+          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.15 + (1.6 + 7.5 * lk.partShapeHold) / Math.max(0.1, lk.partSpeed) + 2.1 * lk.partLife, data: [n.s, 0.15, rate, shapeDir * (slot + 1), tg.x, tg.y, cx, cy, ...n.col, vv, n.idx * 16, 5, size, lk.partShapeHold] });
         } else {
           const mid = this.whiteKeys / 2;
           const c0 = kb.P(mid, kb.edgeY(mid));
@@ -623,8 +634,9 @@ export class Renderer {
         nEmit = act.length;
       }
     }
-    if (lk.partMode === 'shape') this.wantShape(lk.partShape);
-    q.writeBuffer(this.simUni, 0, new Uint32Array([0, nEmit, PER_EMIT, lk.partMode === 'shape' ? this.nShape : 0]));
+    const usesShapes = lk.partMode === 'shape' || this.scenes.length > 0;
+    if (usesShapes) this.wantShapes();
+    q.writeBuffer(this.simUni, 0, new Uint32Array([0, nEmit, PER_EMIT, usesShapes && this.shapeLoaded ? 1 : 0]));
     q.writeBuffer(this.simUni, 0, new Float32Array([t]));
     q.writeBuffer(this.simUni, 16, new Float32Array([
       0, -1, 0, 0, // glitter rises straight up the screen
@@ -897,25 +909,42 @@ export class Renderer {
     this.device.queue.copyExternalImageToTexture({ source: cv }, { texture: this.bgTex }, [cv.width, cv.height]);
   }
 
-  /** load the outline points of a particle shape (built-in name or 'user:<id>' SVG) */
-  private wantShape(key: string) {
-    if (!key || key === this.shapeKey || key === this.shapeWant) return;
-    this.shapeWant = key;
+  /** load the outlines of every shape in use (built-in names or 'user:<id>' SVGs) into the shape buffer */
+  private wantShapes() {
+    const keys = this.shapeKeys;
+    const sig = keys.join('|');
+    if (sig === this.shapeLoaded || sig === this.shapeWant) return;
+    this.shapeWant = sig;
     this.shapeLoad = (async () => {
-      let text: string | null = null;
-      if (key.startsWith('user:')) {
-        const f = this.userFiles ? await this.userFiles(key.slice(5)) : null;
-        if (f?.color) text = await f.color.text();
-      } else {
-        const r = await fetch(`${import.meta.env?.BASE_URL ?? '/'}shapes/${key}.svg`);
-        if (r.ok) text = await r.text();
+      const lists: (Float32Array | null)[] = [];
+      for (const key of keys) {
+        let text: string | null = null;
+        try {
+          if (key.startsWith('user:')) {
+            const f = this.userFiles ? await this.userFiles(key.slice(5)) : null;
+            if (f?.color) text = await f.color.text();
+          } else {
+            const r = await fetch(`${import.meta.env?.BASE_URL ?? '/'}shapes/${key}.svg`);
+            if (r.ok) text = await r.text();
+          }
+        } catch { text = null; }
+        const pts = text ? svgToPoints(text, Math.floor(MAX_SHAPE_POINTS / Math.max(1, keys.length))) : null;
+        if (text && !pts) console.warn('[shape] no outline found in', key);
+        lists.push(pts);
       }
-      if (!text || this.shapeWant !== key) return;
-      const pts = svgToPoints(text);
-      if (!pts) { console.warn('[shape] no outline found in', key); return; }
-      this.device.queue.writeBuffer(this.shapeBuf, 0, pts);
-      this.nShape = pts.length / 4;
-      this.shapeKey = key;
+      if (this.shapeWant !== sig) return;
+      // table: per slot (first point, point count); points follow, with their outline starts made absolute
+      const table = new Float32Array(SHAPE_SLOTS * 4);
+      const all: number[] = [];
+      lists.forEach((pts, i) => {
+        if (!pts || i >= SHAPE_SLOTS) return;
+        const first = SHAPE_SLOTS + all.length / 4;
+        table[i * 4] = first; table[i * 4 + 1] = pts.length / 4;
+        for (let k = 0; k < pts.length; k += 4) all.push(pts[k], pts[k + 1], pts[k + 2] + first, pts[k + 3]);
+      });
+      this.device.queue.writeBuffer(this.shapeBuf, 0, table);
+      if (all.length) this.device.queue.writeBuffer(this.shapeBuf, SHAPE_SLOTS * 16, new Float32Array(all));
+      this.shapeLoaded = sig;
       this.onTexture?.();
     })().catch((e) => console.warn('[shape]', e));
   }
@@ -942,7 +971,7 @@ export class Renderer {
   async texturesReady(): Promise<void> {
     if (this.look.texOn) this.wantTexture(this.look.noteTexture);
     if (this.look.bgImageOn && this.look.bgImage) this.wantBackground(this.look.bgImage);
-    if (this.look.partMode === 'shape') this.wantShape(this.look.partShape);
+    if (this.look.partMode === 'shape' || this.scenes.length) this.wantShapes();
     await this.texLoad;
     await this.bgLoad;
     await this.shapeLoad;

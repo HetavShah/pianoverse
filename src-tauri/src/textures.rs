@@ -24,7 +24,7 @@ const MAPS: [(&str, &[&str]); 3] = [
     ("rough", &["Roughness", "roughness", "rough"]),
     ("metal", &["Metalness", "metalness", "metallic", "metal"]),
 ];
-const EXTS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "bmp"];
+const EXTS: [&str; 6] = ["png", "jpg", "jpeg", "webp", "bmp", "svg"];
 const VIDEO_EXTS: [&str; 4] = ["mp4", "webm", "mov", "m4v"];
 
 /// "Foil002_1K-PNG_Color.png" -> ("…/Foil002_1K-PNG", "Foil002 1K-PNG") when it follows the usual naming

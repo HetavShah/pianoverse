@@ -377,3 +377,16 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .hsl-box { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--dim); }
 .hsl-box input { width: 36px; height: 22px; padding: 0 3px; font-size: 11px; }
 .hsl-row { flex-wrap: wrap; }
+
+/* shape sections */
+.sec-list { display: flex; flex-direction: column; gap: 4px; }
+.sec-item { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
+.sec-item .mono { margin-left: auto; font-size: 11.5px; }
+.sec-item.on { border-color: #a77bff; background: rgba(167,123,255,0.12); }
+.sec-dot { width: 8px; height: 8px; border-radius: 2px; background: #a77bff; flex: none; }
+.sec-add { display: flex; flex-wrap: wrap; gap: 6px; }
+.sec-edit { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 10px; border: 1px solid #4b3b80; background: rgba(167,123,255,0.06); }
+.sec-times { display: flex; gap: 10px; }
+.sec-time { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dim); }
+.sec-time input { width: 64px; height: 28px; font-size: 12.5px; }
+.shape-img { background: #0b0e12; padding: 10%; box-sizing: border-box; filter: invert(0); }

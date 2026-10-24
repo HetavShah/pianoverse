@@ -33,6 +33,7 @@ export const PARTICLE_PRESETS: { id: string; label: string; set: Partial<Look> }
   { id: 'fountain', label: 'Fountain', set: { partMode: 'fountain', partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
   { id: 'spray', label: 'Held-note spray', set: { partMode: 'spray', partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 0.85, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
   { id: 'vortex', label: 'Vortex', set: { partMode: 'vortex', partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
+  { id: 'shape', label: 'Shape (whole video)', set: { partMode: 'shape', partAmount: 1, partSpeed: 1, partSwirl: 1, partLife: 1, partSize: 1, partRays: false, partOctaves: 1, partTurbFreq: 1, partSpread: 0, partGravity: 0, partWind: 0, partRise: 1 } },
   { id: 'twirl', label: 'Twirl', set: { partMode: 'plume', partAmount: 1.2, partSpeed: 0.8, partSwirl: 2.2, partLife: 1.6, partSize: 1, partRays: false, partOctaves: 2, partTurbFreq: 0.6, partSpread: 0, partGravity: 0, partWind: 0.2, partRise: 0.7 } },
 ];
 
@@ -413,6 +414,7 @@ export type Control =
   | { key: keyof Look; kind: 'swatches'; label: string; count?: number; names?: string[]; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'cards'; label: string; cards: { id: string; label: string; set: Partial<Look> }[]; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'bgImage'; label: string; when?: (l: Look) => boolean }
+  | { key: keyof Look; kind: 'shapePick'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'color'; label: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'toggle'; label: string; hint?: string; when?: (l: Look) => boolean }
   | { key: keyof Look; kind: 'note'; label: string; when?: (l: Look) => boolean };
@@ -564,11 +566,17 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     { title: 'Presets', controls: [
       { key: 'partAmount', kind: 'cards', label: 'Preset', cards: PARTICLE_PRESETS },
     ] },
+    { title: 'Shape', controls: [
+      { key: 'partShape', kind: 'shapePick', label: 'Shape', when: (l) => l.partMode === 'shape' },
+      { key: 'partShapeSize', kind: 'slider', label: 'Shape size', min: 0.3, max: 1.6, step: 0.01, fmt: x, when: (l) => l.partMode === 'shape' },
+      { key: 'partShapeDir', kind: 'select', label: 'Direction', segmented: true, when: (l) => l.partMode === 'shape', options: [{ value: 'cw', label: 'Clockwise' }, { value: 'ccw', label: 'Anticlockwise' }] },
+    ] },
     { title: 'Main particles', controls: [
       { key: 'partSize', kind: 'slider', label: 'Particle size', min: 0.3, max: 3, step: 0.01, fmt: x },
       { key: 'partAmount', kind: 'slider', label: 'Particle count', min: 0, max: 3, step: 0.01, fmt: pct },
       { key: 'partSpeed', kind: 'slider', label: 'Particle speed', min: 0, max: 3, step: 0.01, fmt: x },
       { key: 'partLife', kind: 'slider', label: 'Particle lifetime', min: 0.3, max: 3, step: 0.01, fmt: x },
+      { key: 'partShapeHold', kind: 'slider', label: 'Time to trace a shape', min: 0.5, max: 2, step: 0.01, fmt: (v) => `${(6.3 * v).toFixed(1)} s`, hint: 'How long sparks take to go once round a shape (in shape sections too)' },
     ] },
     { title: 'Particle turbulence', fold: true, controls: [
       { key: 'partSwirl', kind: 'slider', label: 'Turbulence', min: 0, max: 3, step: 0.01, fmt: pct },

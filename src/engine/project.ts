@@ -29,8 +29,18 @@ export interface ProjectFile {
   look?: Partial<import('./look').Look>;
   /** the preset the look started from */
   presetId?: string;
+  /** sections of the video where particles trace a shape instead of the normal particle style */
+  particleScenes?: ParticleScene[];
   /** where the notes came from and how they are lined up with the video */
   noteSource?: import('./notes').NoteSource;
+}
+
+export interface ParticleScene {
+  id: string;
+  start: number; end: number; // seconds: notes played in this section send sparks along the shape
+  shape: string; // built-in name or 'user:<id>' SVG
+  size: number; // x the default size
+  dir: 'cw' | 'ccw';
 }
 
 export type RGB = [number, number, number]; // 0..1

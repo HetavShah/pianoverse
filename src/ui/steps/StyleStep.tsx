@@ -6,6 +6,8 @@ import LookControls from '../LookControls';
 import PresetBar from '../PresetBar';
 import StyleTimeline from '../StyleTimeline';
 import type { WS } from '../workspace';
+import ShapeSections from '../ShapeSections';
+import type { ParticleScene } from '../../engine/project';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 
@@ -24,6 +26,7 @@ const PANELS: Panel[] = [
 export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; attachPreview: (c: HTMLCanvasElement | null) => void; fps: number; stats: string }) {
   const { project } = ws;
   const [sel, setSel] = useState<LayerId>('notes');
+  const [scene, setScene] = useState<string | null>(null);
   const [original, setOriginal] = useState(false);
   const [guides, setGuides] = useState(false);
   const [flash, setFlash] = useState<{ n: number; play: boolean }>({ n: 0, play: false });
@@ -53,6 +56,9 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
   const angle = typeof setAngle === 'number' ? setAngle : autoAngle;
   const setNoteAngle = (a: number | null) => setLook({ noteAngle: a });
   const tall = project.video.height > project.video.width;
+  const scenes = project.particleScenes ?? [];
+  const setScenes = (list: ParticleScene[]) => ws.setProject({ ...project, particleScenes: list });
+  const pickScene = (id: string | null) => { setScene(id); if (id) setSel('particles'); };
 
   return (
     <div className="style-page">
@@ -166,6 +172,10 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
             </div>
           </>
         )}
+        {sel === 'particles' && (
+          <ShapeSections scenes={scenes} setScenes={setScenes} selected={scene} setSelected={pickScene}
+            duration={ws.duration} time={ws.time} range={ws.loop.range} seek={ws.seek} />
+        )}
         <LookControls layer={sel} look={look} base={base} set={setKey} patch={setLook} />
         {layerChanged && (
           <button type="button" className="btn small ghost" onClick={() => setLook(Object.fromEntries(layerKeys.map((k) => [k, base[k]])) as Partial<Look>)}>
@@ -181,6 +191,10 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
         range={ws.loop.range}
         onRange={(r) => ws.setLoop({ on: !!r, range: r })}
         onSeek={ws.seek}
+        scenes={scenes}
+        setScenes={setScenes}
+        selectedScene={scene}
+        onSelectScene={pickScene}
       />
     </div>
   );

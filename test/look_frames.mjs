@@ -20,6 +20,7 @@ await page.setInputFiles('.file-card .actions input[type=file]', CLIP);
 await page.waitForTimeout(1500);
 const proj = JSON.parse(readFileSync(PROJ, 'utf8'));
 if (LOOK) proj.look = { ...(proj.look ?? {}), ...LOOK };
+if (process.env.SCENES) proj.particleScenes = JSON.parse(process.env.SCENES);
 // optional background / texture image for 'user:test'
 const EXTRA = process.env.USERIMG ? readFileSync(process.env.USERIMG).toString('base64') : null;
 const EXTRA_TYPE = process.env.USERIMG?.endsWith('.webm') ? 'video/webm' : process.env.USERIMG?.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';

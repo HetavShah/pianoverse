@@ -2,8 +2,9 @@
 import { noteName } from '../engine/calibration';
 import { useEffect, useRef, useState } from 'react';
 import { COLOR_BY, Control, GRADIENTS, hexToHsv, hsvToHex, LayerId, Look, LOOK_SCHEMA, NOTE_STYLE_CARDS, NOTE_TEXTURES, noteColor, PaletteId, toHex } from '../engine/look';
-import { deleteTexture, importTexture, textureThumb, UserTexture, useUserTextures } from './textureStore';
+import { deleteTexture, importShape, importTexture, isSvg, textureThumb, UserTexture, useUserTextures } from './textureStore';
 import { sameValue } from '../engine/look';
+import ShapePicker from './ShapePicker';
 
 type Set = (k: keyof Look, v: unknown) => void;
 type Patch = (p: Partial<Look>) => void;
@@ -48,7 +49,7 @@ function TexturePicker({ look, patch }: { look: Look; patch: Patch }) {
             <img src={`${base}textures/${t.id}/thumb.jpg`} alt="" /><span>{t.label}</span>
           </button>
         ))}
-        {mine.map((t) => (
+        {mine.filter((t) => !isSvg(t)).map((t) => (
           <div key={t.id} className={'tex mine' + (current === 'user:' + t.id ? ' on' : '')} title={t.name + (t.files.normal ? ' · with normal map' : '')}>
             <button type="button" className="tex-pick" onClick={() => pick('user:' + t.id)}><UserThumb t={t} /><span>{t.name}</span></button>
             <button type="button" className="tex-del" aria-label={`Remove ${t.name}`} title="Remove from your textures"
@@ -184,7 +185,7 @@ function BgPicker({ look, patch }: { look: Look; patch: Patch }) {
   return (
     <div className="ctl">
       <div className="tex-grid">
-        {mine.map((t) => (
+        {mine.filter((t) => !isSvg(t)).map((t) => (
           <button key={t.id} type="button" className={'tex' + (look.bgImage === 'user:' + t.id ? ' on' : '')} onClick={() => patch({ bgImage: 'user:' + t.id, bgImageOn: true })} title={t.name}>
             <UserThumb t={t} /><span>{t.name}</span>
           </button>
@@ -264,6 +265,8 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
       return <Cards c={c} look={look} patch={patch} />;
     case 'bgImage':
       return <BgPicker look={look} patch={patch} />;
+    case 'shapePick':
+      return <ShapePicker value={v as string} onPick={(k) => set(c.key, k)} />;
     case 'noteStyle': {
       const base = import.meta.env.BASE_URL ?? '/';
       const cur = NOTE_STYLE_CARDS.find((c) => Object.entries(c.set).every(([k, val]) => look[k as keyof Look] === val))?.id;

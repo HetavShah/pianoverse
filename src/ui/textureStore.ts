@@ -4,7 +4,9 @@
 import { useEffect, useState } from 'react';
 import { inTauri } from './media';
 
-export interface UserTexture { id: string; name: string; files: Partial<Record<'color' | 'video' | 'normal' | 'rough' | 'metal', string>> }
+export interface UserTexture { id: string; name: string; files: Partial<Record<'color' | 'video' | 'normal' | 'rough' | 'metal', string>>; svg?: boolean }
+/** SVG drawings (particle shapes) live in the same library but are listed separately */
+export const isSvg = (t: UserTexture) => !!t.svg || /\.svg$/i.test(t.files.color ?? '');
 
 type Maps = { color?: Blob; video?: Blob; normal?: Blob; rough?: Blob; metal?: Blob };
 const memory = new Map<string, { tex: UserTexture; blobs: Maps }>(); // browser-only textures
@@ -15,7 +17,7 @@ const emit = () => listeners.forEach((f) => f(list));
 
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'webp', 'bmp'];
 const VIDEO_EXT = ['mp4', 'webm', 'mov', 'm4v'];
-const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', bmp: 'image/bmp', mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+const MIME: Record<string, string> = { svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', bmp: 'image/bmp', mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
 
 export async function refreshTextures(): Promise<UserTexture[]> {
   if (inTauri()) {
@@ -48,12 +50,33 @@ export async function importTexture(): Promise<UserTexture | null> {
   return file ? addBrowserTexture(file) : null;
 }
 
+/** pick an SVG drawing for shape particles; returns it (or null if cancelled) */
+export async function importShape(): Promise<UserTexture | null> {
+  if (inTauri()) {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const res = await open({ multiple: false, directory: false, filters: [{ name: 'SVG drawing', extensions: ['svg'] }] });
+    if (!res || Array.isArray(res)) return null;
+    const { invoke } = await import('@tauri-apps/api/core');
+    const tex = await invoke<UserTexture>('import_texture', { path: res });
+    await refreshTextures();
+    return tex;
+  }
+  const file = await new Promise<File | null>((resolve) => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.svg,image/svg+xml';
+    inp.onchange = () => resolve(inp.files?.[0] ?? null);
+    inp.click();
+  });
+  return file ? addBrowserTexture(file) : null;
+}
+
 /** browser / tests: add an image File as a texture for this session */
 export async function addBrowserTexture(file: Blob & { name?: string }): Promise<UserTexture> {
   const id = 'b' + Date.now().toString(36);
   const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name ?? '');
   const name = (file.name ?? 'Texture').replace(/\.[a-z0-9]+$/i, '').replace(/[_-](color|albedo|basecolor|diffuse)$/i, '').replace(/_/g, ' ');
-  const tex: UserTexture = { id, name, files: isVideo ? { video: URL.createObjectURL(file) } : { color: URL.createObjectURL(file) } };
+  const svg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name ?? '');
+  const tex: UserTexture = { id, name, files: isVideo ? { video: URL.createObjectURL(file) } : { color: URL.createObjectURL(file) }, svg };
   memory.set(id, { tex, blobs: isVideo ? { video: file } : { color: file } });
   await refreshTextures();
   return tex;
