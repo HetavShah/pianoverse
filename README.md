@@ -112,10 +112,9 @@ A few ideas that make it work:
 
 ## Try it
 
-1. Download the latest **`Pianoverse_…_x64-setup.exe`** from [Releases](https://github.com/HetavShah/pianoverse/releases) and install it.
-2. Click **Open video…** and choose `samples/interstellar-take1.mp4` from this repo.
-3. Click **Open project data…** and choose `samples/interstellar-take1.pvproj.json`.
-4. Press **Space** to play.
+1. Download the latest **`Pianoverse_…_x64-setup.exe`** from [Releases](https://github.com/HetavShah/pianoverse/releases/latest) and install it. From then on Pianoverse updates itself: when a new build is out, click **Install and restart** in the top bar.
+2. Click **Select both files…** and pick `samples/interstellar-take1.mp4` and `samples/interstellar-take1.pvproj.json` together (or drop them on the window).
+3. Press **Space** to play.
 
 | Key | Action |
 | --- | --- |

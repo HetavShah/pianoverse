@@ -1,4 +1,4 @@
-// In-app updates: on start, ask GitHub Releases for a newer signed build and offer a one-click install.
+// In-app updates: on start and every 30 minutes, ask GitHub Releases for a newer signed build and offer a one-click install.
 import { useEffect, useState } from 'react';
 
 type Phase =
@@ -24,12 +24,15 @@ export function UpdateBanner() {
   useEffect(() => {
     if (!inTauri()) return;
     let cancelled = false;
-    (async () => {
+    let found = false;
+    const run = async () => {
+      if (found || cancelled) return;
       try {
         const { check } = await import('@tauri-apps/plugin-updater');
         const { relaunch } = await import('@tauri-apps/plugin-process');
         const update = await check();
         if (!update || cancelled) return;
+        found = true;
         setPhase({
           kind: 'available',
           version: update.version,
@@ -51,8 +54,11 @@ export function UpdateBanner() {
         // no network or no release yet: stay quiet, just log it
         console.warn('[updater]', e);
       }
-    })();
-    return () => { cancelled = true; };
+    };
+    run();
+    // keep checking while the app stays open, so new builds show up without a restart
+    const timer = window.setInterval(run, 30 * 60 * 1000);
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
 
   if (phase.kind === 'idle') return null;
