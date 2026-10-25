@@ -35,6 +35,8 @@ export interface ProjectFile {
   particleScenes?: ParticleScene[];
   /** where the notes came from and how they are lined up with the video */
   noteSource?: import('./notes').NoteSource;
+  /** the virtual camera: shots, transitions and the frame's shape */
+  cameraTrack?: import('./camera').CameraTrack;
 }
 
 export interface ParticleScene {
