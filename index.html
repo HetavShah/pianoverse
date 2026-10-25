@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="canonical" href="https://pianoverse.in/">
+<meta name="theme-color" content="#06080a">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pianoverse.in/">
+<meta property="og:title" content="Pianoverse">
+<meta property="og:description" content="Falling notes on your real keys. A free Windows app for piano videos.">
+<meta property="og:image" content="https://pianoverse.in/og.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://pianoverse.in/og.jpg">
+<title>Pianoverse</title>
+<meta name="description" content="Falling notes on your real keys. Add your piano video and MIDI; Pianoverse lands every note on the key you pressed. For Windows.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the page follows the demo video. A title card for each step, then its close-up, rendered by the app. */
+:root {
+  --ground: #06080a;
+  --stage: #0b0f12;
+  --panel: #10161a;
+  --line: #1c252b;
+  --line-2: #29343b;
+  --ink: #e9eef0;
+  --ink-2: #b9c4c9;
+  --muted: #8b989e;
+  --teal: #2fd3b5;
+  --teal-ink: #04231d;
+  --glow: rgba(47, 211, 181, 0.35);
+  --display: "Unbounded", "Segoe UI", system-ui, sans-serif;
+  --body: "Hanken Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --wrap: 1240px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--ground); }
+img, video { max-width: 100%; display: block; }
+a { color: var(--teal); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 500; letter-spacing: -0.03em; line-height: 1.05; text-wrap: balance; margin: 0; }
+p { margin: 0; text-wrap: pretty; }
+.wrap { max-width: var(--wrap); margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+@media (min-width: 700px) { .wrap { padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); } }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; gap: 10px; min-height: 50px; padding: 0 24px; border-radius: 999px; font-family: var(--body); font-weight: 600; font-size: 16px; border: 1px solid var(--line-2); color: var(--ink); background: rgba(6,8,10,.4); cursor: pointer; text-decoration: none; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.btn:hover { text-decoration: none; border-color: var(--teal); }
+.btn.primary { background: var(--teal); color: var(--teal-ink); border-color: var(--teal); }
+.btn.primary:hover { box-shadow: 0 0 32px 2px var(--glow); transform: translateY(-1px); }
+.btn svg { width: 18px; height: 18px; flex: none; }
+
+/* header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(6, 8, 10, 0.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 28px; min-height: 68px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-family: var(--display); font-weight: 500; font-size: 18px; }
+.brand:hover { text-decoration: none; }
+.brand svg { width: 30px; height: 30px; }
+.nav { display: flex; gap: 26px; margin-left: auto; }
+.nav a { color: var(--ink-2); font-size: 15px; font-weight: 500; }
+.nav a:hover { color: var(--ink); text-decoration: none; }
+.top .btn { min-height: 44px; padding: 0 18px; font-size: 15px; }
+@media (max-width: 860px) { .nav { display: none; } .top .btn { margin-left: auto; } }
+
+/* hero: the brand over blurred falling notes */
+.hero { position: relative; overflow: hidden; min-height: 680px; display: grid; place-items: center; text-align: center; padding-block: 96px; }
+.hero video { position: absolute; inset: -40px; width: calc(100% + 80px); height: calc(100% + 80px); object-fit: cover; filter: blur(14px) brightness(.5) saturate(1.15); }
+.hero::after { content: ""; position: absolute; inset: 0; background: radial-gradient(60% 70% at 50% 50%, transparent 0, rgba(6,8,10,.55) 70%, var(--ground) 100%); }
+.hero .wrap { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 30px; justify-items: center; width: 100%; }
+.hero .wrap > * { min-width: 0; max-width: 100%; }
+.hero-logo { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: clamp(14px, 2vw, 26px); }
+.hero-logo svg { width: clamp(56px, 8vw, 104px); height: clamp(56px, 8vw, 104px); }
+.hero-logo h1 { font-size: min(128px, 9.5vw); }
+@media (max-width: 640px) { .hero-logo { flex-direction: column; } .hero-logo h1 { font-size: min(64px, 11.5vw); } .hero-logo svg { width: 64px; height: 64px; } .hero { min-height: 0; padding-block: 72px 80px; } }
+.hero .sub { font-family: var(--display); font-weight: 500; font-size: clamp(20px, 3.4vw, 42px); letter-spacing: -0.025em; line-height: 1.25; text-wrap: balance; }
+.lit { color: var(--teal); text-shadow: 0 0 28px var(--glow); }
+.hero .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 8px; }
+.hero .req { color: var(--ink-2); font-size: 14px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; }
+.rise { animation: rise .9s cubic-bezier(.2,.7,.2,1) both; }
+.rise.d1 { animation-delay: .15s; } .rise.d2 { animation-delay: .5s; } .rise.d3 { animation-delay: .8s; }
+@keyframes rise { from { transform: translateY(22px); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+
+/* sections */
+.fold { padding-block: clamp(72px, 9vw, 120px); }
+.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; justify-items: center; text-align: center; margin-bottom: clamp(32px, 4vw, 52px); }
+.card > * { min-width: 0; max-width: 100%; }
+.card .num { font-family: var(--mono); font-size: 15px; letter-spacing: .2em; text-transform: uppercase; color: var(--teal); }
+.card h2 { font-size: clamp(30px, 6vw, 76px); overflow-wrap: anywhere; hyphens: auto; }
+.card .bar { width: min(420px, 60%); height: 3px; background: linear-gradient(90deg, transparent, var(--teal) 20%, #e6fffa 50%, var(--teal) 80%, transparent); box-shadow: 0 0 22px var(--teal); }
+.card p { font-size: clamp(18px, 2vw, 22px); color: var(--ink-2); max-width: 46ch; }
+.card.sm h2 { font-size: clamp(26px, 4.4vw, 52px); }
+.screen { position: relative; border-radius: 18px; overflow: hidden; background: #000; aspect-ratio: 16 / 9; max-width: 100%; box-shadow: 0 0 0 1px var(--line-2), 0 40px 110px -40px rgba(47,211,181,.35), 0 30px 60px -30px #000; }
+.screen video { width: 100%; height: 100%; object-fit: cover; }
+.screen .label { position: absolute; left: 16px; bottom: 14px; font-family: var(--mono); font-size: 13px; color: var(--ink); background: rgba(6,8,10,.78); border: 1px solid var(--line-2); padding: 6px 10px; border-radius: 8px; }
+.under { margin-top: 18px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; color: var(--muted); font-size: 15px; }
+.under span::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin-right: 8px; vertical-align: 2px; }
+.band { background: linear-gradient(180deg, var(--ground), var(--stage) 20%, var(--stage) 80%, var(--ground)); }
+
+/* before / after with two playing videos */
+.compare { position: relative; border-radius: 18px; overflow: hidden; aspect-ratio: 16 / 9; max-width: 100%; background: #000; box-shadow: 0 0 0 1px var(--line-2), 0 40px 110px -40px rgba(47,211,181,.35); touch-action: pan-y; user-select: none; }
+.compare video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.compare .after { clip-path: inset(0 calc(100% - var(--cut, 50%)) 0 0); }
+.compare .line { position: absolute; top: 0; bottom: 0; left: var(--cut, 50%); width: 3px; margin-left: -1.5px; background: #dffff8; box-shadow: 0 0 18px var(--teal), 0 0 50px var(--teal); pointer-events: none; }
+.compare .knob { position: absolute; top: 50%; left: var(--cut, 50%); width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: var(--ground); border: 2px solid var(--teal); display: grid; place-items: center; pointer-events: none; box-shadow: 0 0 26px var(--glow); }
+.compare .knob svg { width: 24px; height: 24px; color: var(--teal); }
+.compare .tag { position: absolute; top: 14px; font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; padding: 6px 10px; border-radius: 8px; background: rgba(6,8,10,.72); }
+.compare .tag.l { left: 14px; color: var(--teal); } .compare .tag.r { right: 14px; color: var(--ink-2); }
+.compare input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0; }
+
+/* particles grid */
+.trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 18px; margin-bottom: clamp(48px, 6vw, 80px); }
+.trio figure { margin: 0; display: grid; gap: 12px; }
+.trio .screen { border-radius: 14px; }
+.trio figcaption strong { display: block; font-size: 18px; font-weight: 600; }
+.trio figcaption span { color: var(--muted); font-size: 15px; }
+
+/* export specs */
+.specs { margin: 32px auto 0; max-width: 900px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.specs div { background: var(--ground); padding: 20px 22px; display: grid; gap: 4px; }
+.specs dt { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--teal); }
+.specs dd { margin: 0; color: var(--ink-2); font-size: 15.5px; }
+
+/* closing */
+.closing { text-align: center; }
+.closing .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; justify-items: center; }
+.closing h2 { font-size: clamp(34px, 5.4vw, 64px); max-width: 16ch; }
+footer { border-top: 1px solid var(--line); padding-block: 32px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: space-between; }
+footer a { color: var(--ink-2); }
+</style>
+
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Pianoverse home">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" stroke="#2fd3b5" stroke-width="2.4"/><path d="M11 9v8M16 7v10M21 10v7M10 22.5h12" stroke="#2fd3b5" stroke-width="2.4" stroke-linecap="round"/></svg>
+      Pianoverse
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#effects">Effects</a>
+      <a href="#particles">Particles</a>
+      <a href="#export">Export</a>
+    </nav>
+    <a class="btn primary" href="https://github.com/HetavShah/pianoverse/releases/latest" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg>
+      Download
+    </a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- hero -->
+<section class="hero" aria-labelledby="hero-title">
+  <video class="loop" data-src="assets/v/herobg.mp4" poster="assets/v/herobg.jpg" muted loop playsinline preload="none" aria-hidden="true"></video>
+  <div class="wrap">
+    <div class="hero-logo rise">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" stroke="#2fd3b5" stroke-width="2.2"/><path d="M11 9v8M16 7v10M21 10v7M10 22.5h12" stroke="#2fd3b5" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <h1 id="hero-title">Pianoverse</h1>
+    </div>
+    <p class="sub rise d1">Falling notes on your <span class="lit">real keys.</span></p>
+    <div class="cta rise d2">
+      <a class="btn primary" href="https://github.com/HetavShah/pianoverse/releases/latest" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg>
+        Download for Windows
+      </a>
+      <a class="btn" href="#how">See how it works</a>
+    </div>
+    <div class="req rise d3"><span>Windows 10 and 11</span><span>·</span><span>DirectX 12 graphics card</span><span>·</span><span>Updates itself</span></div>
+  </div>
+</section>
+
+<!-- before / after -->
+<section class="fold" aria-labelledby="ba-title">
+  <div class="wrap">
+    <div class="card sm">
+      <div class="num">Before / after</div>
+      <h2 id="ba-title">Drag to see the difference.</h2>
+      <p>Same phone video, same moment. Every effect comes from the MIDI. Nothing drawn by hand.</p>
+    </div>
+    <div class="compare" id="compare" style="--cut: 50%;">
+      <video id="vOrig" data-src="assets/v/orig.mp4" poster="assets/v/orig.jpg" muted loop playsinline preload="none" aria-label="Original phone video of a piano performance"></video>
+      <video class="after" id="vViz" data-src="assets/v/viz.mp4" poster="assets/v/viz.jpg" muted loop playsinline preload="none" aria-label="The same video with Pianoverse effects"></video>
+      <span class="tag l">Pianoverse</span><span class="tag r">Original</span>
+      <div class="line"></div>
+      <div class="knob"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg></div>
+      <label for="cut" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Compare Pianoverse and the original</label>
+      <input id="cut" type="range" min="0" max="100" value="50">
+    </div>
+  </div>
+</section>
+
+<!-- steps 1–3 -->
+<section class="fold band" id="how" aria-labelledby="s1">
+  <div class="wrap">
+    <div class="card">
+      <div class="num">Step 1</div>
+      <h2 id="s1">Import</h2>
+      <div class="bar"></div>
+      <p>Drop in your piano video, plus the MIDI if you have it.</p>
+    </div>
+    <div class="screen"><video class="loop" data-src="assets/v/import.mp4" poster="assets/v/import.jpg" muted loop playsinline preload="none" aria-label="The Import screen with the video and MIDI cards"></video></div>
+  </div>
+</section>
+
+<section class="fold" aria-labelledby="s2">
+  <div class="wrap">
+    <div class="card">
+      <div class="num">Step 2</div>
+      <h2 id="s2">MIDI</h2>
+      <div class="bar"></div>
+      <p>Don’t know what MIDI is? Pianoverse takes care of it.</p>
+    </div>
+    <div class="screen"><video class="loop" data-src="assets/v/midi.mp4" poster="assets/v/midi.jpg" muted loop playsinline preload="none" aria-label="Pianoverse detecting the notes from the video's audio and lining them up"></video><span class="label">Detect from audio · sped up 20×</span></div>
+    <div class="under"><span>Finds the notes in your audio</span><span>Lines them up by itself</span><span>Or bring your own MIDI</span></div>
+  </div>
+</section>
+
+<section class="fold band" aria-labelledby="s3">
+  <div class="wrap">
+    <div class="card">
+      <div class="num">Step 3</div>
+      <h2 id="s3">Calibrate</h2>
+      <div class="bar"></div>
+      <p>Mark your keyboard once. It’s tracked in every frame, even if the phone moves.</p>
+    </div>
+    <div class="screen"><video class="loop" data-src="assets/v/calib.mp4" poster="assets/v/calib.jpg" muted loop playsinline preload="none" aria-label="Dragging a keyboard corner into place, then the tracking panel"></video></div>
+    <div class="under"><span>25 to 88 keys</span><span>Side angle or top-down camera</span></div>
+  </div>
+</section>
+
+<!-- step 4: effects -->
+<section class="fold" id="effects" aria-labelledby="s4">
+  <div class="wrap">
+    <div class="card">
+      <div class="num">Step 4</div>
+      <h2 id="s4">Make it yours</h2>
+      <div class="bar"></div>
+      <p>Colours, notes, saber and particles. Every change shows up live.</p>
+    </div>
+  </div>
+</section>
+
+<section class="fold band" style="padding-top: 0;" aria-labelledby="e1">
+  <div class="wrap">
+    <div class="card sm">
+      <div class="num">Effects</div>
+      <h2 id="e1">Colours</h2>
+      <p>Pick a palette. Teal, Neon, Ember, Aurora, Sunset, Gold, and more.</p>
+    </div>
+    <div class="screen"><video class="loop" data-src="assets/v/colours.mp4" poster="assets/v/colours.jpg" muted loop playsinline preload="none" aria-label="Clicking through colour palettes while the notes change colour"></video></div>
+  </div>
+</section>
+
+<section class="fold" aria-labelledby="e2">
+  <div class="wrap">
+    <div class="card sm">
+      <div class="num">Effects</div>
+      <h2 id="e2">Notes</h2>
+      <p>Glass, gem, solid, outline or soft glow. Fill them with real textures.</p>
+    </div>
+    <div class="screen"><video class="loop" data-src="assets/v/notes.mp4" poster="assets/v/notes.jpg" muted loop playsinline preload="none" aria-label="Switching note styles from glass to gem, solid, outline, soft glow and gold foil"></video></div>
+  </div>
+</section>
+
+<section class="fold band" aria-labelledby="e3">
+  <div class="wrap">
+    <div class="card sm">
+      <div class="num">Effects</div>
+      <h2 id="e3">Saber</h2>
+      <p>Five styles of light along your keys: plasma, straight, electric, soft beam and flame.</p>
+    </div>
+    <div class="screen"><video class="loop" data-src="assets/v/saber.mp4" poster="assets/v/saber.jpg" muted loop playsinline preload="none" aria-label="Switching between the five saber styles"></video></div>
+  </div>
+</section>
+
+<!-- particles -->
+<section class="fold" id="particles" aria-labelledby="p1">
+  <div class="wrap">
+    <div class="card">
+      <div class="num">Effects</div>
+      <h2 id="p1">Fully customizable particles</h2>
+      <div class="bar"></div>
+      <p>Presets, turbulence, gravity and shapes.</p>
+    </div>
+    <div class="trio">
+      <figure><div class="screen"><video class="loop" data-src="assets/v/presets.mp4" poster="assets/v/presets.jpg" muted loop playsinline preload="none" aria-label="Particle presets: fountain, held-note spray and vortex"></video></div>
+        <figcaption><strong>Presets</strong><span>Fountain, held-note spray, vortex and more.</span></figcaption></figure>
+      <figure><div class="screen"><video class="loop" data-src="assets/v/turb.mp4" poster="assets/v/turb.jpg" muted loop playsinline preload="none" aria-label="Turning up turbulence on the sparks"></video></div>
+        <figcaption><strong>Turbulence</strong><span>Let the sparks swirl.</span></figcaption></figure>
+      <figure><div class="screen"><video class="loop" data-src="assets/v/grav.mp4" poster="assets/v/grav.jpg" muted loop playsinline preload="none" aria-label="Turning up gravity on the sparks"></video></div>
+        <figcaption><strong>Gravity</strong><span>Pull them down, or lift them up.</span></figcaption></figure>
+    </div>
+    <div class="card sm">
+      <div class="num">Particles</div>
+      <h2>Draw with sparks</h2>
+      <p>Pick a shape. The sparks leave the keys, trace it, then fade away. Built-in shapes, or upload your own SVG.</p>
+    </div>
+    <div class="screen"><video class="loop" data-src="assets/v/heart.mp4" poster="assets/v/heart.jpg" muted loop playsinline preload="none" aria-label="Selecting the heart shape; sparks trace a heart above the keys and fade"></video><span class="label">Sped up 3×</span></div>
+  </div>
+</section>
+
+<!-- step 5 -->
+<section class="fold band" id="export" aria-labelledby="s5">
+  <div class="wrap">
+    <div class="card">
+      <div class="num">Step 5</div>
+      <h2 id="s5">Export</h2>
+      <div class="bar"></div>
+      <p>Shorts, landscape, square or 4K. Made for Shorts, Reels and YouTube.</p>
+    </div>
+    <div class="screen"><video class="loop" data-src="assets/v/export.mp4" poster="assets/v/export.jpg" muted loop playsinline preload="none" aria-label="The Export screen: sizes, then the export button"></video></div>
+    <dl class="specs">
+      <div><dt>Encoder</dt><dd>NVIDIA NVENC, AMD AMF or Intel Quick Sync, found automatically; x264 on the processor otherwise.</dd></div>
+      <div><dt>Format</dt><dd>MP4 in H.264, or H.265 for smaller files. 24, 30 or 60 fps.</dd></div>
+      <div><dt>Sound</dt><dd>Your original audio, copied without re-encoding when it can be.</dd></div>
+      <div><dt>For editors</dt><dd>The effects alone on a transparent background, as ProRes 4444 for DaVinci Resolve or Premiere.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- closing -->
+<section class="fold closing" aria-labelledby="close-title">
+  <div class="wrap">
+    <div class="card" style="margin: 0;">
+      <div class="num">Pianoverse for Windows</div>
+      <h2 id="close-title">Film it. Drop it in. Export.</h2>
+      <div class="bar"></div>
+      <p>Install once. Updates arrive by themselves: click Install and restart.</p>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center;">
+      <a class="btn primary" href="https://github.com/HetavShah/pianoverse/releases/latest" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg>
+        Download for Windows
+      </a>
+      <a class="btn" href="https://github.com/HetavShah/pianoverse" target="_blank" rel="noopener">Source on GitHub</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Made by Hetav Shah</span>
+    <span>Note textures from <a href="https://ambientcg.com" target="_blank" rel="noopener">ambientCG</a> (CC0) · <a href="https://github.com/HetavShah/pianoverse" target="_blank" rel="noopener">GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // play each loop only while it is on screen; load it when it gets close
+  const load = (v) => { if (!v.src && v.dataset.src) { v.src = v.dataset.src; } };
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const v = e.target;
+      if (e.isIntersecting) { load(v); if (!reduce) v.play().catch(() => {}); }
+      else v.pause();
+    }
+  }, { rootMargin: '300px 0px' });
+  document.querySelectorAll('video').forEach((v) => {
+    if (reduce && v.closest('.screen')) v.controls = true;
+    io.observe(v);
+  });
+
+  // before / after: two videos kept in step, a slider between them
+  const cmp = document.getElementById('compare'), cut = document.getElementById('cut');
+  const a = document.getElementById('vOrig'), b = document.getElementById('vViz');
+  const set = (v) => cmp.style.setProperty('--cut', v + '%');
+  cut.addEventListener('input', () => set(cut.value));
+  b.addEventListener('timeupdate', () => { if (a.readyState > 1 && Math.abs(a.currentTime - b.currentTime) > 0.06) a.currentTime = b.currentTime; });
+  if (!reduce) {
+    let touched = false;
+    cut.addEventListener('pointerdown', () => { touched = true; }); cut.addEventListener('keydown', () => { touched = true; });
+    const sweep = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting || touched) return; sweep.disconnect();
+      const t0 = performance.now();
+      const keys = [[0, 50], [600, 50], [1800, 88], [2400, 88], [3800, 12], [4400, 12], [5400, 50]];
+      const step = (now) => {
+        if (touched) return;
+        const t = now - t0; let v = 50;
+        for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) { const [ta, va] = keys[i - 1], [tb, vb] = keys[i], k = (t - ta) / (tb - ta), e = k < .5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2; v = va + (vb - va) * e; break; }
+        set(v.toFixed(2)); cut.value = v;
+        if (t < keys[keys.length - 1][0]) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }, { threshold: .5 });
+    sweep.observe(cmp);
+  }
+})();
+</script>
+
+</body>
+</html>
