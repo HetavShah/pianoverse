@@ -344,6 +344,8 @@ export class Renderer {
   }
 
   get size() { return { width: this.rtW, height: this.rtH }; }
+  /** render-target pixels per frame pixel (preview quality) */
+  get scaleFactor() { return this.scale; }
 
   // ---------- camera ----------
   // Without a camera the frame is the whole video. With one, the frame has its own size (the output's shape)

@@ -5,7 +5,7 @@ import type { WS } from '../workspace';
 import { inTauri } from '../media';
 import {
   detectEncoders, Encoders, encoderLabel, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
-  SIZES, tauriSink, testSink, videoFrame,
+  sizesFor, cameraOn, cameraFrameAt, tauriSink, testSink, videoFrame,
 } from '../exportRun';
 
 const DEFAULTS: ExportSettings = { size: 'shorts', fit: 'crop', fps: 0, codec: 'h264', quality: 'high', audioCopy: true, transparent: false, out: '' };
@@ -44,15 +44,19 @@ export default function ExportStep({ ws }: { ws: WS }) {
     (async () => {
       r.setProject(project);
       await r.texturesReady?.();
-      const old = r.size.width / project.video.width;
-      r.setScale(Math.min(1, 480 / project.video.height));
+      const old = r.scaleFactor;
+      const oldOut = r.output;
+      const cam = cameraOn(project);
+      const o = outSize(s, project);
+      if (cam) { r.setOutput([o.w, o.h]); r.setScale(Math.min(1, 480 / o.h)); const c = cameraFrameAt(project, ws.time, ws.duration || project.video.frames / (project.video.fps || 30)); r.setView(c.view, c.fade); }
+      else r.setScale(Math.min(1, 480 / project.video.height));
       try {
         const img = await r.capture(videoFrame(v), ws.time);
         if (stop) return;
         const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
         c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data.buffer, img.data.byteOffset, img.data.byteLength), img.width, img.height), 0, 0);
         setThumb(c.toDataURL('image/jpeg', 0.85));
-      } finally { r.setScale(old); }
+      } finally { if (cam) { r.setView(null); r.setOutput(oldOut); } r.setScale(old); }
     })().catch(() => {});
     return () => { stop = true; };
   }, [ws.renderer, project?.id, ws.time]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,7 +68,9 @@ export default function ExportStep({ ws }: { ws: WS }) {
   const est = estimate(s, project, part ? part[1] - part[0] : duration);
   const { w: outW, h: outH } = outSize(s, project);
   const srcAspect = project.video.width / project.video.height;
-  const aspectDiffers = Math.abs(outW / outH - srcAspect) > 0.02;
+  const sizeList = sizesFor(project);
+  const sizeId = sizeList.find((z) => z.id === s.size)?.id ?? sizeList[0].id;
+  const aspectDiffers = !cameraOn(project) && Math.abs(outW / outH - srcAspect) > 0.02;
   const encoder = enc ? (s.codec === 'hevc' ? enc.hevc[0] : enc.h264[0]) : null;
   const gpu = ws.renderer?.adapterName ?? '';
   const hw = !!encoder && !encoder.startsWith('lib');
@@ -133,8 +139,8 @@ export default function ExportStep({ ws }: { ws: WS }) {
         <div className="ex-field">
           <span className="ex-label">Size</span>
           <div className="ex-sizes">
-            {SIZES.map((z) => (
-              <button key={z.id} type="button" className={'ex-size' + (s.size === z.id ? ' on' : '')} onClick={() => set({ size: z.id })} disabled={running}>
+            {sizeList.map((z) => (
+              <button key={z.id} type="button" className={'ex-size' + (sizeId === z.id ? ' on' : '')} onClick={() => set({ size: z.id })} disabled={running}>
                 <span className="radio" />
                 <b>{z.label}</b>
                 <span className="mono dim">{z.w}×{z.h}</span>

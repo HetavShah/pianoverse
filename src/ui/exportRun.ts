@@ -2,15 +2,41 @@
 // In the desktop app the encoder is FFmpeg (NVENC / AMF / Quick Sync / x264, see src-tauri/src/export.rs).
 import type { Renderer } from '../engine/renderer';
 import type { CalibratedProject } from '../engine/calibration';
+import { aspectInfo, cameraAt, CameraFrame, followPath, FollowPath } from '../engine/camera';
 import { inTauri } from './media';
 
-export type SizeId = 'source' | 'shorts' | 'landscape' | 'square' | 'k4';
+export type SizeId = 'source' | 'shorts' | 'landscape' | 'square' | 'k4' | 'k4l';
 export const SIZES: { id: SizeId; label: string; w: number; h: number }[] = [
   { id: 'shorts', label: 'Shorts 9:16', w: 1080, h: 1920 },
   { id: 'landscape', label: 'Landscape', w: 1920, h: 1080 },
   { id: 'square', label: 'Square', w: 1080, h: 1080 },
   { id: 'k4', label: '4K vertical', w: 2160, h: 3840 },
+  { id: 'k4l', label: '4K landscape', w: 3840, h: 2160 },
 ];
+
+// ---------- the camera (Camera step) ----------
+export const cameraOn = (p: CalibratedProject) => !!p.cameraTrack?.on;
+/** the sizes on offer: with the camera on, only those in the camera's frame shape */
+export function sizesFor(p: CalibratedProject) {
+  if (!cameraOn(p)) return SIZES.filter((z) => z.id !== 'k4l');
+  const r = aspectInfo(p.cameraTrack!.aspect).ratio;
+  return SIZES.filter((z) => Math.abs(z.w / z.h - r) < 0.01);
+}
+const paths = new WeakMap<object, { key: string; path: FollowPath }>();
+/** where your hands are over time (worked out once per set of notes and calibration) */
+export function cameraPath(p: CalibratedProject): FollowPath {
+  const mv = p.cameraTrack?.auto.movement ?? 'normal';
+  const key = `${mv}|${p.tracking.frames.length}|${p.keyboard.edge.a}|${p.keyboard.lowestNote}|${p.video.fps}`;
+  const hit = paths.get(p.notes);
+  if (hit && hit.key === key && (hit as unknown as { tr: unknown }).tr === p.tracking) return hit.path;
+  const path = followPath(p, mv);
+  paths.set(p.notes, Object.assign({ key, path }, { tr: p.tracking }));
+  return path;
+}
+/** the camera at time t */
+export function cameraFrameAt(p: CalibratedProject, t: number, duration: number): CameraFrame {
+  return cameraAt(p, p.cameraTrack!, cameraPath(p), t, duration);
+}
 
 export interface ExportSettings {
   size: SizeId;
@@ -66,6 +92,11 @@ export const encoderLabel = (enc: string, gpu: string) => {
 
 /** output size for a choice (the video's own size for 'source') */
 export function outSize(s: ExportSettings, p: CalibratedProject) {
+  if (cameraOn(p)) {
+    const list = sizesFor(p);
+    const z = list.find((x) => x.id === s.size) ?? list[0];
+    return { w: z.w, h: z.h };
+  }
   if (s.size === 'source') return { w: p.video.width - (p.video.width % 2), h: p.video.height - (p.video.height % 2) };
   const z = SIZES.find((x) => x.id === s.size)!;
   return { w: z.w, h: z.h };
@@ -121,14 +152,17 @@ export async function runExport(args: {
   const to = args.range ? Math.min(args.duration, args.range[1]) : args.duration;
   const { frames, fps } = estimate(s, p, to - from);
   const srcFps = p.video.fps || 30;
-  const oldScale = r.size.width / p.video.width;
+  const oldScale = r.scaleFactor;
+  const oldOutput = r.output;
+  const cam = cameraOn(p);
   const wasPaused = v.paused;
   v.pause();
   const saved: string[] = [];
   const passes: ('video' | 'effects')[] = s.transparent ? ['video', 'effects'] : ['video'];
   try {
     for (const phase of passes) {
-      r.setScale(renderScale(s, p));
+      // with the camera the frame is drawn at the output size, through the camera's window
+      if (cam) { r.setOutput([outW, outH]); r.setScale(1); } else r.setScale(renderScale(s, p));
       r.alphaOut = phase === 'effects';
       await r.texturesReady?.();
       const { width, height } = r.size;
@@ -148,6 +182,7 @@ export async function runExport(args: {
         // the video frame on screen at time t (frames repeat when exporting at a higher frame rate)
         const si = Math.min(Math.floor(t * srcFps + 1e-6), Math.max(0, Math.floor(args.duration * srcFps) - 1));
         if (si !== lastSrc) { await seekTo(v, (si + 0.5) / srcFps); lastSrc = si; }
+        if (cam) { const c = cameraFrameAt(p, t, args.duration); r.setView(c.view, c.fade); }
         const img = await r.capture(videoFrame(v), t);
         if (pending) await pending;
         pending = sink.frame(img.data);
@@ -163,6 +198,7 @@ export async function runExport(args: {
     }
   } finally {
     r.alphaOut = false;
+    if (cam) { r.setView(null); r.setOutput(oldOutput); }
     r.setScale(oldScale);
     if (!wasPaused) v.play().catch(() => {});
   }
@@ -182,11 +218,13 @@ function thumb(img: { width: number; height: number; data: Uint8Array }): string
 }
 
 /** the current frame as a PNG at the export size */
-export async function framePng(r: Renderer, v: HTMLVideoElement, p: CalibratedProject, s: ExportSettings, t: number): Promise<Blob> {
-  const oldScale = r.size.width / p.video.width;
+export async function framePng(r: Renderer, v: HTMLVideoElement, p: CalibratedProject, s: ExportSettings, t: number, duration = p.video.frames / (p.video.fps || 30)): Promise<Blob> {
+  const oldScale = r.scaleFactor;
+  const oldOutput = r.output;
+  const cam = cameraOn(p);
   const { w, h } = outSize(s, p);
   try {
-    r.setScale(renderScale(s, p));
+    if (cam) { r.setOutput([w, h]); r.setScale(1); const c = cameraFrameAt(p, t, duration); r.setView(c.view, c.fade); } else r.setScale(renderScale(s, p));
     const img = await r.capture(videoFrame(v), t);
     const src = document.createElement('canvas');
     src.width = img.width; src.height = img.height;
@@ -201,6 +239,7 @@ export async function framePng(r: Renderer, v: HTMLVideoElement, p: CalibratedPr
     g.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh);
     return await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('Could not make the PNG'))), 'image/png'));
   } finally {
+    if (cam) { r.setView(null); r.setOutput(oldOutput); }
     r.setScale(oldScale);
   }
 }
