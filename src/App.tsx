@@ -17,6 +17,9 @@ import NotesStep from './ui/steps/NotesStep';
 import CalibrateStep from './ui/steps/CalibrateStep';
 import StyleStep from './ui/steps/StyleStep';
 import ExportStep from './ui/steps/ExportStep';
+import CameraStep from './ui/steps/CameraStep';
+import { cameraFrameAt } from './ui/exportRun';
+import { aspectInfo } from './engine/camera';
 import { RecordOpts, useHistory } from './ui/history';
 import { toast, toastError, Toasts } from './ui/toast';
 import Shortcuts from './ui/Shortcuts';
@@ -104,13 +107,21 @@ export default function App() {
     return { ...project, notes: testNotes(project.keyboard.lowestNote, project.keyboard.keys, duration || project.video.frames / project.video.fps) };
   }, [project, sweep, noNotes, duration]);
 
-  const previewing = route === 'project' && step === 'style';
+  const camStep = route === 'project' && step === 'camera';
+  const previewing = route === 'project' && (step === 'style' || camStep);
+  // on the Camera step the preview looks through the camera; everywhere else it shows the whole video
+  const camOn = camStep && !!project?.cameraTrack?.on;
+  const camRef = useRef<{ p: CalibratedProject; dur: number } | null>(null);
+  camRef.current = camOn && project ? { p: project, dur: duration || project.video.frames / (project.video.fps || 30) } : null;
   const draw = useCallback((t?: number) => {
     const r = rendererRef.current;
     const v = videoRef.current;
     if (!r || !v || v.readyState < 2 || !v.videoWidth) return;
     if ((window as unknown as { __pvHeadless?: boolean }).__pvHeadless) return; // automated tests capture offscreen
-    r.render(v, t ?? v.currentTime);
+    const tt = t ?? v.currentTime;
+    const cam = camRef.current;
+    if (cam) { const f = cameraFrameAt(cam.p, tt, cam.dur); r.setView(f.view, f.fade); } else r.setView(null);
+    r.render(v, tt);
     const now = performance.now();
     const ft = frameTimes.current;
     ft.push(now);
@@ -131,6 +142,14 @@ export default function App() {
   // a note texture finished loading: show it even while paused
   useEffect(() => { const r = rendererRef.current; if (r) r.onTexture = () => { if (previewing) draw(); }; }, [gpuName, draw, previewing]);
   useEffect(() => { rendererRef.current?.setScale(scale); if (previewing) draw(); }, [scale, gpuName, draw, previewing]);
+  const camAspect = project?.cameraTrack?.aspect;
+  useEffect(() => {
+    const r = rendererRef.current;
+    if (!r) return;
+    r.setOutput(camOn && camAspect ? aspectInfo(camAspect).size : null);
+    if (!camOn) r.setView(null);
+    if (previewing) draw();
+  }, [camOn, camAspect, gpuName, draw, previewing]);
   useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (previewing) draw(); } }, [layers, draw, previewing]);
   const attachPreview = useCallback((c: HTMLCanvasElement | null) => {
     const r = rendererRef.current;
@@ -243,7 +262,7 @@ export default function App() {
         if (v && v.videoWidth && !videoIssue) {
           // on the Style screen the thumbnail shows the effects, like the design's project cards
           const r = rendererRef.current;
-          if (stepRef.current === 'style' && r && !(window as unknown as { __pvHeadless?: boolean }).__pvHeadless) {
+          if ((stepRef.current === 'style' || stepRef.current === 'camera') && r && !(window as unknown as { __pvHeadless?: boolean }).__pvHeadless) {
             try {
               const img = await r.capture(v, v.currentTime);
               const c = document.createElement('canvas');
@@ -466,6 +485,9 @@ export default function App() {
         {route === 'project' && step === 'import' && <ImportStep ws={ws} />}
         {route === 'project' && step === 'notes' && ready && <NotesStep ws={ws} />}
         {route === 'project' && step === 'calibrate' && ready && <CalibrateStep ws={ws} />}
+        {route === 'project' && step === 'camera' && ready && (gpuError
+          ? <div className="notice">This window can't use the graphics card: {gpuError}</div>
+          : <CameraStep ws={ws} attachPreview={attachPreview} />)}
         {route === 'project' && step === 'style' && ready && (gpuError
           ? <div className="notice">This window can't use the graphics card: {gpuError}</div>
           : <StyleStep ws={ws} attachPreview={attachPreview} fps={fps} stats={showStats ? `${fps} fps · ${stats}` : ''} />)}

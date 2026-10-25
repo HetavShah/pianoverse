@@ -135,7 +135,7 @@ function shotFraming(proj: ProjectFile, path: FollowPath, shot: Shot, t: number,
   const anchor = ANCHOR[aspect];
   const zMax = maxZoom(W, H, aspect);
   if (shot.kind === 'close') {
-    return { cx: shot.cx ?? path.cx[f], cy: shot.cy ?? path.cy[f], z: clamp(shot.zoom, 1, zMax), anchor: 0.58 };
+    return { cx: shot.cx ?? path.cx[f], cy: shot.cy ?? path.cy[f], z: clamp(shot.zoom, 1, zMax), anchor: Math.max(0.58, anchor - 0.04) };
   }
   if (shot.kind === 'wide') {
     // the whole width; in a frame shorter than the video it keeps your hands' height (slowly)

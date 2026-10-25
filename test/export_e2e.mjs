@@ -1,11 +1,13 @@
 // Export end to end: drive the Export screen in the browser and pipe its frames into a real FFmpeg, using the
 // exact arguments the desktop app builds (printed by the Rust unit test in src-tauri/src/export.rs).
-// usage: node test/export_e2e.mjs <outDir>   env: SIZE (shorts|landscape|square|k4), FIT, CODEC, TRANSPARENT=1, FPS
+// usage: node test/export_e2e.mjs <outDir>   env: SIZE (shorts|landscape|square|k4), FIT, CODEC, TRANSPARENT=1, FPS, PROJ, CLIP, RANGE=a,b
 import { chromium } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, renameSync } from 'node:fs';
 const OUT = process.argv[2] ?? 'test/out/export'; mkdirSync(OUT, { recursive: true });
 const CLIP = process.env.CLIP ?? '/home/claude/sample15a.webm';
+const PROJ = process.env.PROJ ?? 'samples/interstellar-take1.pvproj.json';
+const RANGE = (process.env.RANGE ?? '2,4').split(',').map(Number);
 
 function argsFor(o) {
   const env = { ...process.env, W: String(o.outWidth), H: String(o.outHeight), FIT: o.fit, CODEC: o.codec, ENC: o.encoder, PART: o.part, ...(o.audio ? { AUDIO: o.audio } : {}) };
@@ -48,10 +50,10 @@ await page.exposeFunction('pvSinkFinish', () => new Promise((res, rej) => {
 await page.exposeFunction('pvSinkCancel', () => { ff?.kill(); });
 
 await page.goto('http://localhost:4173/'); await page.waitForTimeout(800);
-await page.setInputFiles('.row-actions input[type=file]', 'samples/interstellar-take1.pvproj.json'); await page.waitForTimeout(600);
+await page.setInputFiles('.row-actions input[type=file]', PROJ); await page.waitForTimeout(600);
 await page.setInputFiles('.file-card .actions input[type=file]', CLIP); await page.waitForTimeout(1500);
 // pick 0:02 - 0:04 (as if dragged on the Style timeline)
-await page.evaluate(() => window.pianoverseSetLoop({ on: false, range: [2, 4] }));
+await page.evaluate((r) => window.pianoverseSetLoop({ on: false, range: r }), RANGE);
 await page.click('.stepper >> text=Export'); await page.waitForTimeout(1500);
 await page.evaluate(() => {
   const b64 = (u8) => { let s = ''; const C = 0x8000; for (let i = 0; i < u8.length; i += C) s += String.fromCharCode.apply(null, u8.subarray(i, i + C)); return btoa(s); };

@@ -6,12 +6,13 @@ import type { ConvertProgress, PickedVideo, PickKind } from './media';
 import type { useCalibration } from './useCalibration';
 import type { useNotes } from './useNotes';
 
-export type Step = 'import' | 'notes' | 'calibrate' | 'style' | 'export';
+export type Step = 'import' | 'notes' | 'calibrate' | 'style' | 'camera' | 'export';
 export const STEPS: { id: Step; label: string }[] = [
   { id: 'import', label: 'Import' },
   { id: 'notes', label: 'Notes and sync' },
   { id: 'calibrate', label: 'Calibrate' },
   { id: 'style', label: 'Style' },
+  { id: 'camera', label: 'Camera' },
   { id: 'export', label: 'Export' },
 ];
 
