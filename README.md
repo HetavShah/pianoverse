@@ -158,6 +158,7 @@ A few ideas that make it work:
 - [x] **Milestone 4 — Style panels and presets.** Eight layers with live controls, note styles and textures, colour modes and palettes, five saber styles, particle motions and shape sections, presets.
 - [x] **Milestone 5 — Export.** Full-quality render with NVENC / AMF / Quick Sync encoding, four sizes, H.264 and H.265, original audio, transparent ProRes effects, selected part only, PNG frames.
 - [ ] **Milestone 6 — Polish.** Signed installer, auto-update, autosave, undo and redo, and keyboard shortcuts (press <kbd>?</kbd> in the app) are in; speed tuning is next.
+- [x] **Milestone 7 — Camera.** A virtual camera over your video: Wide, Follow your hands and Close-up shots, Cut, Glide, Punch, Dip to black and Dip to white transitions on the beat, Auto camera, and vertical, landscape or square frames. Effects stay sharp when zoomed.
 
 **Later:** notes that pass behind your hands · picture shapes and a drawing canvas for particle paths · live mode for streaming · driving a real LED strip on the keyboard · automatic Shorts cuts.
 

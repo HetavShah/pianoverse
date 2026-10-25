@@ -253,7 +253,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
       </aside>
 
       <footer className="page-foot">
-        <button type="button" className="btn" onClick={() => ws.goStep('style')} disabled={running}>Back to style</button>
+        <button type="button" className="btn" onClick={() => ws.goStep('camera')} disabled={running}>Back to camera</button>
         <button type="button" className="btn" onClick={ws.goHome} disabled={running}>Done</button>
       </footer>
     </div>

@@ -415,8 +415,11 @@ export default function App() {
   const goHome = () => { pause(); setRoute('home'); setHomeKey((k) => k + 1); };
   const newProjectFlow = () => { lastThumb.current = undefined; pause(); setProjectState(null); setVideo(null); setVideoIssue(null); setDuration(0); setTime(0); setRoute('project'); setStep('import'); };
 
+  // test hook: the camera's window at a moment (null when the Camera step isn't showing it)
+  (window as unknown as { pianoverseCamera: unknown }).pianoverseCamera = (t: number) => { const c = camRef.current; return c ? cameraFrameAt(c.p, t, c.dur) : null; };
   // test hook: lets automated checks pick a part of the timeline
   (window as unknown as { pianoverseSetLoop: unknown }).pianoverseSetLoop = setLoop;
+  (window as unknown as { pianoverseSeek: unknown }).pianoverseSeek = seek;
   const ws: WS = {
     project, setProject, video, videoEl: videoRef, videoIssue, convert,
     time, duration, playing, togglePlay, seek, frameTick,
@@ -428,7 +431,7 @@ export default function App() {
   readyRef.current = ready;
   goStepRef.current = goStep;
   const doneStep = (s: Step) =>
-    s === 'import' ? ready : s === 'notes' ? !!project?.notes.length : s === 'calibrate' ? !!project?.progress?.calibrated : false;
+    s === 'import' ? ready : s === 'notes' ? !!project?.notes.length : s === 'calibrate' ? !!project?.progress?.calibrated : s === 'camera' ? !!project?.cameraTrack : false;
   const saveText = saved.state === 'saving' ? 'Saving…' : saved.state === 'error' ? 'Not saved' : saved.state === 'saved' ? `Saved ${ago(saved.at)}` : '';
 
   return (
