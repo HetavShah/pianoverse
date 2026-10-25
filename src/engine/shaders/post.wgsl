@@ -81,7 +81,7 @@ fn background(uv0: vec2f) -> vec3f {
   var bg = vec3f(0.0);
   if (BGU.colorOn > 0.5) { bg = vec3f(BGU.colR, BGU.colG, BGU.colB); }
   if (BGU.imgOn > 0.5) {
-    let ar = F.srcSize.x / F.srcSize.y;
+    let ar = F.rtSize.x / F.rtSize.y;   // the frame's shape
     var q = uv0 - vec2f(0.5) - vec2f(BGU.iX, BGU.iY);
     q.x *= ar;
     let cs = cos(-BGU.iRot);
@@ -107,7 +107,7 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   var inside = 1.0;
   if (BGU.xform > 0.5) {
     // the video (with its notes and effects) can be moved, scaled, turned and cropped
-    let ar = F.srcSize.x / F.srcSize.y;
+    let ar = F.rtSize.x / F.rtSize.y;   // the frame's shape
     var q = i.uv - vec2f(0.5) - vec2f(BGU.fX, BGU.fY);
     q.x *= ar;
     let cs = cos(-BGU.fRot);
@@ -117,9 +117,10 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
     uv = q + vec2f(0.5);
     inside = step(BGU.cropL, uv.x) * step(uv.x, 1.0 - BGU.cropR) * step(BGU.cropT, uv.y) * step(uv.y, 1.0 - BGU.cropB);
   }
-  let srcPx = uv * F.srcSize;
+  // the camera's window onto the video (the light layer is already drawn through it)
+  let srcPx = F.view.xy + uv * F.view.zw;
   // footage: darker, contrasty, vignetted
-  var src = textureSampleLevel(srcTex, samp, uv, 0.0).rgb;
+  var src = textureSampleLevel(srcTex, samp, srcPx / F.srcSize, 0.0).rgb;
   if (BGU.on > 0.5) {
     src = src + BGU.fBright;
     if (BGU.fHue != 0.0) { src = hueRot(src, BGU.fHue); }
@@ -130,7 +131,7 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   var base = pow(x, vec3f(1.0 + 0.45 * F.darken)) * (1.0 - 0.08 * F.darken);
   let luma = dot(base, vec3f(0.2126, 0.7152, 0.0722));
   base = max(mix(vec3f(luma), base, F.saturation), vec3f(0.0));
-  let vig = 1.0 - 0.5 * F.vignette * (sq((srcPx.x - 0.56 * F.srcSize.x) / (0.8 * F.srcSize.x)) + sq((srcPx.y - 0.5 * F.srcSize.y) / (0.62 * F.srcSize.y)));
+  let vig = 1.0 - 0.5 * F.vignette * (sq((uv.x - 0.56) / 0.8) + sq((uv.y - 0.5) / 0.62));   // follows the frame, not the video
   base *= clamp(vig, max(1.0 - 0.82 * F.vignette, 0.0), 1.0);
 
   var L = textureSampleLevel(lightTex, samp, uv, 0.0);
@@ -164,12 +165,14 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   if (BGU.alphaOut > 0.5) {
     // effects only, on a transparent background: over the original video this gives light + video * (1 - alpha)
     let a = clamp(max(max(max(Lc.r, Lc.g), Lc.b), clamp(L.a, 0.0, 0.8)), 0.0, 1.0);
-    return vec4f(select(vec3f(0.0), clamp(Lc / max(a, 1e-4), vec3f(0.0), vec3f(1.0)), a > 1e-4), a);
+    return vec4f(select(vec3f(0.0), clamp(Lc / max(a, 1e-4), vec3f(0.0), vec3f(1.0)), a > 1e-4), a * (1.0 - F.fade));
   }
   var out = base + Lc * (vec3f(1.0) - base * 0.55);
 
   let l = clamp(dot(out, vec3f(0.333)), 0.0, 1.0);
   let gn = hashU(vec2u(i.pos.xy), u32(F.grain)) - 0.5;
   out += vec3f(gn * 2.0 * 9.0 / 255.0 * l * (1.0 - l) * F.grainAmt);
+  // dip to black or white between shots
+  out = mix(out, vec3f(F.fadeWhite), F.fade);
   return vec4f(clamp(out, vec3f(0.0), vec3f(1.0)), 1.0);
 }

@@ -129,7 +129,7 @@ fn texAt(i: VOut, p: vec2f, n: vec3f, w: f32) -> TexOut {
   var uv0 = p / tile + vec2f(i.seed * 7.13, i.seed * 3.71);
   if (TP.reflect > 0.5) {
     // stays put on screen; on 3D notes the surface tilt bends it like a reflection
-    uv0 = (i.pos.xy / F.scale) / tile + n.xy * 0.35 * NP.reflectivity * NP.dim;
+    uv0 = (F.view.xy + i.pos.xy / F.scale) / tile + n.xy * 0.35 * NP.reflectivity * NP.dim;
   }
   var uv = uv0 + vec2f(0.006, -0.02) * F.time * live;
   if (NP.tMirror > 0.5) { uv = 1.0 - abs(1.0 - 2.0 * fract(uv * 0.5)); }   // mirrored tiles join without seams

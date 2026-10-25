@@ -76,6 +76,9 @@ const FLAT_KEYS = { major: [5, 10, 3, 8, 1, 6], minor: [2, 7, 0, 5, 10, 3] };
 const originalNotes = (lk: Look) => lk.noteDim === '3d' && lk.note3d === 'glass' && !lk.texOn && lk.noteEdge === 1 && lk.noteOpacity === 1
   && lk.lightDir === DEFAULT_LOOK.lightDir && lk.lightPower === 1 && lk.lightShine === 1 && lk.noteDistort === 0;
 
+/** a window onto the video, in video pixels */
+export interface View { x: number; y: number; w: number; h: number }
+
 export class Renderer {
   layers: Layers = { ...DEFAULT_LAYERS };
   stats: FrameStats = { notes: 0, emitters: 0, particles: 0, cpuMs: 0 };
@@ -302,7 +305,7 @@ export class Renderer {
     this.notes = prepareNotes(proj.notes, proj.keyboard.lowestNote, proj.keyboard.keys, this.look);
     this.up = fallUp(proj);
     this.buildEmitters();
-    if (Math.round(this.srcW * this.scale) !== this.rtW || Math.round(this.srcH * this.scale) !== this.rtH) this.resize();
+    if (Math.round(this.frameW * this.scale) !== this.rtW || Math.round(this.frameH * this.scale) !== this.rtH) this.resize();
     else this.writePost();
   }
 
@@ -318,19 +321,21 @@ export class Renderer {
     canvas.height = this.rtH;
   }
 
-  private writePost() {
+  /** blur sizes follow the camera's zoom (pixels of the frame per video pixel) */
+  private writePost(pxScale = this.postScale > 0 ? this.postScale : this.rtW / this.frameView().w) {
     if (!this.b1a) return;
+    this.postScale = pxScale;
     const w1 = this.b1a.width, h1 = this.b1a.height, w2 = this.b2a.width, h2 = this.b2a.height;
     const q = this.device.queue;
     const post = (i: number, v: number[]) => q.writeBuffer(this.postUni[i], 0, new Float32Array(v));
     // texel(2) dir(2) sigma factor clampIn nLights
     post(0, [1 / this.rtW, 1 / this.rtH, 0, 0, 1, 2, 1, 0]);                  // light -> b1
     const bw = this.look.bloomWide;
-    post(1, [1 / w1, 1 / h1, 1, 0, 5 * this.scale * bw, 1, 0, 0]);            // b1 blur H
-    post(2, [1 / w1, 1 / h1, 0, 1, 5 * this.scale * bw, 1, 0, 0]);            // b1 blur V
+    post(1, [1 / w1, 1 / h1, 1, 0, 5 * pxScale * bw, 1, 0, 0]);            // b1 blur H
+    post(2, [1 / w1, 1 / h1, 0, 1, 5 * pxScale * bw, 1, 0, 0]);            // b1 blur V
     post(3, [1 / w1, 1 / h1, 0, 0, 1, 3, 0, 0]);                              // b1 -> b2
-    post(4, [1 / w2, 1 / h2, 1, 0, 7 * this.scale * bw, 1, 0, 0]);            // b2 blur H
-    post(5, [1 / w2, 1 / h2, 0, 1, 7 * this.scale * bw, 1, 0, 0]);            // b2 blur V
+    post(4, [1 / w2, 1 / h2, 1, 0, 7 * pxScale * bw, 1, 0, 0]);            // b2 blur H
+    post(5, [1 / w2, 1 / h2, 0, 1, 7 * pxScale * bw, 1, 0, 0]);            // b2 blur V
   }
 
   setScale(scale: number) {
@@ -339,11 +344,44 @@ export class Renderer {
   }
 
   get size() { return { width: this.rtW, height: this.rtH }; }
+
+  // ---------- camera ----------
+  // Without a camera the frame is the whole video. With one, the frame has its own size (the output's shape)
+  // and shows a window of the video; the effects are drawn through the window, so they stay sharp when zoomed.
+  private outSize: [number, number] | null = null;
+  private view: View | null = null;
+  private fade: [number, number] = [0, 0];
+  private postScale = -1;
+
+  /** The frame's size in output pixels (the preview draws it at `scale` of that), or null for the video's own size. */
+  setOutput(size: [number, number] | null) {
+    const same = (this.outSize?.[0] ?? -1) === (size?.[0] ?? -1) && (this.outSize?.[1] ?? -1) === (size?.[1] ?? -1);
+    this.outSize = size ? [Math.max(2, Math.round(size[0])), Math.max(2, Math.round(size[1]))] : null;
+    if (!same) this.resize();
+  }
+  get output() { return this.outSize; }
+
+  /** The part of the video to show (video pixels), and an optional dip to black or white: [amount 0..1, white 0/1]. */
+  setView(view: View | null, fade?: [number, number] | null) {
+    this.view = view;
+    this.fade = fade ?? [0, 0];
+  }
+
+  /** the window used this frame: the camera's, or the whole video (covering the frame if its shape differs) */
+  private frameView(): View {
+    if (this.view) return this.view;
+    if (!this.outSize) return { x: 0, y: 0, w: this.srcW, h: this.srcH };
+    const a = this.outSize[0] / this.outSize[1];
+    const w = Math.min(this.srcW, this.srcH * a), h = w / a;
+    return { x: (this.srcW - w) / 2, y: (this.srcH - h) / 2, w, h };
+  }
+  private get frameW() { return this.outSize ? this.outSize[0] : this.srcW; }
+  private get frameH() { return this.outSize ? this.outSize[1] : this.srcH; }
   get noteCount() { return this.notes.length; }
 
   private resize() {
-    this.rtW = Math.max(2, Math.round(this.srcW * this.scale));
-    this.rtH = Math.max(2, Math.round(this.srcH * this.scale));
+    this.rtW = Math.max(2, Math.round(this.frameW * this.scale));
+    this.rtH = Math.max(2, Math.round(this.frameH * this.scale));
     this.canvas.width = this.rtW;
     this.canvas.height = this.rtH;
     const tex = (w: number, h: number) => this.device.createTexture({
@@ -356,6 +394,7 @@ export class Renderer {
     const w2 = Math.ceil(w1 / 3), h2 = Math.ceil(h1 / 3);
     this.b1a = tex(w1, h1); this.b1b = tex(w1, h1);
     this.b2a = tex(w2, h2); this.b2b = tex(w2, h2);
+    this.postScale = -1;
     this.writePost();
     this.groups = {};
   }
@@ -596,15 +635,19 @@ export class Renderer {
 
     // frame uniforms
     const sb = saberBase(lk);
+    const vw = this.frameView();
+    const pxScale = this.rtW / vw.w;
+    if (Math.abs(pxScale - this.postScale) > 1e-6) this.writePost(pxScale);
     q.writeBuffer(this.frameBuf, 0, new Float32Array([
-      this.srcW, this.srcH, this.rtW, this.rtH, this.scale, t, bass, Math.floor(t * 24),
+      this.srcW, this.srcH, this.rtW, this.rtH, pxScale, t, bass, Math.floor(t * 24),
       lk.noteBright, lk.noteGlow, lk.noteFill, lk.noteRim, lk.noteRound,
       originalNotes(lk) ? 0 : 1, 0, lk.noteDepth,
       lk.saberBright, lk.saberThick, lk.saberFlicker, lk.saberReact, lk.saberTint, lk.noteOpacity, 0, 0,
       sb[0], sb[1], sb[2], 0,
       lk.partSize, lk.partHaze, 0, 0,
       lk.bloom, lk.fringe, lk.grain, lk.bgDarken, lk.bgContrast, lk.bgSaturation, lk.bgVignette, lk.relight,
-      lk.bassPulse, 0, 0, 0,
+      lk.bassPulse, this.fade[0], this.fade[1], 0,
+      vw.x, vw.y, vw.w, vw.h,
     ]));
     if (glass.length) q.writeBuffer(this.glassBuf, 0, new Float32Array(glass));
     if (labels.length) q.writeBuffer(this.labelBuf, 0, new Float32Array(labels));

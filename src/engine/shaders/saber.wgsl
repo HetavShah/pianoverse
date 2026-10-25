@@ -42,7 +42,7 @@ fn fbm(p: vec2f) -> f32 {
 
 @fragment
 fn fs(@builtin(position) fp: vec4f) -> @location(0) vec4f {
-  let src = fp.xy / F.scale;
+  let src = F.view.xy + fp.xy / F.scale;
   let s = (src.x - S.A.x) / (S.B.x - S.A.x);
   if (s < 0.0 || s > 1.0) { discard; }
   let fi = s * 63.0;
