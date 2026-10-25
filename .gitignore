@@ -7,3 +7,6 @@ test/out
 test/out*
 test/*.png
 test/debug.mjs
+
+# scratch scripts for demo videos
+test/_*.mjs
