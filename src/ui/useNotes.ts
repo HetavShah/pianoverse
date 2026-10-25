@@ -19,7 +19,7 @@ export const withSource = (p: CalibratedProject, src: NoteSource | undefined): C
 export const sourceOf = (p: CalibratedProject): NoteSource | null =>
   p.noteSource ?? (p.notes.length ? { kind: 'audio', name: 'Notes from the project file', notes: p.notes, offset: 0 } : null);
 
-export function useNotes(opts: { project: CalibratedProject | null; setProject: (p: CalibratedProject) => void; videoUrl: string | null }) {
+export function useNotes(opts: { project: CalibratedProject | null; setProject: (p: CalibratedProject, opts?: { merge?: boolean }) => void; videoUrl: string | null }) {
   const { project, setProject, videoUrl } = opts;
   const [busy, setBusy] = useState<NotesBusy | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
     const r = findOffset(a.envelope, info.notes);
     src = { ...src, offset: r.offset, confidence: r.confidence };
     const p1 = latest.current;
-    if (p1) setProject(withSource(p1, src));
+    if (p1) setProject(withSource(p1, src), { merge: true }); // the sync is part of the import
   }), [run, getAudio, setProject]);
 
   const detect = useCallback((onset = DEFAULT_DETECT.onset) => run(async () => {

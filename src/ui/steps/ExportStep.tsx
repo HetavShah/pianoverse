@@ -24,7 +24,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
   const [msg, setMsg] = useState('');
   const cancel = useRef(false);
   const s: ExportSettings = { ...DEFAULTS, ...(project?.exportSettings ?? {}) } as ExportSettings;
-  const set = (patch: Partial<ExportSettings>) => project && ws.setProject({ ...project, exportSettings: { ...project.exportSettings, ...patch } });
+  const set = (patch: Partial<ExportSettings>, silent = false) => project && ws.setProject({ ...project, exportSettings: { ...project.exportSettings, ...patch } }, { silent });
 
   useEffect(() => { detectEncoders().then(setEnc).catch((e) => setEncErr(String(e?.message ?? e))); }, []);
   // default file name in Videos\Pianoverse
@@ -33,7 +33,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
     (async () => {
       let dir = 'C:\\Users\\You\\Videos\\Pianoverse';
       if (inTauri()) { const { invoke } = await import('@tauri-apps/api/core'); dir = await invoke<string>('export_default_dir'); }
-      set({ out: `${dir}${dir.includes('/') ? '/' : '\\'}${safeName(project.name)}.mp4` });
+      set({ out: `${dir}${dir.includes('/') ? '/' : '\\'}${safeName(project.name)}.mp4` }, true);
     })().catch(() => {});
   }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // a preview of the current frame

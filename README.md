@@ -157,7 +157,7 @@ A few ideas that make it work:
 - [x] **Milestone 3 — Notes and sync.** MIDI import (tempo maps, velocities, sustain pedal), automatic alignment to the video's audio within a few milliseconds, sync strip with nudging, note detection from audio with Spotify's basic-pitch for videos without MIDI.
 - [x] **Milestone 4 — Style panels and presets.** Eight layers with live controls, note styles and textures, colour modes and palettes, five saber styles, particle motions and shape sections, presets.
 - [x] **Milestone 5 — Export.** Full-quality render with NVENC / AMF / Quick Sync encoding, four sizes, H.264 and H.265, original audio, transparent ProRes effects, selected part only, PNG frames.
-- [ ] **Milestone 6 — Polish.** Signed installer, auto-update and autosave are in; undo and redo, speed tuning and keyboard shortcuts are next.
+- [ ] **Milestone 6 — Polish.** Signed installer, auto-update, autosave, undo and redo, and keyboard shortcuts (press <kbd>?</kbd> in the app) are in; speed tuning is next.
 
 **Later:** notes that pass behind your hands · picture shapes and a drawing canvas for particle paths · live mode for streaming · driving a real LED strip on the keyboard · automatic Shorts cuts.
 

@@ -425,3 +425,22 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .ex-error { padding: 12px 14px; border-radius: 10px; border: 1px solid #7a3b2e; font-size: 13px; color: var(--bad); }
 .ex-error pre { white-space: pre-wrap; font-size: 11px; color: var(--dim); max-height: 140px; overflow: auto; margin: 6px 0 0; }
 .ex-side .btn.big { height: 48px; }
+
+/* ---------- undo / redo, messages, shortcuts ---------- */
+.undo-redo { display: flex; gap: 2px; }
+.undo-redo .btn.icon { width: 34px; height: 34px; color: var(--dim); }
+.undo-redo .btn.icon:hover:not(:disabled) { color: var(--text); border-color: var(--border2); }
+.undo-redo .btn:disabled { opacity: 0.3; }
+.menu button kbd { float: right; }
+kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--border2); border-bottom-width: 2px; background: var(--panel); color: var(--text); font: 600 11.5px var(--mono); }
+.toasts { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 60; pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: center; gap: 12px; max-width: min(560px, 90vw); padding: 10px 14px 10px 16px; border-radius: 10px; background: #1a1f26; border: 1px solid var(--border2); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5); font-size: 13.5px; line-height: 1.45; animation: toast-in 0.16s ease-out; }
+.toast.error { border-color: #7a3b2e; background: #1f1513; }
+.toast .x { margin-right: -6px; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
+.modal-back { position: fixed; inset: 0; background: rgba(4, 6, 8, 0.6); display: grid; place-items: center; z-index: 50; animation: toast-in 0.12s ease-out; }
+.modal { width: min(460px, 92vw); max-height: 86vh; overflow: auto; padding: 20px 22px 22px; border-radius: 14px; background: var(--panel2); border: 1px solid var(--border2); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6); display: grid; gap: 16px; }
+.shortcuts section { display: grid; gap: 2px; }
+.sc-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.sc-row:last-child { border-bottom: 0; }
+.sc-keys { display: flex; gap: 4px; }

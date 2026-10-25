@@ -17,6 +17,9 @@ import NotesStep from './ui/steps/NotesStep';
 import CalibrateStep from './ui/steps/CalibrateStep';
 import StyleStep from './ui/steps/StyleStep';
 import ExportStep from './ui/steps/ExportStep';
+import { RecordOpts, useHistory } from './ui/history';
+import { toast, toastError, Toasts } from './ui/toast';
+import Shortcuts from './ui/Shortcuts';
 
 type RVFCVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
@@ -49,6 +52,7 @@ export default function App() {
   const [saved, setSaved] = useState<{ state: 'idle' | 'saving' | 'saved' | 'error'; at: number }>({ state: 'idle', at: 0 });
   const [, setClock] = useState(0);
   const [menu, setMenu] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
   const [loop, setLoop] = useState<{ on: boolean; range: [number, number] | null }>({ on: false, range: null });
   const loopRef = useRef(loop);
   loopRef.current = loop;
@@ -67,7 +71,10 @@ export default function App() {
   stepRef.current = step;
   const videoUrl = video && !videoIssue ? video.url : video?.url ?? null;
 
-  const setProject = useCallback((p: CalibratedProject) => setProjectState(p), []);
+  const history = useHistory(project, setProjectState);
+  const setProject: (p: CalibratedProject, o?: RecordOpts) => void = history.record;
+  const undo = useCallback(() => { const what = history.undo(); toast(what ? `Undone: ${what}` : 'Nothing to undo'); }, [history.undo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const redo = useCallback(() => { const what = history.redo(); toast(what ? `Redone: ${what}` : 'Nothing to redo'); }, [history.redo]); // eslint-disable-line react-hooks/exhaustive-deps
   const calib = useCalibration({ project, setProject, time, videoUrl });
   const notesApi = useNotes({ project, setProject, videoUrl });
   // test hook: lets automated checks read the current project
@@ -184,21 +191,46 @@ export default function App() {
     setTime(v.currentTime);
   }, []);
 
+  const readyRef = useRef(false);
+  const goStepRef = useRef<(s: Step) => void>(() => {});
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || route !== 'project') return;
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      const type = (el as HTMLInputElement | null)?.type;
+      // text fields keep their own keys (including their own undo); sliders and buttons don't
+      const typing = !!el && (el.isContentEditable || tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'color'].includes(type ?? '')));
+      const onSlider = tag === 'INPUT' && type === 'range';
       const v = videoRef.current;
       const st = 1 / (project?.video.fps || 30);
+      if (e.ctrlKey || e.metaKey) {
+        if (typing || e.altKey) return;
+        const k = e.code;
+        if (k === 'KeyZ' && !e.shiftKey) { e.preventDefault(); undo(); }
+        else if (k === 'KeyY' || (k === 'KeyZ' && e.shiftKey)) { e.preventDefault(); redo(); }
+        else if (k === 'KeyS') { e.preventDefault(); toast('Pianoverse saves your project as you go'); }
+        else if (/^Digit[1-5]$/.test(k)) {
+          e.preventDefault();
+          const s = STEPS[Number(k.slice(5)) - 1].id;
+          if (s === 'import' || readyRef.current) goStepRef.current(s);
+        }
+        return;
+      }
+      if (typing || e.altKey) return;
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-      else if (e.code === 'ArrowRight' && v) seek(v.currentTime + (e.shiftKey ? 1 : st));
-      else if (e.code === 'ArrowLeft' && v) seek(v.currentTime - (e.shiftKey ? 1 : st));
+      else if (e.code === 'ArrowRight' && v && !onSlider) { e.preventDefault(); seek(v.currentTime + (e.shiftKey ? 1 : st)); }
+      else if (e.code === 'ArrowLeft' && v && !onSlider) { e.preventDefault(); seek(v.currentTime - (e.shiftKey ? 1 : st)); }
+      else if (e.code === 'Home' && v && !onSlider) { e.preventDefault(); seek(0); }
+      else if (e.code === 'End' && v && !onSlider) { e.preventDefault(); seek(v.duration || 0); }
+      else if (e.code === 'KeyL') { const l = loopRef.current; setLoop({ ...l, on: !l.on }); toast(l.on ? 'Loop off' : l.range ? 'Looping the selected part' : 'Looping the whole video'); }
       else if (e.code === 'KeyP') setShowStats((s) => !s);
+      else if (e.key === '?') setShortcuts((s) => !s);
+      else if (e.code === 'Escape') setShortcuts(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [togglePlay, seek, project?.video.fps, route]);
+  }, [togglePlay, seek, project?.video.fps, route, undo, redo]);
 
   // ---------- autosave ----------
   useEffect(() => {
@@ -275,7 +307,7 @@ export default function App() {
       if (data.format !== 'pianoverse-project') throw new Error('Not a Pianoverse project file.');
       openProject(data);
     } catch (e) {
-      alert(`Could not open project: ${(e as Error).message}`);
+      toast(`Could not open the project: ${(e as Error).message}`, { kind: 'error' });
     }
   };
 
@@ -292,7 +324,7 @@ export default function App() {
       return;
     }
     if (mid) {
-      if (!project || route !== 'project') { alert('Open or start a project with its video first, then add the MIDI file.'); return; }
+      if (!project || route !== 'project') { toast('Open or start a project with its video first, then add the MIDI file.', { kind: 'error' }); return; }
       notesApi.importMidi(mid);
     }
   };
@@ -303,7 +335,7 @@ export default function App() {
     if (files?.length) openFiles(Array.from(files)).then(openItems);
   };
   const pick = (what: PickKind) => {
-    pickNative(what).then(openItems).catch((e) => alert(String(e?.message ?? e)));
+    pickNative(what).then(openItems).catch(toastError);
   };
 
   // native drag and drop in the desktop app (gives file paths, so videos can be converted)
@@ -374,6 +406,8 @@ export default function App() {
   };
 
   const ready = !!project && !!video && !videoIssue;
+  readyRef.current = ready;
+  goStepRef.current = goStep;
   const doneStep = (s: Step) =>
     s === 'import' ? ready : s === 'notes' ? !!project?.notes.length : s === 'calibrate' ? !!project?.progress?.calibrated : false;
   const saveText = saved.state === 'saving' ? 'Saving…' : saved.state === 'error' ? 'Not saved' : saved.state === 'saved' ? `Saved ${ago(saved.at)}` : '';
@@ -399,6 +433,16 @@ export default function App() {
         )}
         <div className="top-right">
           <UpdatePill phase={updater.phase} />
+          {route === 'project' && project && (
+            <div className="undo-redo">
+              <button type="button" className="btn icon ghost" onClick={undo} disabled={!history.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+              </button>
+              <button type="button" className="btn icon ghost" onClick={redo} disabled={!history.canRedo} aria-label="Redo" title="Redo (Ctrl+Y)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m15 14 5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></svg>
+              </button>
+            </div>
+          )}
           {route === 'project' ? <span className="saved dim">{saveText}</span> : <span className="gpu">{gpuError ? 'WebGPU unavailable' : gpuName}</span>}
           <div className="menu-wrap">
             <button type="button" className="btn icon" onClick={() => setMenu(!menu)} aria-label="Settings" title="Settings">
@@ -408,7 +452,8 @@ export default function App() {
               <div className="menu" onMouseLeave={() => setMenu(false)}>
                 <div className="menu-head"><b>Pianoverse {updater.version && `v${updater.version}`}</b><small>{updateStatusText(updater.phase) || (inTauri() ? '' : 'Browser preview')}</small></div>
                 {inTauri() && <button type="button" onClick={() => updater.check()}>Check for updates</button>}
-                {project && <button type="button" onClick={() => { setMenu(false); saveProject(project, project.video.file).catch((e) => alert(String(e?.message ?? e))); }}>Save project file…</button>}
+                <button type="button" onClick={() => { setMenu(false); setShortcuts(true); }}>Keyboard shortcuts <kbd>?</kbd></button>
+                {project && <button type="button" onClick={() => { setMenu(false); saveProject(project, project.video.file).catch(toastError); }}>Save project file…</button>}
                 <div className="menu-foot dim">{gpuError ? `Graphics: ${gpuError}` : `Graphics: ${gpuName || '…'}`}</div>
               </div>
             )}
@@ -417,7 +462,7 @@ export default function App() {
       </header>
 
       <div className="route">
-        {route === 'home' && <Home onNew={newProjectFlow} onOpen={(id) => loadFromStore(id).then(openProject).catch((e) => alert(String(e?.message ?? e)))} onPick={pick} onFiles={onFiles} refreshKey={homeKey} />}
+        {route === 'home' && <Home onNew={newProjectFlow} onOpen={(id) => loadFromStore(id).then(openProject).catch(toastError)} onPick={pick} onFiles={onFiles} refreshKey={homeKey} />}
         {route === 'project' && step === 'import' && <ImportStep ws={ws} />}
         {route === 'project' && step === 'notes' && ready && <NotesStep ws={ws} />}
         {route === 'project' && step === 'calibrate' && ready && <CalibrateStep ws={ws} />}
@@ -442,6 +487,8 @@ export default function App() {
         onEnded={() => setPlaying(false)}
         onError={() => { if (videoUrl) setVideoIssue((cur) => cur ?? { kind: 'unsupported' }); }}
       />
+      {shortcuts && <Shortcuts onClose={() => setShortcuts(false)} />}
+      <Toasts />
     </div>
   );
 }

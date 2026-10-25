@@ -74,7 +74,7 @@ export async function openFiles(files: File[]): Promise<Picked[]> {
 export async function onNativeDrop(cb: (items: Picked[]) => void): Promise<() => void> {
   const { getCurrentWebview } = await import('@tauri-apps/api/webview');
   return getCurrentWebview().onDragDropEvent((ev) => {
-    if (ev.payload.type === 'drop') openPaths(ev.payload.paths).then(cb).catch((e) => alert(String(e?.message ?? e)));
+    if (ev.payload.type === 'drop') openPaths(ev.payload.paths).then(cb).catch((e) => import('./toast').then((t) => t.toastError(e)));
   });
 }
 

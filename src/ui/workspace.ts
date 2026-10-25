@@ -23,7 +23,7 @@ export type VideoIssue =
 
 export interface WS {
   project: CalibratedProject | null;
-  setProject: (p: CalibratedProject) => void;
+  setProject: (p: CalibratedProject, opts?: import('./history').RecordOpts) => void;
   video: PickedVideo | null;
   videoEl: MutableRefObject<HTMLVideoElement | null>;
   videoIssue: VideoIssue | null;
