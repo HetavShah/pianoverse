@@ -6,6 +6,9 @@ import type { Layers } from '../../engine/renderer';
 import { applyPreset, LayerId, Look, LOOK_SCHEMA, matchesPreset, PALETTES, resolveLook, NOTE_TEXTURES, COLOR_BY, NOTE_2D, NOTE_3D, SABER_STYLES, PARTICLE_PRESETS, sameValue } from '../../engine/look';
 import LookControls from '../LookControls';
 import PresetBar from '../PresetBar';
+import LookGallery from '../LookGallery';
+import TitlesPanel from '../TitlesPanel';
+import { resolveTitles } from '../../engine/titles';
 import StyleTimeline from '../StyleTimeline';
 import type { WS } from '../workspace';
 import ShapeSections from '../ShapeSections';
@@ -23,9 +26,11 @@ const PANELS: Panel[] = [
   { id: 'finish', label: 'Glow and film', kind: () => 'Bloom', toggle: 'bloom' },
 ];
 
+type Sel = LayerId | 'looks' | 'titles';
+
 export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; attachPreview: (c: HTMLCanvasElement | null) => void; fps: number; stats: string }) {
   const { project } = ws;
-  const [sel, setSel] = useState<LayerId>('notes');
+  const [sel, setSel] = useState<Sel>('notes');
   const [scene, setScene] = useState<string | null>(null);
   const [original, setOriginal] = useState(false);
   const [guides, setGuides] = useState(false);
@@ -47,8 +52,9 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button'].includes((el as HTMLInputElement).type)))) return;
-      const n = /^Digit([1-8])$/.exec(e.code);
-      if (n) { e.preventDefault(); setSel(PANELS[Number(n[1]) - 1].id); }
+      // 0 Looks, 1–8 the layers, 9 Titles
+      const n = /^Digit([0-9])$/.exec(e.code);
+      if (n) { e.preventDefault(); const k = Number(n[1]); setSel(k === 0 ? 'looks' : k === 9 ? 'titles' : PANELS[k - 1].id); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -56,13 +62,17 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
 
   if (!project) return null;
   const noNotes = project.notes.length === 0;
-  const layer = PANELS.find((l) => l.id === sel)!;
+  const isLayer = sel !== 'looks' && sel !== 'titles';
+  const layer = PANELS.find((l) => l.id === sel) ?? PANELS[1];
   const look = resolveLook(project.look);
   const preset = ws.presets.find((p) => p.id === project.presetId) ?? ws.presets.find((p) => p.id === 'interstellar-teal')!;
   const base = resolveLook(applyPreset(project.look, preset));
   const setLook = (patch: Partial<Look>) => ws.setProject({ ...project, look: { ...project.look, ...patch } });
   const setKey = (k: keyof Look, v: unknown) => setLook({ [k]: v } as Partial<Look>);
-  const layerKeys = LOOK_SCHEMA[sel].flatMap((sec) => sec.controls.map((c) => c.key));
+  const layerKeys = isLayer ? LOOK_SCHEMA[sel as LayerId].flatMap((sec) => sec.controls.map((c) => c.key)) : [];
+  const modified = !matchesPreset(project.look, preset);
+  const titles = resolveTitles(project.titles);
+  const titlesKind = [titles.intro.on && 'Opening', titles.outro.on && 'End card'].filter(Boolean).join(' · ') || 'Off';
   const layerChanged = layerKeys.some((k) => !sameValue(look[k], base[k]));
   const autoAngle = autoNoteAngle(project);
   const setAngle = project.look?.noteAngle;
@@ -76,6 +86,11 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
   return (
     <div className="style-page">
       <nav className="style-layers" aria-label="Layers">
+        <button type="button" className={'layer-row looks-row' + (sel === 'looks' ? ' on' : '')} onClick={() => setSel('looks')}
+          aria-current={sel === 'looks' ? 'true' : undefined} title={`Looks · ${preset.name}${modified ? ' (changed)' : ''} (press 0)`}>
+          <span className="num" aria-hidden="true">00</span>
+          <span className="name">Looks</span>
+        </button>
         {PANELS.map((l, i) => {
           const hidden = !!l.toggle && !ws.layers[l.toggle];
           return (
@@ -86,6 +101,11 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
             </button>
           );
         })}
+        <button type="button" className={'layer-row titles-row' + (sel === 'titles' ? ' on' : '')} onClick={() => setSel('titles')}
+          aria-current={sel === 'titles' ? 'true' : undefined} title={`Titles · ${titlesKind} (press 9)`}>
+          <span className="num" aria-hidden="true">09</span>
+          <span className="name">Titles</span>
+        </button>
       </nav>
 
       <main className="style-center">
@@ -137,6 +157,11 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
       </main>
 
       <aside className="style-side">
+        {sel === 'looks' && <div className="insp-head"><div><h2>Looks</h2><span className="insp-kind">{preset.name}{modified ? ' · changed' : ''}</span></div></div>}
+        {sel === 'looks' && <LookGallery ws={ws} current={preset} modified={modified} />}
+        {sel === 'titles' && <div className="insp-head"><div><h2>Titles</h2><span className="insp-kind">{titlesKind}</span></div></div>}
+        {sel === 'titles' && <TitlesPanel ws={ws} />}
+        {isLayer && <>
         <div className="insp-head"><div><h2>{layer.label}</h2><span className="insp-kind">{layer.kind(look)}</span></div>{layer.toggle && <label className="check-inline">Shown <input type="checkbox" checked={ws.layers[layer.toggle]} onChange={(e) => ws.setLayers({ ...ws.layers, [layer.toggle!]: e.target.checked })} /></label>}</div>
         {sel === 'notes' && (
           <>
@@ -166,7 +191,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
             </div>
           </>
         )}
-        <LookControls layer={sel} look={look} base={base} set={setKey} patch={setLook} />
+        <LookControls layer={sel as LayerId} look={look} base={base} set={setKey} patch={setLook} />
         {/* shape sections come after the particle look, so the first thing on screen is a value to change */}
         {sel === 'particles' && (
           <ShapeSections scenes={scenes} setScenes={setScenes} selected={scene} setSelected={pickScene}
@@ -177,7 +202,8 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
             Reset {layer.label.toLowerCase()} to “{preset.name}”
           </button>
         )}
-        <PresetBar ws={ws} preset={preset} modified={!matchesPreset(project.look, preset)} />
+        </>}
+        {sel !== 'titles' && <PresetBar ws={ws} preset={preset} modified={modified} onOpenLooks={sel === 'looks' ? undefined : () => setSel('looks')} />}
       </aside>
 
       <div className="score">

@@ -16,7 +16,7 @@ const GROUPS: { title: string; keys: [string[], string][] }[] = [
       [['Ctrl', 'Z'], 'Undo'],
       [['Ctrl', 'Y'], 'Redo (also Ctrl+Shift+Z)'],
       [['Ctrl', '1–5'], 'Go to a step'],
-      [['1–8'], 'Pick a layer on Style'],
+      [['0–9'], 'On Style: Looks, the eight layers, Titles'],
     ],
   },
   {

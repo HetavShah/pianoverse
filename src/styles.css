@@ -381,6 +381,31 @@ input[type=color]::-webkit-color-swatch { border: 1px solid var(--rule-2); borde
 .preset-bar { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 16px 0 0; border-top: 1px solid var(--rule); }
 .preset-bar select { height: 34px; font-size: 14px; font-weight: 600; }
 .preset-bar .mod { color: var(--warn); font-size: 12px; }
+.preset-bar .look-open { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 2px; border: 0; border-bottom: 1px solid var(--rule-2); background: none; color: var(--paper); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; }
+.preset-bar .look-open:hover { border-bottom-color: var(--paper); }
+.preset-bar .look-name { font-size: 14px; font-weight: 600; }
+/* looks and titles sit apart from the eight layers */
+.layer-row.looks-row { border-bottom: 1px solid var(--rule); }
+.layer-row.titles-row { border-top: 1px solid var(--rule); }
+/* Looks: a grid of pictures of the user's own video */
+.looks { display: flex; flex-direction: column; gap: 12px; }
+.look-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 10px; }
+.look-card { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; color: var(--stone); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.look-card .pic { display: block; aspect-ratio: 4 / 3; background: var(--stage); box-shadow: inset 0 0 0 1px var(--rule-2); overflow: hidden; }
+.look-card .pic img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s; }
+.look-card:hover { color: var(--paper); }
+.look-card:hover .pic img { transform: scale(1.04); }
+.look-card .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.look-card.on { color: var(--paper); font-weight: 700; }
+.look-card.on .pic { box-shadow: 0 0 0 2px var(--live); }
+.look-card:focus-visible { outline: none; }
+.look-card:focus-visible .pic { box-shadow: 0 0 0 2px var(--paper); }
+/* Titles */
+.titles-panel { display: flex; flex-direction: column; }
+.titles-panel .ctl-section:first-child { border-top: 0; padding-top: 4px; }
+.titles-panel .toggle-row .section-label { margin: 0; }
+.logo-pick { display: inline-flex; align-items: center; gap: 10px; }
+.logo-pick img { height: 28px; max-width: 80px; object-fit: contain; }
 .preset-actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
 .preset-actions .link { text-align: left; }
 .preset-actions input[type=text] { height: 34px; font-size: 13.5px; }
