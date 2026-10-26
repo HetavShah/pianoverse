@@ -4,8 +4,11 @@ import type { CalibratedProject } from '../engine/calibration';
 import { NoteSource, parseMidi, placeNotes } from '../engine/notes';
 import { findOffset } from '../engine/sync';
 import { DEFAULT_DETECT } from '../engine/detectConfig';
-import { loadAudio, VideoAudio } from './audio';
+import { loadAudio, loadPianoAudio, VideoAudio } from './audio';
 import type { PickedMidi } from './media';
+
+/** which note finder listens to the audio */
+export type NoteFinder = 'piano' | 'any';
 
 export type NotesBusy =
   | { kind: 'audio' }
@@ -57,15 +60,24 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
     if (p1) setProject(withSource(p1, src), { merge: true }); // the sync is part of the import
   }), [run, getAudio, setProject]);
 
-  const detect = useCallback((onset = DEFAULT_DETECT.onset) => run(async () => {
+  /** find the notes in the soundtrack: 'piano' (Transkun, for piano) or 'any' (Basic Pitch, any instrument) */
+  const detect = useCallback((onset = DEFAULT_DETECT.onset, finder: NoteFinder = 'piano') => run(async () => {
     const a = await getAudio();
     setBusy({ kind: 'detect', pct: 0 });
-    const { detectNotes } = await import('../engine/detect'); // keeps the model code out of start-up
-    const notes = await detectNotes(a.mono, '/models/basic-pitch/model.json', (pct) => setBusy({ kind: 'detect', pct }), { ...DEFAULT_DETECT, onset });
-    if (!notes.length) throw new Error('No notes were found in the audio. Try more sensitivity.');
+    let notes;
+    if (finder === 'piano') {
+      const { transcribePiano, TK_RATE } = await import('../engine/transkun'); // keeps the model code out of start-up
+      const x = await loadPianoAudio(videoUrl!, TK_RATE);
+      notes = await transcribePiano(x, (pct) => setBusy({ kind: 'detect', pct: pct / 100 }));
+    } else {
+      const { detectNotes } = await import('../engine/detect');
+      notes = await detectNotes(a.mono, '/models/basic-pitch/model.json', (pct) => setBusy({ kind: 'detect', pct }), { ...DEFAULT_DETECT, onset });
+    }
+    if (!notes.length) throw new Error(finder === 'piano' ? 'No piano notes were found in the audio.' : 'No notes were found in the audio. Try more sensitivity.');
     const p = latest.current;
-    if (p) setProject(withSource(p, { kind: 'audio', name: "Detected from the video's audio", notes, offset: 0 }));
-  }), [run, getAudio, setProject]);
+    const name = finder === 'piano' ? "Piano notes from the video's audio" : "Detected from the video's audio";
+    if (p) setProject(withSource(p, { kind: 'audio', name, notes, offset: 0, sustain: finder === 'piano' && notes.some((x) => (x.h ?? x.e) > x.e) }));
+  }), [run, getAudio, setProject, videoUrl]);
 
   const autoAlign = useCallback(() => run(async () => {
     const p0 = latest.current;
