@@ -20,48 +20,48 @@ colors:
   bad: "#f0607a"
 typography:
   display:
-    fontFamily: "'Archivo Variable', Archivo, 'Segoe UI', system-ui, sans-serif"
-    fontSize: "88px"
+    fontFamily: "Syncopate, 'Archivo Variable', sans-serif"
+    fontSize: "clamp(56px, 7vw, 104px)"
     fontWeight: 700
-    lineHeight: 0.92
-    letterSpacing: "-0.04em"
-    fontVariation: "'wdth' 85"
-  timecode:
-    fontFamily: "'Archivo Variable', Archivo, 'Segoe UI', system-ui, sans-serif"
-    fontSize: "64px"
-    fontWeight: 300
     lineHeight: 0.95
-    letterSpacing: "-0.035em"
+    letterSpacing: "0.04em"
+    textTransform: "uppercase"
+  timecode:
+    fontFamily: "Syncopate, 'Archivo Variable', sans-serif"
+    fontSize: "34px"
+    fontWeight: 400
+    lineHeight: 1
     fontFeature: "'tnum' 1"
-    fontVariation: "'wdth' 78"
   headline:
-    fontFamily: "'Archivo Variable', Archivo, 'Segoe UI', system-ui, sans-serif"
-    fontSize: "44px"
+    fontFamily: "Syncopate, 'Archivo Variable', sans-serif"
+    fontSize: "32px"
     fontWeight: 700
-    lineHeight: 1
-    letterSpacing: "-0.025em"
-    fontVariation: "'wdth' 90"
+    lineHeight: 1.05
+    letterSpacing: "0.02em"
+    textTransform: "uppercase"
   inspector-title:
-    fontFamily: "'Archivo Variable', Archivo, 'Segoe UI', system-ui, sans-serif"
-    fontSize: "40px"
+    fontFamily: "Syncopate, 'Archivo Variable', sans-serif"
+    fontSize: "24px"
     fontWeight: 700
-    lineHeight: 1
-    letterSpacing: "-0.03em"
-    fontVariation: "'wdth' 90"
+    lineHeight: 1.1
+    letterSpacing: "0.04em"
+    textTransform: "uppercase"
   readout:
-    fontFamily: "'Archivo Variable', Archivo, 'Segoe UI', system-ui, sans-serif"
-    fontSize: "28px"
-    fontWeight: 500
+    fontFamily: "Syncopate, 'Archivo Variable', sans-serif"
+    fontSize: "18px"
+    fontWeight: 400
     lineHeight: 1
-    letterSpacing: "-0.01em"
     fontFeature: "'tnum' 1"
-    fontVariation: "'wdth' 85"
   room:
-    fontFamily: "'Archivo Variable', Archivo, 'Segoe UI', system-ui, sans-serif"
-    fontSize: "19px"
-    fontWeight: 600
-    letterSpacing: "-0.01em"
-    fontVariation: "'wdth' 88"
+    fontFamily: "Syncopate, 'Archivo Variable', sans-serif"
+    fontSize: "13px"
+    fontWeight: 700
+    letterSpacing: "0.08em"
+    textTransform: "uppercase"
+  layer-number:
+    fontFamily: "Syncopate, 'Archivo Variable', sans-serif"
+    fontSize: "18px"
+    fontWeight: 700
   title:
     fontFamily: "'Archivo Variable', Archivo, 'Segoe UI', system-ui, sans-serif"
     fontSize: "17px"
@@ -167,14 +167,14 @@ components:
 
 **Creative North Star: "The Musica Viva Poster"**
 
-The studio is set like a Müller-Brockmann concert poster for the Tonhalle: a warm poster-black ground, paper-white ink, a strict ruled grid of hairlines, one grotesk used at two far-apart scales, and a single vermilion reserved for whatever is live right now. The take itself is drawn as rhythm: the score band along the bottom of the studio is the poster's figure, and everything else is the ruled sheet it is printed on.
+The studio is set like a Müller-Brockmann concert poster for the Tonhalle: a warm poster-black ground, paper-white ink, a strict ruled grid of hairlines, a wide display face set in capitals against a plain grotesk at two far-apart scales, and a single vermilion reserved for whatever is live right now. The take itself is drawn as rhythm: the score band along the bottom of the studio is the poster's figure, and everything else is the ruled sheet it is printed on.
 
-Density is that of a working tool, not a dashboard. Regions are separated by 1px rules, never by cards, fills or shadows. Controls are text sitting on rules; values are read as big condensed numerals; the colour in the frame belongs to the user's video, so the chrome stays black, paper and stone. The visual rejections are confirmed by the build and the direction: no SaaS carded panels, no pill segments, no neon accent on blue-black, no glow, gradient or glass gloss on chrome.
+Density is that of a working tool, not a dashboard. Regions are separated by 1px rules, never by cards, fills or shadows. Controls are text sitting on rules; values are read as big Syncopate numerals; the colour in the frame belongs to the user's video, so the chrome stays black, paper and stone. The visual rejections are confirmed by the build and the direction: no SaaS carded panels, no pill segments, no neon accent on blue-black, no glow, gradient or glass gloss on chrome.
 
 **Key Characteristics:**
 - Warm neutral blacks (never blue) with paper-white ink and stone secondary text.
 - Hairline rules (1px) do all the structural work; nothing is rounded.
-- One family, Archivo Variable, with its width axis condensing the big numerals and titles.
+- Two families: Syncopate (wide, set in capitals) for titles, rooms and the big numerals; Archivo Variable for everything you read.
 - Vermilion appears only on the one live thing per region.
 - The score band (notes on bar and beat hairlines, the vermilion playhead) is the signature.
 
@@ -207,26 +207,27 @@ A monochrome poster palette of warm blacks, paper and stone, punctured by one ve
 
 ## Typography
 
-**Display Font:** Archivo Variable (with Archivo, Segoe UI, system-ui), self-hosted with the width axis.
-**Body Font:** Archivo Variable, the same family.
+**Display Font:** Syncopate (400 and 700), self-hosted. Wide letterforms, always in capitals for words; numerals at 400.
+**Body Font:** Archivo Variable (with Archivo, Segoe UI, system-ui), self-hosted with the width axis.
 
-**Character:** One grotesk from 11px captions to 88px titles. The width axis does the expressive work: big titles and numerals condense to 78 to 90 percent width, while UI text stays at normal width.
+**Character:** A poster headline face against a working grotesk. Syncopate carries the titles, the rooms, the layer numbers and every big changing number; Archivo carries labels, help, buttons and body text at 11 to 17px.
 
 ### Hierarchy
-- **Display** (700, 88px, 0.92, width 85): the Projects home title only.
-- **Timecode** (300, 64px, 0.95, width 78, tabular): the playhead time at the head of the score band; 54px below 1280px wide.
-- **Headline** (700, 44px, 1, width 90): setup page titles.
-- **Inspector Title** (700, 40px, width 90): the selected layer's name in the Style inspector; modal titles at 26px and shot cards at 24px follow the same recipe.
-- **Readout** (500, 28px, width 85, tabular): one big value per slider in the inspector; stat cards at 34px share it.
-- **Room** (600, 19px, width 88): the studio rooms Style, Camera, Export in the top band.
-- **Title** (700, 17px): section headings and the wordmark (800).
-- **Body** (400, 14px, 1.4): default text; help text runs at 12.5px, 1.55, max 62ch in stone.
-- **Control** (600, 13.5px): buttons, menu items, segmented choices.
-- **Label** (600, 12px, sentence case, stone): section labels above control groups.
-- **Caption** (600, 11px, tabular): layer numbers, step numbers, ruler ticks.
+- **Display** (Syncopate 700, 56 to 104px, capitals): the Projects home title only.
+- **Headline** (Syncopate 700, 32px, capitals): setup page titles (Import your performance, Notes and sync, Calibrate keyboard, Export video).
+- **Inspector Title** (Syncopate 700, 24px, capitals): the selected layer's name in the Style inspector and the Camera panel; shot cards and modal titles follow it.
+- **Timecode** (Syncopate 400, 34px, tabular): the playhead time at the head of the score band.
+- **Readout** (Syncopate 400, 18px): one value per dial in the inspector; stat numbers on Notes at 26px.
+- **Room** (Syncopate 700, 13px, capitals, 0.08em tracking): Style, Camera, Export in the top band.
+- **Layer number** (Syncopate 700, 18px): 01 to 08 in the layer rail.
+- **Title** (Archivo 700, 17px): section headings; the wordmark is Archivo 700 at 14px in capitals with 0.12em tracking.
+- **Body** (Archivo 400, 14px, 1.4): default text; help text runs at 12.5px, 1.55, max 62ch in stone.
+- **Control** (Archivo 600, 13.5px): buttons, menu items, segmented choices.
+- **Label** (Archivo 600, 12px, sentence case, stone): section labels above control groups.
+- **Caption** (Archivo 600, 11px, tabular): step numbers, ruler ticks.
 
 ### Named Rules
-**The Two Scales Rule.** Type lives at two far-apart sizes: big condensed tabular numerals and titles (28 to 88px) against 11 to 14px UI text. Nothing fills the middle except the 17 to 24px heading step. Every changing number is tabular.
+**The Two Faces Rule.** Syncopate is for things you glance at (titles, rooms, numbers); Archivo is for things you read. Words in Syncopate are always capitals; sentences are never set in Syncopate. Every changing number is tabular.
 
 ## Layout
 
@@ -278,7 +279,7 @@ A paper block with poster-black text at the bottom centre; errors use the bad fi
 ### Navigation
 - **Wordmark:** 17px, 800, paper.
 - **Setup trail:** 13px stone labels with 11px dim tabular step numbers and an authored SVG tick in ok green for done steps. The current step goes paper with a 2px vermilion underline and a vermilion number.
-- **Rooms:** 19px condensed 600, separated from the trail by a hairline; the current room carries a 3px vermilion underline that eases in.
+- **Rooms:** 13px Syncopate 700 in capitals, separated from the trail by a hairline; the current room carries a 3px vermilion underline that eases in.
 
 ### Layer List
 Numbered rows (01 to 08) at 16px, 40px tall. The current layer's name and number turn vermilion and the name goes 700; hidden layers fall to dim; hover is a raise wash.
@@ -302,7 +303,7 @@ Authored inline SVG at 11 to 18px in currentColor, stroked about 1.6 to 1.8. Nev
 - **Do** draw buttons as text with a 1px rule underneath; only the primary (vermilion) and Play (paper) are filled blocks.
 - **Do** give a disabled primary the neutral raise-2 fill with dim text.
 - **Do** separate regions and rows with 1px hairlines in rule colour.
-- **Do** set changing numbers big, condensed and tabular (64px timecode, 28px readouts) against 11 to 14px UI text.
+- **Do** set changing numbers in Syncopate, tabular (34px timecode, 18px readouts), against 11 to 14px Archivo UI text.
 - **Do** float popovers as a raise fill with a 1px rule-2 border.
 - **Do** collapse score-band lanes that carry no data.
 - **Do** author icons as inline SVG in currentColor.

@@ -158,8 +158,8 @@ export default function StyleTimeline(props: {
           <span style={{ height: NOTES_H + GAP }} title="Every note in the clip. Each bar is one note: further right is later, higher up is a higher pitch, thicker is louder.">
             <b>Notes</b><small>pitch and loudness</small>
           </span>
-          {trackOn && <span style={{ height: TL }} title="How well the keyboard was followed through the clip. Green: locked on; amber: unsure; red: lost (filled in from nearby frames).">
-            <b>Tracking</b><small>{tracked || imported ? 'keyboard followed' : cal?.cameraMoves ? 'not tracked yet' : 'fixed camera'}</small>
+          {trackOn && <span className="tl-track-label" style={{ height: TL }} title={`Tracking: ${tracked || imported ? 'keyboard followed' : cal?.cameraMoves ? 'not tracked yet' : 'fixed camera'}. How well the keyboard was followed through the clip. Green: locked on; amber: unsure; red: lost (filled in from nearby frames).`}>
+            <b>Tracking</b>
           </span>}
           <span style={{ height: PART_H + 12 }} title="Where notes send sparks along a shape. Add sections in the Particles panel; click one to edit it, drag its edges to resize it, or drag it to move it.">
             <b>Particles</b><small>{scenes.length ? `${scenes.length} shape section${scenes.length > 1 ? 's' : ''}` : 'normal'}</small>

@@ -1,9 +1,14 @@
 // A scroll-wheel dial in place of a plain slider: a tape of ticks slides under a fixed centre line. Drag the
-// tape, turn the mouse wheel over it (Shift for fine steps), or click one of the stops. A real range input sits
+// tape, turn the mouse wheel over it (Shift for fine steps), or click one of the stops. The wheel only turns the
+// dial once the pointer has rested on it: while you scroll the panel past it, the panel scrolls. A real range input sits
 // underneath for the keyboard, screen readers and the automated checks.
 import { useEffect, useRef, useState } from 'react';
 
 const TAPE = 480; // px of tape for the whole range
+
+// when anything scrolled last: a dial under a scrolling panel doesn't grab the wheel
+let lastPanelScroll = -Infinity;
+if (typeof window !== 'undefined') window.addEventListener('scroll', () => { lastPanelScroll = performance.now(); }, { capture: true, passive: true });
 
 export default function Dial(props: {
   value: number;
@@ -32,18 +37,25 @@ export default function Dial(props: {
   };
   const frac = Math.min(1, Math.max(0, (value - min) / span));
 
-  // the wheel turns the dial instead of scrolling the panel
+  // the wheel turns the dial instead of scrolling the panel, but only after the pointer has settled on it
   useEffect(() => {
     const el = ruler.current;
     if (!el || disabled) return;
+    let since = Infinity;
+    const enter = () => { since = performance.now(); };
+    const leave = () => { since = Infinity; };
     const onWheel = (e: WheelEvent) => {
+      const now = performance.now();
+      if (now - since < 350 || now - lastPanelScroll < 350) { since = now; return; } // passing by: let the panel scroll
       e.preventDefault();
       const notch = e.shiftKey ? Math.max(step, span / 400) : Math.max(step, span / 60);
       const dir = (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) > 0 ? -1 : 1;
       live.current.onChange(snap(live.current.value + dir * notch));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    el.addEventListener('pointerenter', enter);
+    el.addEventListener('pointerleave', leave);
+    return () => { el.removeEventListener('wheel', onWheel); el.removeEventListener('pointerenter', enter); el.removeEventListener('pointerleave', leave); };
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
   let stopList: number[] = [];

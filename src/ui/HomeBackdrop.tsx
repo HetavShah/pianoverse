@@ -1,5 +1,6 @@
 // Behind the Projects title: notes falling slowly onto a keyboard line, in the app's own note colours.
-// It shows what Pianoverse does at a glance. Still frame under reduced motion; paused while the window is hidden.
+// It shows what Pianoverse does at a glance. The notes pass behind the title and its line of text (they are cut
+// out where the type sits), so the words always read. Still frame under reduced motion; paused while hidden.
 import { useEffect, useRef } from 'react';
 import { pal } from '../engine/project';
 
@@ -17,6 +18,7 @@ export default function HomeBackdrop() {
     const g = cv.getContext('2d')!;
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let w = 0, h = 0, raf = 0, last = performance.now(), t = 0, nextAt = 0, pitch = 60;
+    let holes: DOMRect[] = []; // where the title's type sits, in canvas pixels
     const notes: Falling[] = [];
     const whiteKeys: number[] = [];
     for (let n = LOW; n < LOW + KEYS; n++) if (WHITE.includes(n % 12)) whiteKeys.push(n);
@@ -25,6 +27,11 @@ export default function HomeBackdrop() {
       w = r.width; h = r.height;
       cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const hero = cv.parentElement;
+      holes = hero ? [...hero.querySelectorAll('h1, .sub, .row-actions')].map((el) => {
+        const b = el.getBoundingClientRect();
+        return new DOMRect(b.left - r.left - 10, b.top - r.top - 8, b.width + 20, b.height + 16);
+      }) : [];
     };
     const keyX = (p: number) => {
       const kw = w / whiteKeys.length;
@@ -50,6 +57,12 @@ export default function HomeBackdrop() {
       g.fillRect(0, line, w, KEY_H);
       g.fillStyle = 'rgba(22,22,21,1)';
       for (let i = 1; i < whiteKeys.length; i++) g.fillRect(Math.round(i * kw), line, 1, KEY_H);
+      // the notes fall behind the type: everything but the type's boxes
+      g.save();
+      g.beginPath();
+      g.rect(0, 0, w, h);
+      for (const b of holes) g.rect(b.x, b.y, b.width, b.height);
+      g.clip('evenodd');
       for (const n of notes) {
         const y1 = (t - n.t0) * SPEED; // bottom edge of the bar
         const y0 = y1 - n.len * SPEED; // top edge
@@ -68,6 +81,7 @@ export default function HomeBackdrop() {
           g.fillRect(x + (kw - wid) / 2, top, wid, bottom - top);
         }
       }
+      g.restore();
       while (notes.length && (t - notes[0].t0) * SPEED - notes[0].len * SPEED > fall + 20) notes.shift();
     };
     const tick = (now: number) => {
@@ -78,6 +92,7 @@ export default function HomeBackdrop() {
       raf = requestAnimationFrame(tick);
     };
     size();
+    document.fonts?.ready.then(() => { size(); if (still) draw(); });
     const ro = new ResizeObserver(() => { size(); if (still) draw(); });
     ro.observe(cv);
     if (still) {

@@ -162,7 +162,7 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .home { display: flex; min-height: 0; }
 .home-main { flex: 1; overflow-y: auto; padding: 48px 56px 56px; display: flex; flex-direction: column; gap: 18px; }
 .home-main h1 { font-size: clamp(56px, 7vw, 104px); letter-spacing: 0.04em; line-height: 0.95; }
-.home-hero { position: relative; margin: -48px -56px 0; padding: 56px 56px 0; min-height: clamp(380px, 52vh, 560px); display: flex; flex-direction: column; overflow: hidden; }
+.home-hero { position: relative; margin: -48px -56px 0; padding: 56px 56px 0; min-height: clamp(300px, 40vh, 440px); display: flex; flex-direction: column; overflow: hidden; }
 .home-hero > .title-row { position: relative; z-index: 1; }
 .home-hero .sub { color: var(--paper); opacity: 0.8; }
 .home-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
@@ -172,7 +172,7 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .shelf-head .count { font-size: 12px; color: var(--stone); font-variant-numeric: tabular-nums; }
 .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 210px)); gap: 32px 24px; align-items: start; }
 .project-card { position: relative; display: flex; flex-direction: column; gap: 10px; }
-.project-card .thumb { width: 100%; overflow: hidden; border: 0; background: var(--stage); padding: 0; cursor: pointer; display: block; max-height: 380px; outline: 2px solid transparent; outline-offset: 3px; transition: outline-color 0.15s; }
+.project-card .thumb { width: 100%; overflow: hidden; border: 0; background: var(--stage); padding: 0; cursor: pointer; display: block; max-height: 300px; outline: 2px solid transparent; outline-offset: 3px; transition: outline-color 0.15s; }
 .project-card .thumb:hover { outline-color: var(--paper); }
 .project-card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .project-card .ph { display: grid; place-items: center; width: 100%; height: 100%; min-height: 160px; background: var(--stage); color: var(--dim); box-shadow: inset 0 0 0 1px var(--rule-2); }
@@ -346,6 +346,9 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .tl-labels span { display: flex; flex-direction: column; justify-content: center; gap: 1px; cursor: help; }
 .tl-labels b { font-size: 12.5px; font-weight: 600; }
 .tl-labels small { font-size: 11px; color: var(--stone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the tracking lane is a 6px strip: its label sits on it, one line */
+.tl-labels span.tl-track-label { justify-content: flex-start; }
+.tl-labels span.tl-track-label b { line-height: 12px; transform: translateY(-3px); }
 .tl-body canvas { width: 100%; display: block; touch-action: none; }
 
 /* style panels */
@@ -575,14 +578,14 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 }
 
 /* ---------- the dial: a tape of ticks under a fixed centre line ---------- */
-.dial { display: flex; flex-direction: column; gap: 6px; position: relative; user-select: none; -webkit-user-select: none; }
+.dial { display: flex; flex-direction: column; gap: 4px; position: relative; user-select: none; -webkit-user-select: none; }
 .dial.off { opacity: 0.4; pointer-events: none; }
 .dial-stops { display: flex; gap: 4px; }
-.dial-stops button { position: relative; flex: 1; height: 28px; padding: 0 4px; border: 1px solid var(--rule-2); background: none; color: var(--stone); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap; transition: color 0.12s, border-color 0.12s, background-color 0.12s; }
+.dial-stops button { position: relative; flex: 1; height: 24px; padding: 0 4px; border: 1px solid var(--rule-2); background: none; color: var(--stone); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap; transition: color 0.12s, border-color 0.12s, background-color 0.12s; }
 .dial-stops button:hover:not(:disabled) { color: var(--paper); border-color: var(--dim); }
 .dial-stops button.on { background: var(--paper); border-color: var(--paper); color: var(--live-ink); font-weight: 700; }
 .dial-base { position: absolute; left: 50%; bottom: 3px; width: 3px; height: 3px; margin-left: -1px; background: currentColor; }
-.dial-ruler { position: relative; height: 30px; overflow: hidden; cursor: ew-resize; touch-action: none; background: var(--stage); -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); }
+.dial-ruler { position: relative; height: 24px; overflow: hidden; cursor: ew-resize; touch-action: none; background: var(--stage); -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); }
 .dial-ruler:hover .dial-tape { --tick: var(--stone); }
 .dial-tape { --tick: var(--dim); position: absolute; left: 50%; top: 0; bottom: 0;
   background-image: linear-gradient(90deg, var(--tick) 1px, transparent 1px), linear-gradient(90deg, var(--rule-2) 1px, transparent 1px);
@@ -590,7 +593,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
   box-shadow: inset 1px 0 0 var(--stone), inset -1px 0 0 var(--stone);
   transition: transform 0.22s var(--ease); will-change: transform; }
 .dial-ruler.dragging .dial-tape { transition: none; }
-.dial-tick-base { position: absolute; bottom: 0; width: 2px; height: 20px; margin-left: -1px; background: var(--stone); }
+.dial-tick-base { position: absolute; bottom: 0; width: 2px; height: 16px; margin-left: -1px; background: var(--stone); }
 .dial-mark { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--paper); pointer-events: none; }
 .dial-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; bottom: 0; left: 50%; }
 .dial:focus-within .dial-ruler { outline: 2px solid var(--live); outline-offset: 2px; }

@@ -16,7 +16,11 @@ const toast = () => page.$$eval('.toast', (t) => t.map((x) => x.textContent).joi
 let fails = 0;
 const check = (name, ok, extra = '') => { console.log((ok ? 'PASS ' : 'FAIL ') + name + (extra ? '  ' + extra : '')); if (!ok) fails++; };
 const drag = async (label, fracs) => {
-  const loc = page.locator(`input[aria-label="${label}"]`); await loc.scrollIntoViewIfNeeded();
+  // the inspector's sliders are dials: drag the tape (the range input underneath is for keyboards)
+  const input = page.locator(`input[aria-label="${label}"]`);
+  const dial = await input.evaluate((el) => !!el.closest('.dial'));
+  const loc = dial ? input.locator('xpath=ancestor::div[contains(@class,"dial")][1]').locator('.dial-ruler') : input;
+  await loc.scrollIntoViewIfNeeded();
   const box = await loc.boundingBox();
   const y = box.y + box.height / 2;
   await page.mouse.move(box.x + box.width * fracs[0], y); await page.mouse.down();
@@ -53,7 +57,7 @@ check('redo brings the glow back', (await look()).noteGlow === g1);
 await key('Control+Shift+z');
 check('Ctrl+Shift+Z redoes too', (await look()).noteWidth === w1);
 await key('Control+z'); // undo width again, then make a new edit: redo is gone
-await drag('Glow', [0.2]);
+await drag('Glow', [0.5, 0.2]);
 check('new edit clears redo', await page.$eval('button[aria-label=Redo]', (b) => b.disabled));
 await page.screenshot({ path: `${OUT}/1-style.png` });
 
