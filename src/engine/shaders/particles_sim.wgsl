@@ -328,7 +328,7 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   if (kf < nS) {
     // trail: a bright head that shoots up from the key, slowing and bending a little, a fading tail behind it
     let ts = E.start + rnd(st) * 0.06;
-    let plife = (0.45 + 0.6 * rnd(st)) * PP.lifeMul;
+    let plife = (0.7 + 0.7 * rnd(st)) * PP.lifeMul;
     let age = t - ts;
     if (age < 0.0 || age > plife) { return off; }
     let a = base + gaussR(st) * 0.32;
@@ -336,8 +336,10 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let kd = 2.2;
     let ex = 1.0 - exp(-kd * age);
     let g = vec2f(PP.wind * u * 2.0, u * 3.0 * (1.0 + PP.gravity));
-    let pos = E.pos + v0 * ex / kd + 0.5 * g * age * age;
-    let vel = v0 * (1.0 - ex) + g * age;
+    // a gentle sideways bend as the air takes it, so trails curve instead of flying dead straight
+    let side = vec2f(-up.y, up.x) * gaussR(st) * u * 1.6;
+    let pos = E.pos + v0 * ex / kd + 0.5 * g * age * age + side * age * age;
+    let vel = v0 * (1.0 - ex) + g * age + side * 2.0 * age;
     let bright = (2.2 + 1.4 * rnd(st)) * (0.8 + 0.5 * E.vn);
     var star = 0.0;
     if (rnd(st) < 0.06 * PP.stars) { star = 1.0; }
