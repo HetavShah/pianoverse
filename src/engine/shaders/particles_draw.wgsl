@@ -31,25 +31,32 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
   let isStar = P.star > 0.5 && P.b > 0.35;
   var half = max(9.0, 4.0 / F.scale) * max(F.partSize, sqrt(F.partSize * max(F.partHaze, 1.0)));
   if (isStar) { half = 24.0 * F.partSize; }
-  let zs = max(0.2, 1.0 + 0.5 * P.z);
+  var zs = max(0.2, 1.0 + 0.5 * P.z);
+  // mixed sizes: most dots small and crisp, one in sixteen a larger, brighter ball
+  let spark = P.pad > 0.5;
+  var bmul = 1.0;
+  if (!spark && !isStar) {
+    let hv = fract(sin(f32(ii) * 91.345 + 3.1) * 47453.5453);
+    if (hv > 0.94) { zs *= 1.9; bmul = 2.6; } else { zs *= 0.8; }
+  }
   half *= zs;
   let c = corner(vi) * 2.0 - vec2f(1.0);
   var p = P.pos + c * half;
   o.local = c * half;
   o.ray = vec4f(0.0, 0.0, 0.0, zs);
   let sp = length(P.vel);
-  let spark = P.pad > 0.5;
   if ((DP.rays > 0.5 || spark) && sp > 1.0 && !isStar) {
-    // a short streak along the particle's motion (sparks always have one)
+    // a streak along the particle's motion; trails put the particle at the head with a tail behind
     let dir = P.vel / sp;
-    let len = max(half, sp * select(0.045 * DP.rayLen, 0.035, spark) * F.partSize);
+    let len = max(half, sp * select(0.045 * DP.rayLen, 0.17, spark) * F.partSize);
     let nrm = vec2f(-dir.y, dir.x);
-    p = P.pos + dir * (c.x * (len + half)) + nrm * (c.y * half);
+    let back = select(0.0, len, spark);
+    p = P.pos - dir * back + dir * (c.x * (len + half)) + nrm * (c.y * half);
     o.local = vec2f(c.x * (len + half), c.y * half);
-    o.ray = vec4f(1.0, 0.0, len, zs);
+    o.ray = vec4f(1.0, select(0.0, 1.0, spark), len, zs);
   }
   o.pos = toClip(p);
-  o.col = vec4f(P.col.rgb, P.b);
+  o.col = vec4f(P.col.rgb, P.b * bmul);
   o.star = select(0.0, 1.0, isStar);
   return o;
 }
@@ -63,12 +70,20 @@ fn fs(i: VOut) -> @location(0) vec4f {
     let rgbG = i.col.rgb * i.col.a * gl * 0.5 * F.partHaze;
     return vec4f(rgbG * DP.additive * DP.bright * DP.opacity, 0.0);
   }
+  var taper = 1.0;
+  var thin = 1.0;
+  if (i.ray.y > 0.5) {
+    // trail: brightest and widest at the head (+x), thinning and fading to nothing at the tail
+    let tx = clamp((lp.x + i.ray.z) / (2.0 * i.ray.z), 0.0, 1.0);
+    taper = tx * tx;
+    thin = 0.45 + 0.55 * tx;
+  }
   if (i.ray.x > 0.5) { lp.x = max(abs(lp.x) - i.ray.z, 0.0); }    // streak: a line with round ends
   let rr = dot(lp, lp);
-  let sig = max(0.75, 0.6 / F.scale) * F.partSize * i.ray.w;
+  let sig = max(0.75, 0.6 / F.scale) * F.partSize * i.ray.w * thin;
   let norm = sq(0.75 / sig);
   var g = (0.962 * norm * exp(-rr / (2.0 * sig * sig)) + 0.072 * F.partHaze * exp(-rr / (13.52 * F.partSize * F.partSize))) * 1.3;
-  var rgb = i.col.rgb * i.col.a * g;
+  var rgb = i.col.rgb * i.col.a * g * taper;
   if (i.star > 0.5) {
     let x = i.local.x;
     let y = i.local.y;

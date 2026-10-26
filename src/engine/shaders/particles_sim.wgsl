@@ -326,22 +326,22 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let tint = mix(vec3f(1.0), vec3f(0.55) + E.col * 0.45, PP.colorMix);
   var o: Particle;
   if (kf < nS) {
-    // spark: fast, out in a wide cone, slowed by the air and pulled down
-    let ts = E.start + rnd(st) * 0.04;
-    let plife = (0.3 + 0.5 * rnd(st)) * PP.lifeMul;
+    // trail: a bright head that shoots up from the key, slowing and bending a little, a fading tail behind it
+    let ts = E.start + rnd(st) * 0.06;
+    let plife = (0.45 + 0.6 * rnd(st)) * PP.lifeMul;
     let age = t - ts;
     if (age < 0.0 || age > plife) { return off; }
-    let a = base + gaussR(st) * 0.62;
-    let v0 = vec2f(cos(a), sin(a)) * u * (5.5 + 9.0 * rnd(st)) * (0.75 + 0.5 * E.vn) * PP.speed;
-    let kd = 2.6;
+    let a = base + gaussR(st) * 0.32;
+    let v0 = vec2f(cos(a), sin(a)) * u * (9.0 + 9.0 * rnd(st)) * (0.75 + 0.5 * E.vn) * PP.speed;
+    let kd = 2.2;
     let ex = 1.0 - exp(-kd * age);
-    let g = vec2f(PP.wind * u * 2.0, u * 11.0 * (1.0 + PP.gravity));
+    let g = vec2f(PP.wind * u * 2.0, u * 3.0 * (1.0 + PP.gravity));
     let pos = E.pos + v0 * ex / kd + 0.5 * g * age * age;
     let vel = v0 * (1.0 - ex) + g * age;
-    let bright = (1.5 + 1.1 * rnd(st)) * (0.8 + 0.5 * E.vn);
+    let bright = (2.2 + 1.4 * rnd(st)) * (0.8 + 0.5 * E.vn);
     var star = 0.0;
-    if (rnd(st) < 0.1 * PP.stars) { star = 1.0; }
-    o = finishP(pos, vel, age, plife, bright, star, mix(tint, vec3f(1.0), 0.35), st);
+    if (rnd(st) < 0.06 * PP.stars) { star = 1.0; }
+    o = finishP(pos, vel, age, plife, bright, star, mix(E.col, vec3f(1.0), 0.3), st);
     o.pad = 1.0;
     return o;
   }
@@ -358,11 +358,25 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let ex = 1.0 - exp(-kd * age);
     var pos = p0 + v0 * ex / kd + up * u * 0.25 * PP.rise * age + vec2f(PP.wind * u * 1.2, PP.gravity * u * 2.5) * age;
     pos += turbVel(pos, t) * min(age, 2.0) * 0.22 * PP.swirl;
-    let bright = (0.35 + 0.6 * rnd(st)) * (0.75 + 0.45 * E.vn);
+    let bright = (0.2 + 0.45 * rnd(st)) * (0.75 + 0.45 * E.vn);   // faint: dust around the brighter dots
     var star = 0.0;
-    if (rnd(st) < 0.025 * PP.stars) { star = 1.0; }
+    if (rnd(st) < 0.02 * PP.stars) { star = 1.0; }
     o = finishP(pos, v0 * (1.0 - ex), age, plife, bright, star, tint, st);
     o.z = -0.9;                                   // finer than the plume's particles
+    return o;
+  }
+  if (kf == nS + nD && nG > 0.5) {
+    // the hot core: a white-hot ball of light right where the note lands, fading quickly
+    let age = t - E.start;
+    let plife = 0.75 * PP.lifeMul;
+    if (age < 0.0 || age > plife) { return off; }
+    o.pos = E.pos + up * u * 0.15;
+    o.vel = vec2f(0.0);
+    o.b = smoothstep(0.0, 0.03, age) * exp(-age * 3.2) * (0.9 + 0.6 * E.vn) * 2.6;
+    o.star = 0.0;
+    o.z = u * (0.6 + 0.2 * E.vn);
+    o.pad = 2.0;
+    o.col = vec4f(mix(E.col, vec3f(1.0), 0.75), 1.0);
     return o;
   }
   if (kf < nS + nD + nG) {

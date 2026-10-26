@@ -488,9 +488,9 @@ export class Renderer {
       // the layers on every hit (sparks, glitter, glows): one emitter per note, any particle style but Shape
       if (lk.partMode !== 'shape') {
         const amt = lk.partAmount;
-        const nS = Math.round((5 + 9 * vv) * lk.partSparks * amt);
-        const nD = Math.round((70 + 110 * vv) * lk.partGlitter * amt);
-        const nG = Math.round((2 + 2 * vv) * lk.partGlow);
+        const nS = Math.round((3 + 4 * vv) * lk.partSparks * amt);
+        const nD = Math.round((30 + 45 * vv) * lk.partGlitter * amt);
+        const nG = lk.partGlow > 0 ? 1 + Math.round((1 + vv) * lk.partGlow) : 0;
         if (nS + nD + nG > 0) {
           const k = Math.min(1, (PER_EMIT - 8) / (nS + nD + nG));
           rows.push({ start: n.s, end: n.s + 0.4 + 3.4 * lk.partLife, data: [n.s, Math.round(nG * k), Math.round(nS * k), Math.round(nD * k), tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 13, 6, tg.unit, 0] });
@@ -544,7 +544,7 @@ export class Renderer {
         const a = gauss(rnd, -Math.PI / 2, 0.32);
         const sp = (170 + 100 * rnd()) * (0.8 + 0.5 * vv) * lk.partRise * lk.partSpeed;
         const life = (0.9 + 0.7 * rnd()) * (0.8 + 0.5 * vv) * lk.partLife;
-        const rate = (330 + 190 * rnd()) * (0.6 + 0.8 * vv) * lk.partAmount;
+        const rate = (200 + 120 * rnd()) * (0.6 + 0.8 * vv) * lk.partAmount; // sparse, so each dot reads on its own
         if (rate <= 0) continue;
         let ex = tg.x, ey = tg.y;
         if (lk.partSpread > 0) { ex += gauss(rnd, 0, tg.unit * 0.8 * lk.partSpread); ey += gauss(rnd, 0, tg.unit * 0.3 * lk.partSpread); }
