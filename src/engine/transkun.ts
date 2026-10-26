@@ -41,7 +41,9 @@ async function load(base: string, onProgress: (pct: number) => void): Promise<Mo
   const attrBytes = await get('attr.onnx', 14, 15);
   const opts = (gpu: boolean) => ({ executionProviders: gpu ? ['webgpu', 'wasm'] : ['wasm'], graphOptimizationLevel: 'all' as const });
   let net: Model['net'], attr: Model['attr'];
-  try { net = await ort.InferenceSession.create(netBytes, opts(true)); }
+  // automated tests run without a real GPU: software WebGPU is far slower than the CPU there
+  const gpu = !(globalThis as { __pvCpuModel?: boolean }).__pvCpuModel;
+  try { net = await ort.InferenceSession.create(netBytes, opts(gpu)); }
   catch { net = await ort.InferenceSession.create(netBytes, opts(false)); } // no usable GPU: slower, same notes
   attr = await ort.InferenceSession.create(attrBytes, opts(false));
   // the mel filters are mostly zeros: keep each band's non-zero span
