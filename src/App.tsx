@@ -10,8 +10,9 @@ import { useNotes } from './ui/useNotes';
 import { ago, fileExists, loadFromStore, makeThumb, newId, saveToStore } from './ui/projectStore';
 import { Step, STEPS, VideoIssue, WS } from './ui/workspace';
 import Home from './ui/Home';
-import { loadPresets } from './ui/presetStore';
-import { applyPreset, BUILT_IN_PRESETS, Preset } from './engine/look';
+import { loadBrand, loadPresets, saveBrand } from './ui/presetStore';
+import { applyPreset, BUILT_IN_PRESETS, Look, Preset } from './engine/look';
+import { Brand, DEFAULT_BRAND, loadTitleFonts } from './engine/titles';
 import ImportStep from './ui/steps/ImportStep';
 import NotesStep from './ui/steps/NotesStep';
 import CalibrateStep from './ui/steps/CalibrateStep';
@@ -27,10 +28,6 @@ import Shortcuts from './ui/Shortcuts';
 type RVFCVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
 };
-
-const Logo = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="none" stroke="#2FD3B5" strokeWidth="1.8" /><path d="M8 6.5v7M12 5v9M16 7.5v6" stroke="#2FD3B5" strokeWidth="1.8" strokeLinecap="round" /><path d="M5.5 17.5h13" stroke="#E8EAED" strokeWidth="1.8" strokeLinecap="round" /></svg>
-);
 
 export default function App() {
   const videoRef = useRef<RVFCVideo>(null);
@@ -64,6 +61,17 @@ export default function App() {
   const [defaultPresetId, setDefaultPresetId] = useState(BUILT_IN_PRESETS[0].id);
   const refreshPresets = useCallback(async () => { const r = await loadPresets(); setPresets(r.presets); setDefaultPresetId(r.defaultId); }, []);
   useEffect(() => { refreshPresets(); }, [refreshPresets]);
+  // the brand kit: saved once, used by every project's cards
+  const [brand, setBrandState] = useState<Brand>(DEFAULT_BRAND);
+  useEffect(() => { loadBrand().then(setBrandState).catch(() => {}); loadTitleFonts(); }, []);
+  const brandSave = useRef<number | null>(null);
+  const setBrand = useCallback((b: Brand) => {
+    setBrandState(b);
+    if (brandSave.current) window.clearTimeout(brandSave.current);
+    brandSave.current = window.setTimeout(() => { saveBrand(b).catch(toastError); }, 400);
+  }, []);
+  // a look shown while the pointer rests on a gallery card (not part of the project until clicked)
+  const [lookPreview, setLookPreview] = useState<Partial<Look> | null>(null);
   const frameTimes = useRef<number[]>([]);
   const wantNewProject = useRef(false);
   const editCopyOf = useRef<string | null>(null);
@@ -103,9 +111,10 @@ export default function App() {
   const noNotes = !!project && project.notes.length === 0;
   const renderProject = useMemo(() => {
     if (!project) return null;
-    if (!(sweep || noNotes)) return project;
-    return { ...project, notes: testNotes(project.keyboard.lowestNote, project.keyboard.keys, duration || project.video.frames / project.video.fps) };
-  }, [project, sweep, noNotes, duration]);
+    const p = lookPreview ? { ...project, look: lookPreview } : project;
+    if (!(sweep || noNotes)) return p;
+    return { ...p, notes: testNotes(project.keyboard.lowestNote, project.keyboard.keys, duration || project.video.frames / project.video.fps) };
+  }, [project, sweep, noNotes, duration, lookPreview]);
 
   const camStep = route === 'project' && step === 'camera';
   const previewing = route === 'project' && (step === 'style' || camStep);
@@ -151,6 +160,8 @@ export default function App() {
     if (previewing) draw();
   }, [camOn, camAspect, gpuName, draw, previewing]);
   useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (previewing) draw(); } }, [layers, draw, previewing]);
+  useEffect(() => { if (rendererRef.current) { rendererRef.current.setBrand(brand); if (previewing) draw(); } }, [brand, gpuName, draw, previewing]);
+  useEffect(() => { if (!previewing || step !== 'style') setLookPreview(null); }, [previewing, step]);
   const attachPreview = useCallback((c: HTMLCanvasElement | null) => {
     const r = rendererRef.current;
     if (!c || !r) return;
@@ -425,6 +436,7 @@ export default function App() {
     time, duration, playing, togglePlay, seek, frameTick,
     calib, notes: notesApi, renderer: rendererRef.current, layers, setLayers, scale, setScale, sweep, setSweep,
     pick, onFiles, loop, setLoop, presets, defaultPresetId, refreshPresets, goStep, goHome,
+    brand, setBrand, previewLook: setLookPreview,
   };
 
   const ready = !!project && !!video && !videoIssue;
@@ -437,20 +449,27 @@ export default function App() {
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); onFiles(e.dataTransfer.files); }}>
       <header className="topbar">
-        <button type="button" className="brand" onClick={goHome} title="Projects"><Logo /><span>Pianoverse</span></button>
-        {route === 'project' && <span className="project-name">{project?.name ?? 'New project'}</span>}
+        <button type="button" className="brand" onClick={goHome} title="Projects">Pianoverse</button>
+        {route === 'project' && <span className="project-name" title={project?.name}>{project?.name ?? 'New project'}</span>}
         {route === 'project' && (
           <nav className="stepper" aria-label="Steps">
-            {STEPS.map((s, i) => {
-              const done = doneStep(s.id);
-              const disabled = s.id !== 'import' && !ready;
-              return (
-                <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done ? ' done' : '')} disabled={disabled}
-                  onClick={() => goStep(s.id)}>
-                  <span className="dot">{done && step !== s.id ? '✓' : i + 1}</span>{s.label}
-                </button>
-              );
-            })}
+            <span className="trail">
+              {STEPS.slice(0, 3).map((s, i) => {
+                const done = doneStep(s.id);
+                return (
+                  <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done ? ' done' : '')} disabled={s.id !== 'import' && !ready}
+                    onClick={() => goStep(s.id)} aria-current={step === s.id ? 'step' : undefined}>
+                    <span className="dot">{i + 1}</span>{s.label}{done && step !== s.id && <svg className="tick" width="11" height="11" viewBox="0 0 12 12" aria-label="done"><path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>}
+                  </button>
+                );
+              })}
+            </span>
+            <span className="rooms">
+              {STEPS.slice(3).map((s) => (
+                <button key={s.id} type="button" className={'step-btn room' + (step === s.id ? ' on' : '')} disabled={!ready}
+                  onClick={() => goStep(s.id)} aria-current={step === s.id ? 'page' : undefined}>{s.label}</button>
+              ))}
+            </span>
           </nav>
         )}
         <div className="top-right">

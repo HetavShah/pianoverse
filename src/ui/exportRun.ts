@@ -1,6 +1,7 @@
 // Export: render every frame with the same engine as the preview and hand the pixels to an encoder.
 // In the desktop app the encoder is FFmpeg (NVENC / AMF / Quick Sync / x264, see src-tauri/src/export.rs).
 import type { Renderer } from '../engine/renderer';
+import { loadTitleFonts } from '../engine/titles';
 import type { CalibratedProject } from '../engine/calibration';
 import { aspectInfo, cameraAt, CameraFrame, followPath, FollowPath } from '../engine/camera';
 import { inTauri } from './media';
@@ -159,6 +160,9 @@ export async function runExport(args: {
   v.pause();
   const saved: string[] = [];
   const passes: ('video' | 'effects')[] = s.transparent ? ['video', 'effects'] : ['video'];
+  // the opening title and end card belong to what is exported (a section gets its own)
+  r.cardSpan = [from, to];
+  await loadTitleFonts();
   try {
     for (const phase of passes) {
       // with the camera the frame is drawn at the output size, through the camera's window
@@ -198,6 +202,7 @@ export async function runExport(args: {
     }
   } finally {
     r.alphaOut = false;
+    r.cardSpan = null;
     if (cam) { r.setView(null); r.setOutput(oldOutput); }
     r.setScale(oldScale);
     if (!wasPaused) v.play().catch(() => {});

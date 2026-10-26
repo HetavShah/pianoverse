@@ -53,5 +53,10 @@ export interface WS {
   defaultPresetId: string;
   refreshPresets: () => Promise<void>;
   goStep: (s: Step) => void;
+  /** the brand kit (name, handle, logo) used by the cards */
+  brand: import('../engine/titles').Brand;
+  setBrand: (b: import('../engine/titles').Brand) => void;
+  /** show a look on the preview without changing the project (null = back to the project's) */
+  previewLook: (look: Partial<import('../engine/look').Look> | null) => void;
   goHome: () => void;
 }

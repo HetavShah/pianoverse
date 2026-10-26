@@ -1,6 +1,7 @@
 // Controls for one layer of the look, generated from LOOK_SCHEMA.
 import { noteName } from '../engine/calibration';
 import { useEffect, useRef, useState } from 'react';
+import Dial from './Dial';
 import { COLOR_BY, Control, GRADIENTS, hexToHsv, hsvToHex, LayerId, Look, LOOK_SCHEMA, NOTE_STYLE_CARDS, NOTE_TEXTURES, noteColor, PaletteId, toHex } from '../engine/look';
 import { deleteTexture, importShape, importTexture, isSvg, textureThumb, UserTexture, useUserTextures } from './textureStore';
 import { sameValue } from '../engine/look';
@@ -53,7 +54,7 @@ function TexturePicker({ look, patch }: { look: Look; patch: Patch }) {
           <div key={t.id} className={'tex mine' + (current === 'user:' + t.id ? ' on' : '')} title={t.name + (t.files.normal ? ' · with normal map' : '')}>
             <button type="button" className="tex-pick" onClick={() => pick('user:' + t.id)}><UserThumb t={t} /><span>{t.name}</span></button>
             <button type="button" className="tex-del" aria-label={`Remove ${t.name}`} title="Remove from your textures"
-              onClick={async () => { if (current === 'user:' + t.id) pick(NOTE_TEXTURES[0].id); await deleteTexture(t.id); }}>×</button>
+              onClick={async () => { if (current === 'user:' + t.id) pick(NOTE_TEXTURES[0].id); await deleteTexture(t.id); }}><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.7" /></svg></button>
           </div>
         ))}
         <button type="button" className="tex add" onClick={upload} disabled={busy} title="Use your own image. Picking a *_Color file from ambientCG or Poly Haven also brings in its normal and roughness maps.">
@@ -143,9 +144,9 @@ function Swatches({ c, look, set }: { c: Extract<Control, { kind: 'swatches' }>;
     <div className="ctl">
       <div className="ctl-head"><span>{c.label}</span>
         {growable && <span className="sw-count">
-          <button type="button" className="reset" disabled={list.length <= 2} onClick={() => set(c.key, list.slice(0, -1))} aria-label="Fewer colours">−</button>
+          <button type="button" className="reset" disabled={list.length <= 2} onClick={() => set(c.key, list.slice(0, -1))} aria-label="Fewer colours"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" strokeWidth="1.6" /></svg></button>
           <span className="mono">{list.length}</span>
-          <button type="button" className="reset" disabled={list.length >= (c.count ?? 6)} onClick={() => set(c.key, [...list, list[list.length - 1] ?? '#ffffff'])} aria-label="More colours">+</button>
+          <button type="button" className="reset" disabled={list.length >= (c.count ?? 6)} onClick={() => set(c.key, [...list, list[list.length - 1] ?? '#ffffff'])} aria-label="More colours"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8M6 2v8" stroke="currentColor" strokeWidth="1.6" /></svg></button>
         </span>}
       </div>
       {growable && <div className="grad-preview" style={{ background: `linear-gradient(90deg, ${list.join(', ')})` }} />}
@@ -203,7 +204,7 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
   const v = look[c.key];
   const changed = !sameValue(v, base[c.key]);
   const reset = changed ? (
-    <button type="button" className="reset" onClick={() => set(c.key, base[c.key])} title="Back to the preset's value" aria-label={`Reset ${c.label}`}>↺</button>
+    <button type="button" className="reset" onClick={() => set(c.key, base[c.key])} title="Back to the preset's value" aria-label={`Reset ${c.label}`}>Reset</button>
   ) : null;
   switch (c.kind) {
     case 'slider': {
@@ -211,8 +212,10 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
       return (
         <div className="ctl" title={c.hint}>
           <div className="ctl-head"><span>{c.label}</span>{reset}<span className="mono val">{c.fmt ? c.fmt(n) : n}</span></div>
-          <input type="range" min={c.min} max={c.max} step={c.step} value={n} className={c.hue ? 'hue-track' : undefined}
-            onChange={(e) => set(c.key, Number(e.target.value))} onDoubleClick={() => set(c.key, base[c.key])} aria-label={c.label} />
+          {c.hue
+            ? <input type="range" min={c.min} max={c.max} step={c.step} value={n} className="hue-track"
+                onChange={(e) => set(c.key, Number(e.target.value))} onDoubleClick={() => set(c.key, base[c.key])} aria-label={c.label} />
+            : <Dial value={n} min={c.min} max={c.max} step={c.step} label={c.label} fmt={c.fmt} base={base[c.key] as number} onChange={(x) => set(c.key, x)} />}
         </div>
       );
     }
@@ -327,7 +330,7 @@ export default function LookControls({ layer, look, base, set, patch }: { layer:
     return (
       <div key={sec.title} className="ctl-section">
         <button type="button" className="section-label fold" onClick={() => setOpen({ ...open, [id]: !isOpen })} aria-expanded={isOpen}>
-          <span className="chev">{isOpen ? '▾' : '▸'}</span>{sec.title}{!isOpen && changed ? <span className="dot" title="Changed" /> : null}
+          <svg className="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style={{ transform: `rotate(${isOpen ? 90 : 0}deg)` }}><path d="M3 2l4 3-4 3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>{sec.title}{!isOpen && changed ? <span className="dot" title="Changed" /> : null}
         </button>
         {isOpen && rows.map((c, i) => <Row key={c.key + c.kind + i} c={c} look={look} base={base} set={set} patch={patch} />)}
       </div>
@@ -341,7 +344,7 @@ export default function LookControls({ layer, look, base, set, patch }: { layer:
       {extra.length > 0 && (
         <button type="button" className="more-toggle" onClick={() => setMore(!more)} aria-expanded={more}>
           <span>{more ? 'Fewer settings' : 'More settings'}{extraChanged && !more ? ' · changed' : ''}</span>
-          <span className="chev">{more ? '▴' : '▾'}</span>
+          <svg className="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style={{ transform: `rotate(${more ? -90 : 90}deg)` }}><path d="M3 2l4 3-4 3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
         </button>
       )}
       {more && extra.map(section)}

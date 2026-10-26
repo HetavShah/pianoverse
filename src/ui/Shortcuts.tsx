@@ -16,6 +16,7 @@ const GROUPS: { title: string; keys: [string[], string][] }[] = [
       [['Ctrl', 'Z'], 'Undo'],
       [['Ctrl', 'Y'], 'Redo (also Ctrl+Shift+Z)'],
       [['Ctrl', '1–5'], 'Go to a step'],
+      [['0–9'], 'On Style: Looks, the eight layers, Titles'],
     ],
   },
   {
@@ -31,7 +32,7 @@ export default function Shortcuts({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal shortcuts" role="dialog" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()}>
-        <div className="row"><h2>Keyboard shortcuts</h2><button type="button" className="x" aria-label="Close" onClick={onClose}>×</button></div>
+        <div className="row"><h2>Keyboard shortcuts</h2><button type="button" className="x" aria-label="Close" onClick={onClose}><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.7" /></svg></button></div>
         {GROUPS.map((g) => (
           <section key={g.title}>
             <span className="section-label">{g.title}</span>

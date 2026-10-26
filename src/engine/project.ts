@@ -37,6 +37,8 @@ export interface ProjectFile {
   noteSource?: import('./notes').NoteSource;
   /** the virtual camera: shots, transitions and the frame's shape */
   cameraTrack?: import('./camera').CameraTrack;
+  /** opening title and end card */
+  titles?: Partial<import('./titles').Titles>;
 }
 
 export interface ParticleScene {

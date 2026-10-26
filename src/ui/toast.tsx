@@ -31,7 +31,7 @@ export function Toasts() {
         <div key={t.id} className={'toast ' + t.kind}>
           <span>{t.text}</span>
           {t.action && <button type="button" className="link inline" onClick={() => { t.action!.run(); dismiss(t.id); }}>{t.action.label}</button>}
-          {t.kind === 'error' && <button type="button" className="x" aria-label="Dismiss" onClick={() => dismiss(t.id)}>×</button>}
+          {t.kind === 'error' && <button type="button" className="x" aria-label="Dismiss" onClick={() => dismiss(t.id)}><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.7" /></svg></button>}
         </div>
       ))}
     </div>

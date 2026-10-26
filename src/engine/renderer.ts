@@ -12,6 +12,7 @@ import saberSrc from './shaders/saber.wgsl?raw';
 import simSrc from './shaders/particles_sim.wgsl?raw';
 import partsSrc from './shaders/particles_draw.wgsl?raw';
 import postSrc from './shaders/post.wgsl?raw';
+import { Brand, DEFAULT_BRAND, drawTitles, resolveTitles, Titles } from './titles';
 import {
   Keyboard, Note, ProjectFile, RGB, gauss, lighten, mulberry32, prepareNotes, trackingMatrix,
 } from './project';
@@ -168,6 +169,15 @@ export class Renderer {
   private b2a!: GPUTexture;
   private b2b!: GPUTexture;
   private groups: Record<string, GPUBindGroup> = {};
+  // opening title and end card: a transparent layer drawn with 2D canvas, laid over the finished frame
+  private titles: Titles = resolveTitles(null);
+  private brand: Brand = DEFAULT_BRAND;
+  private logoImg: HTMLImageElement | null = null;
+  private titleCanvas: HTMLCanvasElement | null = null;
+  private titleTex: GPUTexture | null = null;
+  private blankTex!: GPUTexture;
+  /** the stretch of the video the cards belong to (export of a section); null = the whole video */
+  cardSpan: [number, number] | null = null;
 
   static async create(canvas: HTMLCanvasElement): Promise<Renderer> {
     if (!navigator.gpu) throw new Error('WebGPU is not available in this window.');
@@ -201,6 +211,8 @@ export class Renderer {
     this.bgUni = buf(128, U.UNIFORM | U.COPY_DST);
     this.bgTex = d.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
     this.tex = placeholder(d);
+    this.blankTex = d.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+    d.queue.writeTexture({ texture: this.blankTex }, new Uint8Array([0, 0, 0, 0]), { bytesPerRow: 4 }, [1, 1]);
     this.glassBuf = buf(MAX_GLASS * 64, U.VERTEX | U.COPY_DST);
     this.keysBuf = buf(MAX_KEYS * 6 * 28, U.VERTEX | U.COPY_DST);
     this.spriteBuf = buf(MAX_SPRITES * 48, U.VERTEX | U.COPY_DST);
@@ -208,7 +220,7 @@ export class Renderer {
     this.atlas = makeAtlas(d);
     this.saberUni = buf(64, U.UNIFORM | U.COPY_DST);
     this.saberMap = buf(64 * 8, U.STORAGE | U.COPY_DST);
-    this.heatBuf = buf(40 * 16, U.STORAGE | U.COPY_DST);
+    this.heatBuf = buf(64 * 16, U.STORAGE | U.COPY_DST);
     this.simUni = buf(112, U.UNIFORM | U.COPY_DST);
     this.partDrawUni = buf(32, U.UNIFORM | U.COPY_DST);
     this.shapeBuf = buf((SHAPE_SLOTS + MAX_SHAPE_POINTS) * 16, U.STORAGE | U.COPY_DST);
@@ -299,6 +311,7 @@ export class Renderer {
     this.whiteKeys = proj.keyboard.whiteKeys;
     this.kb = new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b);
     this.look = resolveLook(proj.look);
+    this.titles = resolveTitles(proj.titles);
     this.scenes = (proj.particleScenes ?? []).filter((sc) => sc.end > sc.start).slice(0, SHAPE_SLOTS - 1);
     const ns = proj.noteSource;
     this.bars = ns?.bars ? ns.bars.map((b) => b + ns.offset) : [];
@@ -344,6 +357,8 @@ export class Renderer {
   }
 
   get size() { return { width: this.rtW, height: this.rtH }; }
+  /** the project being drawn (gallery thumbnails borrow the renderer and put this back) */
+  get project() { return this.proj; }
   /** render-target pixels per frame pixel (preview quality) */
   get scaleFactor() { return this.scale; }
 
@@ -380,6 +395,46 @@ export class Renderer {
   private get frameW() { return this.outSize ? this.outSize[0] : this.srcW; }
   private get frameH() { return this.outSize ? this.outSize[1] : this.srcH; }
   get noteCount() { return this.notes.length; }
+
+  /** the maker's name, handle and logo for the cards */
+  setBrand(b: Brand | null) {
+    const nb = b ?? DEFAULT_BRAND;
+    if (nb.logo !== this.brand.logo || (nb.logo && !this.logoImg)) {
+      this.logoImg = null;
+      if (nb.logo) {
+        const img = new Image();
+        img.onload = () => { if (this.brand.logo === nb.logo) { this.logoImg = img; this.onTexture?.(); } };
+        img.src = nb.logo;
+      }
+    }
+    this.brand = nb;
+  }
+
+  private dropCompGroups() { for (const k of Object.keys(this.groups)) if (k.startsWith('comp1-')) delete this.groups[k]; }
+
+  /** draws this moment's cards; returns the texture to lay over the frame */
+  private cardLayer(t: number): GPUTexture {
+    const T = this.titles;
+    if (!this.proj || (!T.intro.on && !T.outro.on)) return this.blankTex;
+    const dur = this.proj.video.duration ?? this.proj.video.frames / (this.proj.video.fps || 30);
+    const span = this.cardSpan ?? [0, dur];
+    const w = this.rtW, h = this.rtH;
+    const cv = (this.titleCanvas ??= document.createElement('canvas'));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const ctx = cv.getContext('2d')!;
+    // where the keys are in the frame (the type goes above them); kb.H is this frame's tracking
+    const mid = this.whiteKeys / 2;
+    const v = this.frameView();
+    const keysAt = (this.kb.P(mid, this.kb.edgeY(mid))[1] - v.y) / v.h;
+    if (!drawTitles(ctx, w, h, t, span, T, this.brand, this.logoImg, this.proj.name, Number.isFinite(keysAt) ? keysAt : 0.6)) return this.blankTex;
+    if (!this.titleTex || this.titleTex.width !== w || this.titleTex.height !== h) {
+      this.titleTex?.destroy();
+      this.titleTex = this.device.createTexture({ size: [w, h], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+      this.dropCompGroups();
+    }
+    this.device.queue.copyExternalImageToTexture({ source: cv }, { texture: this.titleTex, premultipliedAlpha: true }, [w, h]);
+    return this.titleTex;
+  }
 
   private resize() {
     this.rtW = Math.max(2, Math.round(this.frameW * this.scale));
@@ -430,6 +485,17 @@ export class Renderer {
       const tg = kb.target(n.p);
       const vv = lk.partVelocity ? n.vn : 0.5; // "louder notes, bigger plumes" off: every note average
       // in a shape section the note sends sparks to the shape, and (unless turned off) its usual particles too
+      // the layers on every hit (sparks, glitter, glows): one emitter per note, any particle style but Shape
+      if (lk.partMode !== 'shape') {
+        const amt = lk.partAmount;
+        const nS = Math.round((5 + 9 * vv) * lk.partSparks * amt);
+        const nD = Math.round((70 + 110 * vv) * lk.partGlitter * amt);
+        const nG = Math.round((2 + 2 * vv) * lk.partGlow);
+        if (nS + nD + nG > 0) {
+          const k = Math.min(1, (PER_EMIT - 8) / (nS + nD + nG));
+          rows.push({ start: n.s, end: n.s + 0.4 + 3.4 * lk.partLife, data: [n.s, Math.round(nG * k), Math.round(nS * k), Math.round(nD * k), tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 13, 6, tg.unit, 0] });
+        }
+      }
       const jobs: { mode: string; slot: number; dir: number; size: number }[] = [];
       if (!sc || sc.keep !== false) jobs.push({ mode: lk.partMode, slot: 0, dir: lk.partShapeDir === 'ccw' ? -1 : 1, size: lk.partShapeSize });
       if (sc) jobs.push({ mode: 'shape', slot: scene + 1, dir: sc.dir === 'ccw' ? -1 : 1, size: sc.size });
@@ -513,7 +579,7 @@ export class Renderer {
     const keys: number[] = [];
     const sprites: number[] = [];
     const lights: number[] = [];
-    const heat = new Float32Array(40 * 4);
+    const heat = new Float32Array(64 * 4);
     let bass = 0;
     const L = this.layers;
     const kb = this.kb;
@@ -605,16 +671,20 @@ export class Renderer {
         }
       }
       const since = t - n.s;
-      if (since >= 0 && since < 0.9) {
+      // a saber lit only where you play also stays softly lit over held notes
+      const local = 1 - Math.min(1, lk.saberIdle);
+      const heldGlow = local > 0 && since >= 0 && t <= n.e ? 0.32 * local * lk.keyHeld : 0;
+      if (since >= 0 && (since < 0.9 || heldGlow > 0)) {
         const c = kb.keyCenterX(n.p);
-        for (let k = 0; k < 40; k++) {
-          const wgt = Math.exp(-since * 3.5) * Math.exp(-(((k + 0.5 - c) / 2.2) ** 2));
+        const wd = 2.2 - 0.7 * local;
+        for (let k = 0; k < 64; k++) {
+          const wgt = (Math.exp(-since * 3.5) + heldGlow) * Math.exp(-(((k + 0.5 - c) / wd) ** 2));
           heat[k * 4] += wgt * col[0];
           heat[k * 4 + 1] += wgt * col[1];
           heat[k * 4 + 2] += wgt * col[2];
           heat[k * 4 + 3] += wgt;
         }
-        if (n.p < 50) bass += Math.exp(-since * 4) * (0.6 + 0.6 * vn);
+        if (n.p < 50 && since < 0.9) bass += Math.exp(-since * 4) * (0.6 + 0.6 * vn);
       }
     }
     bass = Math.min(1, bass);
@@ -644,7 +714,7 @@ export class Renderer {
       this.srcW, this.srcH, this.rtW, this.rtH, pxScale, t, bass, Math.floor(t * 24),
       lk.noteBright, lk.noteGlow, lk.noteFill, lk.noteRim, lk.noteRound,
       originalNotes(lk) ? 0 : 1, 0, lk.noteDepth,
-      lk.saberBright, lk.saberThick, lk.saberFlicker, lk.saberReact, lk.saberTint, lk.noteOpacity, 0, 0,
+      lk.saberBright, lk.saberThick, lk.saberFlicker, lk.saberReact, lk.saberTint, lk.noteOpacity, lk.saberIdle, 0,
       sb[0], sb[1], sb[2], 0,
       lk.partSize, lk.partHaze, 0, 0,
       lk.bloom, lk.fringe, lk.grain, lk.bgDarken, lk.bgContrast, lk.bgSaturation, lk.bgVignette, lk.relight,
@@ -827,11 +897,13 @@ export class Renderer {
       } else {
         view = this.context.getCurrentTexture().createView();
       }
+      const card = this.cardLayer(t);
       const key = offscreen ? 'off' : 'on';
+      const ck = key + (card === this.blankTex ? '-0' : '-T');
       const cp = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }] });
       cp.setPipeline(pipe);
       cp.setBindGroup(0, frameGroup('comp-' + key, pipe));
-      cp.setBindGroup(1, this.group('comp1-' + key, () => d.createBindGroup({
+      cp.setBindGroup(1, this.group('comp1-' + ck, () => d.createBindGroup({
         layout: pipe.getBindGroupLayout(1),
         entries: [
           { binding: 0, resource: { buffer: this.postUni[6] } },
@@ -843,6 +915,7 @@ export class Renderer {
           { binding: 6, resource: { buffer: this.lightsBuf } },
           { binding: 7, resource: this.bgTex.createView() },
           { binding: 8, resource: { buffer: this.bgUni } },
+          { binding: 9, resource: card.createView() },
         ],
       })));
       cp.draw(3);
@@ -946,7 +1019,7 @@ export class Renderer {
       this.bgVideo?.pause();
       this.bgTex.destroy();
       this.bgTex = tex; this.bgCanvas = cv; this.bgVideo = video; this.bgAspect = w / h; this.bgKey = key;
-      delete this.groups['comp1-on']; delete this.groups['comp1-off'];
+      this.dropCompGroups();
       if (video) this.refreshBgVideo();
       this.onTexture?.();
     })().catch((e) => console.warn('[background]', e));

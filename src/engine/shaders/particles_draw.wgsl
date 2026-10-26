@@ -17,6 +17,17 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
   var o: VOut;
   let P = parts[ii];
   if (P.b < 0.01) { o.pos = OFFSCREEN; return o; }
+  let c0 = corner(vi) * 2.0 - vec2f(1.0);
+  if (P.pad > 1.5) {
+    // a soft glow (radius in z)
+    let gh = P.z * 2.6;
+    o.pos = toClip(P.pos + c0 * gh);
+    o.local = c0 * gh;
+    o.ray = vec4f(2.0, 0.0, P.z, 1.0);
+    o.col = vec4f(P.col.rgb, P.b);
+    o.star = 0.0;
+    return o;
+  }
   let isStar = P.star > 0.5 && P.b > 0.35;
   var half = max(9.0, 4.0 / F.scale) * max(F.partSize, sqrt(F.partSize * max(F.partHaze, 1.0)));
   if (isStar) { half = 24.0 * F.partSize; }
@@ -27,10 +38,11 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
   o.local = c * half;
   o.ray = vec4f(0.0, 0.0, 0.0, zs);
   let sp = length(P.vel);
-  if (DP.rays > 0.5 && sp > 1.0 && !isStar) {
-    // a short streak along the particle's motion
+  let spark = P.pad > 0.5;
+  if ((DP.rays > 0.5 || spark) && sp > 1.0 && !isStar) {
+    // a short streak along the particle's motion (sparks always have one)
     let dir = P.vel / sp;
-    let len = max(half, sp * 0.045 * DP.rayLen * F.partSize);
+    let len = max(half, sp * select(0.045 * DP.rayLen, 0.035, spark) * F.partSize);
     let nrm = vec2f(-dir.y, dir.x);
     p = P.pos + dir * (c.x * (len + half)) + nrm * (c.y * half);
     o.local = vec2f(c.x * (len + half), c.y * half);
@@ -45,6 +57,12 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
 @fragment
 fn fs(i: VOut) -> @location(0) vec4f {
   var lp = i.local;
+  if (i.ray.x > 1.5) {
+    let R = i.ray.z;
+    let gl = exp(-dot(lp, lp) / (2.0 * R * R));
+    let rgbG = i.col.rgb * i.col.a * gl * 0.5 * F.partHaze;
+    return vec4f(rgbG * DP.additive * DP.bright * DP.opacity, 0.0);
+  }
   if (i.ray.x > 0.5) { lp.x = max(abs(lp.x) - i.ray.z, 0.0); }    // streak: a line with round ends
   let rr = dot(lp, lp);
   let sig = max(0.75, 0.6 / F.scale) * F.partSize * i.ray.w;

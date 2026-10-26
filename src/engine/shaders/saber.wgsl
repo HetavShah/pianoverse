@@ -12,7 +12,7 @@ struct Saber {
 };
 @group(1) @binding(0) var<uniform> S: Saber;
 @group(1) @binding(1) var<storage, read> smap: array<vec2f>;  // 64 samples along the line: plane x, px per key
-@group(1) @binding(2) var<storage, read> heat: array<vec4f>;  // per key: colour-weighted sum (xyz), heat (w)
+@group(1) @binding(2) var<storage, read> heat: array<vec4f>;  // per white key (64): colour-weighted sum (xyz), heat (w)
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
@@ -53,9 +53,9 @@ fn fs(@builtin(position) fp: vec4f) -> @location(0) vec4f {
   let sc = m.y / 30.0;
   let endf = clamp((pcol + 0.2) / 0.6, 0.0, 1.0) * clamp((S.keys + 0.2 - pcol) / 0.6, 0.0, 1.0);
 
-  let hx = clamp(pcol - 0.5, 0.0, 39.0);
+  let hx = clamp(pcol - 0.5, 0.0, 63.0);
   let h0 = u32(floor(hx));
-  let h1 = min(h0 + 1u, 39u);
+  let h1 = min(h0 + 1u, 63u);
   let hv = mix(heat[h0], heat[h1], fract(hx));
   let hk = min(hv.w * F.saberReact, 2.5);
   var hc = vec3f(150.0, 255.0, 222.0) / 255.0;
@@ -66,7 +66,8 @@ fn fs(@builtin(position) fp: vec4f) -> @location(0) vec4f {
   let t = S.time;
   let swell = (0.55 + 0.45 * sin(pcol * 1.1 + t * 1.9)) * (0.6 + 0.4 * sin(pcol * 0.37 - t * 1.2 + 1.3));
   let h = max((7.0 + 9.0 * swell + 26.0 * sqrt(hk)) * sc * F.saberFlicker, 0.01);
-  let I = (0.6 + 0.25 * S.bass + 0.9 * hk) * endf * F.saberBright;
+  // the resting glow (whole line) plus the flare where notes land; with a low resting glow only the played stretch lights
+  let I = ((0.6 + 0.25 * S.bass) * F.saberIdle + 0.9 * hk) * endf * F.saberBright;
 
   let vline = S.A.y + (S.B.y - S.A.y) * s;
   let dy = vline - src.y;            // > 0 above the line

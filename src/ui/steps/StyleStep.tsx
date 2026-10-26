@@ -1,31 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
+import Transport from '../Transport';
+import Dial from '../Dial';
 import { autoNoteAngle, MAX_TILT } from '../../engine/direction';
 import type { Layers } from '../../engine/renderer';
 import { applyPreset, LayerId, Look, LOOK_SCHEMA, matchesPreset, PALETTES, resolveLook, NOTE_TEXTURES, COLOR_BY, NOTE_2D, NOTE_3D, SABER_STYLES, PARTICLE_PRESETS, sameValue } from '../../engine/look';
 import LookControls from '../LookControls';
 import PresetBar from '../PresetBar';
+import LookGallery from '../LookGallery';
+import TitlesPanel from '../TitlesPanel';
+import { resolveTitles } from '../../engine/titles';
 import StyleTimeline from '../StyleTimeline';
 import type { WS } from '../workspace';
 import ShapeSections from '../ShapeSections';
 import type { ParticleScene } from '../../engine/project';
 
-const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
-
-type Panel = { id: LayerId; label: string; kind: (l: Look) => string; icon: string; toggle?: keyof Layers };
+type Panel = { id: LayerId; label: string; kind: (l: Look) => string; toggle?: keyof Layers };
 const PANELS: Panel[] = [
-  { id: 'colors', label: 'Colours', kind: (l) => (l.colorBy === 'gradient' ? PALETTES.find((p) => p.id === l.palette)?.label.split(' ')[0] ?? '' : COLOR_BY.find((c) => c.id === l.colorBy)?.label ?? ''), icon: 'M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-1-.8-1.4-.8-2.4 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.7-4-8.4-9-8.4zM7.5 11a1 1 0 1 0 0 .1M10 7a1 1 0 1 0 0 .1M15 7.5a1 1 0 1 0 0 .1' },
-  { id: 'notes', label: 'Notes', kind: (l) => (l.noteDim === '2d' ? NOTE_2D.find((o) => o.id === l.note2d)?.label ?? '2D' : NOTE_3D.find((o) => o.id === l.note3d)?.label ?? '3D') + (l.texOn ? ' · ' + (NOTE_TEXTURES.find((t) => t.id === l.noteTexture)?.label ?? 'texture') : ''), icon: 'M9 3h6v18H9z', toggle: 'notes' },
-  { id: 'saber', label: 'Saber', kind: (l) => SABER_STYLES.find((x) => x.id === l.saberStyle)?.label ?? 'Plasma', icon: 'M3 14h18M6 11c2-2 4-2 6 0s4 2 6 0', toggle: 'saber' },
-  { id: 'impact', label: 'Impact', kind: () => 'Flash', icon: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6', toggle: 'impact' },
-  { id: 'particles', label: 'Particles', kind: (l) => PARTICLE_PRESETS.find((p) => Object.entries(p.set).every(([k, v]) => sameValue(l[k as keyof Look], v)))?.label ?? 'Custom', icon: 'M7 17a1 1 0 1 0 0 .1M12 9a1 1 0 1 0 0 .1M16 14a1 1 0 1 0 0 .1M10 5a1 1 0 1 0 0 .1M17 6a1 1 0 1 0 0 .1', toggle: 'particles' },
-  { id: 'lighting', label: 'Lighting', kind: () => 'Relight', icon: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z', toggle: 'keys' },
-  { id: 'background', label: 'Background', kind: (l) => (l.bgImageOn ? 'Image' : l.bgColorOn ? 'Colour' : 'Footage'), icon: 'M3 5h18v14H3zM3 15l5-4 4 3 3-2 6 5' },
-  { id: 'finish', label: 'Glow and film', kind: () => 'Bloom', icon: 'M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10M12 2v2M12 20v2M2 12h2M20 12h2', toggle: 'bloom' },
+  { id: 'colors', label: 'Colours', kind: (l) => (l.colorBy === 'gradient' ? PALETTES.find((p) => p.id === l.palette)?.label.split(' ')[0] ?? '' : COLOR_BY.find((c) => c.id === l.colorBy)?.label ?? '') },
+  { id: 'notes', label: 'Notes', kind: (l) => (l.noteDim === '2d' ? NOTE_2D.find((o) => o.id === l.note2d)?.label ?? '2D' : NOTE_3D.find((o) => o.id === l.note3d)?.label ?? '3D') + (l.texOn ? ' · ' + (NOTE_TEXTURES.find((t) => t.id === l.noteTexture)?.label ?? 'texture') : ''), toggle: 'notes' },
+  { id: 'saber', label: 'Saber', kind: (l) => SABER_STYLES.find((x) => x.id === l.saberStyle)?.label ?? 'Plasma', toggle: 'saber' },
+  { id: 'impact', label: 'Impact', kind: () => 'Flash', toggle: 'impact' },
+  { id: 'particles', label: 'Particles', kind: (l) => PARTICLE_PRESETS.find((p) => Object.entries(p.set).every(([k, v]) => sameValue(l[k as keyof Look], v)))?.label ?? 'Custom', toggle: 'particles' },
+  { id: 'lighting', label: 'Lighting', kind: () => 'Relight', toggle: 'keys' },
+  { id: 'background', label: 'Background', kind: (l) => (l.bgImageOn ? 'Image' : l.bgColorOn ? 'Colour' : 'Footage') },
+  { id: 'finish', label: 'Glow and film', kind: () => 'Bloom', toggle: 'bloom' },
 ];
+
+type Sel = LayerId | 'looks' | 'titles';
 
 export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; attachPreview: (c: HTMLCanvasElement | null) => void; fps: number; stats: string }) {
   const { project } = ws;
-  const [sel, setSel] = useState<LayerId>('notes');
+  const [sel, setSel] = useState<Sel>('notes');
   const [scene, setScene] = useState<string | null>(null);
   const [original, setOriginal] = useState(false);
   const [guides, setGuides] = useState(false);
@@ -41,15 +46,33 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
     cv.getContext('2d')!.drawImage(v, 0, 0, cv.width, cv.height);
   }, [original, v, ws.time, ws.frameTick]);
 
+  // 1–8 pick a layer, in the order of the list
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button'].includes((el as HTMLInputElement).type)))) return;
+      // 0 Looks, 1–8 the layers, 9 Titles
+      const n = /^Digit([0-9])$/.exec(e.code);
+      if (n) { e.preventDefault(); const k = Number(n[1]); setSel(k === 0 ? 'looks' : k === 9 ? 'titles' : PANELS[k - 1].id); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   if (!project) return null;
   const noNotes = project.notes.length === 0;
-  const layer = PANELS.find((l) => l.id === sel)!;
+  const isLayer = sel !== 'looks' && sel !== 'titles';
+  const layer = PANELS.find((l) => l.id === sel) ?? PANELS[1];
   const look = resolveLook(project.look);
   const preset = ws.presets.find((p) => p.id === project.presetId) ?? ws.presets.find((p) => p.id === 'interstellar-teal')!;
   const base = resolveLook(applyPreset(project.look, preset));
   const setLook = (patch: Partial<Look>) => ws.setProject({ ...project, look: { ...project.look, ...patch } });
   const setKey = (k: keyof Look, v: unknown) => setLook({ [k]: v } as Partial<Look>);
-  const layerKeys = LOOK_SCHEMA[sel].flatMap((sec) => sec.controls.map((c) => c.key));
+  const layerKeys = isLayer ? LOOK_SCHEMA[sel as LayerId].flatMap((sec) => sec.controls.map((c) => c.key)) : [];
+  const modified = !matchesPreset(project.look, preset);
+  const titles = resolveTitles(project.titles);
+  const titlesKind = [titles.intro.on && 'Opening', titles.outro.on && 'End card'].filter(Boolean).join(' · ') || 'Off';
   const layerChanged = layerKeys.some((k) => !sameValue(look[k], base[k]));
   const autoAngle = autoNoteAngle(project);
   const setAngle = project.look?.noteAngle;
@@ -63,18 +86,26 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
   return (
     <div className="style-page">
       <nav className="style-layers" aria-label="Layers">
-        <span className="section-label">Layers</span>
-        {PANELS.map((l) => (
-          <div key={l.id} className={'layer-row' + (sel === l.id ? ' on' : '') + (l.toggle && !ws.layers[l.toggle] ? ' off' : '')} onClick={() => setSel(l.id)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d={l.icon} /></svg>
-            <span className="name">{l.label}</span>
-            <span className="kind">{l.kind(look)}</span>
-            {l.toggle ? (
-              <input type="checkbox" checked={ws.layers[l.toggle]} onClick={(e) => e.stopPropagation()} onChange={(e) => ws.setLayers({ ...ws.layers, [l.toggle!]: e.target.checked })} aria-label={`Show ${l.label}`} />
-            ) : <span className="cb-space" />}
-          </div>
-        ))}
-        <PresetBar ws={ws} preset={preset} modified={!matchesPreset(project.look, preset)} />
+        <button type="button" className={'layer-row looks-row' + (sel === 'looks' ? ' on' : '')} onClick={() => setSel('looks')}
+          aria-current={sel === 'looks' ? 'true' : undefined} title={`Looks · ${preset.name}${modified ? ' (changed)' : ''} (press 0)`}>
+          <span className="num" aria-hidden="true">00</span>
+          <span className="name">Looks</span>
+        </button>
+        {PANELS.map((l, i) => {
+          const hidden = !!l.toggle && !ws.layers[l.toggle];
+          return (
+            <button key={l.id} type="button" className={'layer-row' + (sel === l.id ? ' on' : '') + (hidden ? ' off' : '')} onClick={() => setSel(l.id)}
+              aria-current={sel === l.id ? 'true' : undefined} title={`${l.label} · ${l.kind(look)}${hidden ? ' · hidden' : ''} (press ${i + 1})`}>
+              <span className="num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+              <span className="name">{l.label}</span>
+            </button>
+          );
+        })}
+        <button type="button" className={'layer-row titles-row' + (sel === 'titles' ? ' on' : '')} onClick={() => setSel('titles')}
+          aria-current={sel === 'titles' ? 'true' : undefined} title={`Titles · ${titlesKind} (press 9)`}>
+          <span className="num" aria-hidden="true">09</span>
+          <span className="name">Titles</span>
+        </button>
       </nav>
 
       <main className="style-center">
@@ -123,39 +154,27 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
           </div>
           {stats && <div className="stats">{stats}</div>}
         </div>
-        <div className="transport-row">
-          <button type="button" className="btn icon ghost" onClick={() => ws.seek(Math.max(0, ws.time - 5))} aria-label="Back 5 seconds" title="Back 5 s">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM19 5v14l-10-7z" /></svg>
-          </button>
-          <button type="button" className="play" onClick={ws.togglePlay} aria-label={ws.playing ? 'Pause' : 'Play'}>
-            {ws.playing ? <svg width="18" height="18" viewBox="0 0 24 24" fill="#0B0D10"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg> : <svg width="18" height="18" viewBox="0 0 24 24" fill="#0B0D10"><path d="M7 4.5v15l12-7.5z" /></svg>}
-          </button>
-          <button type="button" className="btn icon ghost" onClick={() => ws.seek(Math.min(ws.duration, ws.time + 5))} aria-label="Forward 5 seconds" title="Forward 5 s">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM5 5v14l10-7z" /></svg>
-          </button>
-          <span className="time">{fmtT(ws.time)} <span className="dim">/ {fmtT(ws.duration)}</span></span>
-          {ws.loop.on && <span className="loop-tag mono">{ws.loop.range ? `loop ${fmtT(ws.loop.range[0])}–${fmtT(ws.loop.range[1])}` : 'loop all'}</span>}
-          <button type="button" className={'btn icon' + (ws.loop.on ? ' on' : ' ghost')} onClick={() => ws.setLoop({ ...ws.loop, on: !ws.loop.on })} aria-label="Loop"
-            title={ws.loop.range ? 'Loop the selected section' : 'Loop the whole video (drag on the timeline to loop a section)'}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" /></svg>
-          </button>
-        </div>
       </main>
 
       <aside className="style-side">
-        <div className="row"><h2>{layer.label}</h2>{layer.toggle && <label className="check-inline">On <input type="checkbox" checked={ws.layers[layer.toggle]} onChange={(e) => ws.setLayers({ ...ws.layers, [layer.toggle!]: e.target.checked })} /></label>}</div>
+        {sel === 'looks' && <div className="insp-head"><div><h2>Looks</h2><span className="insp-kind">{preset.name}{modified ? ' · changed' : ''}</span></div></div>}
+        {sel === 'looks' && <LookGallery ws={ws} current={preset} modified={modified} />}
+        {sel === 'titles' && <div className="insp-head"><div><h2>Titles</h2><span className="insp-kind">{titlesKind}</span></div></div>}
+        {sel === 'titles' && <TitlesPanel ws={ws} />}
+        {isLayer && <>
+        <div className="insp-head"><div><h2>{layer.label}</h2><span className="insp-kind">{layer.kind(look)}</span></div>{layer.toggle && <label className="check-inline">Shown <input type="checkbox" checked={ws.layers[layer.toggle]} onChange={(e) => ws.setLayers({ ...ws.layers, [layer.toggle!]: e.target.checked })} /></label>}</div>
         {sel === 'notes' && (
           <>
             <div className="ctl-section"><span className="section-label">Direction</span>
             <div className="angle">
               <svg width="34" height="34" viewBox="-17 -17 34 34" aria-hidden="true">
-                <circle r="15" fill="none" stroke="#2c333c" />
+                <circle r="15" fill="none" stroke="var(--rule-2)" />
                 <g transform={`rotate(${angle})`}>
-                  <line x1="0" y1="-12" x2="0" y2="7" stroke="#2FD3B5" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M-4.5 4 L0 10 L4.5 4" fill="none" stroke="#2FD3B5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <line x1="0" y1="-12" x2="0" y2="7" stroke="var(--paper)" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M-4.5 4 L0 10 L4.5 4" fill="none" stroke="var(--paper)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </g>
               </svg>
-              <input type="range" min={-MAX_TILT} max={MAX_TILT} step={1} value={angle} onChange={(e) => setNoteAngle(Number(e.target.value))} aria-label="Note angle" />
+              <Dial value={angle} min={-MAX_TILT} max={MAX_TILT} step={1} label="Note angle" fmt={(v) => `${v}°`} base={autoAngle} onChange={(v) => setNoteAngle(v)} />
               <span className="deg">{angle}°</span>
             </div>
             <p className="help">
@@ -172,18 +191,23 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
             </div>
           </>
         )}
+        <LookControls layer={sel as LayerId} look={look} base={base} set={setKey} patch={setLook} />
+        {/* shape sections come after the particle look, so the first thing on screen is a value to change */}
         {sel === 'particles' && (
           <ShapeSections scenes={scenes} setScenes={setScenes} selected={scene} setSelected={pickScene}
             duration={ws.duration} time={ws.time} range={ws.loop.range} seek={ws.seek} />
         )}
-        <LookControls layer={sel} look={look} base={base} set={setKey} patch={setLook} />
         {layerChanged && (
           <button type="button" className="btn small ghost" onClick={() => setLook(Object.fromEntries(layerKeys.map((k) => [k, base[k]])) as Partial<Look>)}>
             Reset {layer.label.toLowerCase()} to “{preset.name}”
           </button>
         )}
+        </>}
+        {sel !== 'titles' && <PresetBar ws={ws} preset={preset} modified={modified} onOpenLooks={sel === 'looks' ? undefined : () => setSel('looks')} />}
       </aside>
 
+      <div className="score">
+      <Transport ws={ws} />
       <StyleTimeline
         project={project}
         time={ws.time}
@@ -196,6 +220,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
         selectedScene={scene}
         onSelectScene={pickScene}
       />
+      </div>
     </div>
   );
 }

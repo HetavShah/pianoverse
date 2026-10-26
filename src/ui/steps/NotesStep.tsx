@@ -3,6 +3,7 @@ import { noteName } from '../../engine/calibration';
 import { outOfRange, pitchRange } from '../../engine/notes';
 import { useClickTrack } from '../clicks';
 import PickButton from '../PickButton';
+import Dial from '../Dial';
 import { sourceOf } from '../useNotes';
 import WaveSync, { attackTimes, matchScore } from '../WaveSync';
 import type { WS } from '../workspace';
@@ -36,7 +37,7 @@ export default function NotesStep({ ws }: { ws: WS }) {
         <div className="title-row">
           <div>
             <h1>Notes and sync</h1>
-            <p className="sub">Each teal tick is a note. They should sit on the attacks in your audio.</p>
+            <p className="sub">Each white tick is a note. It should sit on an attack in your audio.</p>
           </div>
           <div className="seg big" role="radiogroup" aria-label="Where the notes come from">
             <PickButton what="midi" className={'seg-btn' + (src?.kind === 'midi' ? ' on' : '')} onPick={ws.pick} onFiles={ws.onFiles} disabled={!!busy}>From MIDI file</PickButton>
@@ -58,14 +59,14 @@ export default function NotesStep({ ws }: { ws: WS }) {
           </div>
         ) : src.kind === 'midi' ? (
           <div className={'banner' + (src.confidence !== undefined && src.confidence < 0.5 ? ' warn' : '')}>
-            <span className={'check' + (src.confidence !== undefined && src.confidence < 0.5 ? ' warn' : '')}>{src.confidence !== undefined && src.confidence < 0.5 ? '!' : '✓'}</span>
+            <span className={'check' + (src.confidence !== undefined && src.confidence < 0.5 ? ' warn' : '')} aria-hidden="true" />
             <b>{src.confidence === undefined ? 'Placed by hand' : src.confidence >= 0.5 ? 'Aligned automatically' : 'Not sure about the alignment: check by ear'}</b>
             <span className="mono dim">offset {fmtOffset(src.offset)}{score !== null ? ` · match ${Math.round(score * 100)}%` : ''}</span>
             <button type="button" className="btn small" onClick={n.autoAlign}>Re-run alignment</button>
           </div>
         ) : (
           <div className="banner">
-            <span className="check">✓</span>
+            <span className="check" aria-hidden="true" />
             <b>{src.name}</b>
             <span className="mono dim">{src.notes.length} notes{score !== null ? ` · match ${Math.round(score * 100)}%` : ''}</span>
             <button type="button" className="btn small" onClick={() => setShowDetect(true)}>Detection settings</button>
@@ -99,11 +100,9 @@ export default function NotesStep({ ws }: { ws: WS }) {
       <aside className="page-side">
         <h2>Fine-tune</h2>
         <div className="side-field">
-          <span className="row"><span>Offset</span><span className="mono">{src ? fmtOffset(src.offset) : '—'}</span></span>
-          <input
-            type="range" min={c - 1} max={c + 1} step={0.001} value={src?.offset ?? 0} disabled={!src}
-            onChange={(e) => n.setOffset(Number(e.target.value))} aria-label="Offset"
-          />
+          <span className="ctl-head"><span>Offset</span><span className="mono val">{src ? fmtOffset(src.offset) : '—'}</span></span>
+          <Dial value={src?.offset ?? 0} min={c - 1} max={c + 1} step={0.001} label="Offset" fmt={fmtOffset} stops={false} disabled={!src}
+            onChange={(v) => n.setOffset(v)} />
           <div className="nudge">
             {[-0.1, -0.01, 0.01, 0.1].map((d) => (
               <button key={d} type="button" className="btn small" disabled={!src} onClick={() => src && n.setOffset(src.offset + d)}>{d > 0 ? '+' : '−'}{Math.abs(d * 1000)}</button>
@@ -115,7 +114,7 @@ export default function NotesStep({ ws }: { ws: WS }) {
           <input type="checkbox" checked={clickOn} onChange={(e) => setClickOn(e.target.checked)} />
         </label>
         <button type="button" className="btn wide" onClick={ws.togglePlay}>
-          {ws.playing ? '❚❚  Pause' : '▶  Play from playhead'}
+          {ws.playing ? 'Pause' : 'Play from the playhead'}
         </button>
         <label className="side-field">
           <span>Transpose</span>
@@ -141,7 +140,7 @@ export default function NotesStep({ ws }: { ws: WS }) {
 
       <footer className="page-foot">
         <button type="button" className="btn" onClick={() => ws.goStep('import')}>Back</button>
-        <button type="button" className="btn primary" onClick={() => ws.goStep('calibrate')}>Continue to calibration <span aria-hidden="true">→</span></button>
+        <button type="button" className="btn primary" onClick={() => ws.goStep('calibrate')}>Continue to calibration <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
       </footer>
     </div>
   );

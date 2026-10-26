@@ -1,8 +1,9 @@
 // Shape sections: parts of the video where the notes' particles trace a shape instead of the normal
-// particle style. Listed at the top of the Particles panel; the selected one can be edited here and
+// particle style. Listed below the particle controls; the selected one can be edited here and
 // resized on the timeline.
 import type { ParticleScene } from '../engine/project';
 import ShapePicker, { BUILT_IN_SHAPES } from './ShapePicker';
+import Dial from './Dial';
 
 const fmt = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 const newId = () => 's' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
@@ -68,7 +69,7 @@ export default function ShapeSections(props: {
           <ShapePicker value={sel.shape} onPick={(shape) => edit({ shape })} />
           <div className="ctl">
             <div className="ctl-head"><span>Size</span><span className="mono val">{sel.size.toFixed(2)}×</span></div>
-            <input type="range" min={0.3} max={1.6} step={0.01} value={sel.size} onChange={(e) => edit({ size: Number(e.target.value) })} aria-label="Shape size" />
+            <Dial value={sel.size} min={0.3} max={1.6} step={0.01} label="Shape size" fmt={(v) => `${v.toFixed(2)}×`} base={1} onChange={(v) => edit({ size: v })} />
           </div>
           <div className="ctl">
             <div className="ctl-head"><span>Direction</span></div>

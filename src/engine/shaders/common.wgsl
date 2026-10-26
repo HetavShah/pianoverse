@@ -11,7 +11,7 @@ struct Frame {
   noteBright: f32, noteGlow: f32, noteFill: f32, noteRim: f32,
   noteRound: f32, noteStyle: f32, noteShape: f32, noteDepth: f32,
   saberBright: f32, saberThick: f32, saberFlicker: f32, saberReact: f32,
-  saberTint: f32, noteOpacity: f32, lpad4: f32, lpad5: f32,
+  saberTint: f32, noteOpacity: f32, saberIdle: f32, lpad5: f32,  // saberIdle: glow of the line where nothing is played
   saberBase: vec4f,
   partSize: f32, partHaze: f32, lpad6: f32, lpad7: f32,
   bloom: f32, fringe: f32, grainAmt: f32, darken: f32,

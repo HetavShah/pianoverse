@@ -2,6 +2,7 @@
 // attacks in the audio. Bright ticks land on a heard attack, faded ones don't. Drag sideways to nudge the
 // notes, click to move the playhead, scroll to zoom, Shift+scroll to pan, drag the bottom edge to resize.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { FONT, INK } from './palette';
 import type { RawNote } from '../engine/project';
 import { RATE } from '../engine/sync';
 import { PEAK_RATE, VideoAudio } from './audio';
@@ -94,21 +95,21 @@ export default function WaveSync(props: {
     const pxs = w / span;
     const X = (t: number) => (t - t0) * pxs;
     // ruler
-    ctx.font = '11px "Cascadia Mono", Consolas, monospace';
-    ctx.fillStyle = '#7d8896';
+    ctx.font = `500 11px ${FONT}`;
+    ctx.fillStyle = INK.stone;
     const step = span <= 4 ? 0.5 : span <= 16 ? 2 : span <= 40 ? 5 : span <= 120 ? 10 : 30;
     for (let s = Math.ceil(t0 / step) * step; s <= t0 + span + 1e-6; s += step) {
       const x = Math.round(X(s));
       ctx.fillText(step < 1 ? s.toFixed(1) : fmtT(s), Math.min(w - 34, x + 2), 14);
-      ctx.fillStyle = '#1b2027'; ctx.fillRect(x, RULER, 1, h - RULER); ctx.fillStyle = '#7d8896';
+      ctx.fillStyle = INK.rule; ctx.fillRect(x, RULER, 1, h - RULER); ctx.fillStyle = INK.stone;
     }
     // panel
     const top = RULER, waveTop = top + TICKS + 6, waveH = h - waveTop - 2, mid = waveTop + waveH / 2;
-    ctx.fillStyle = '#0b0e12';
-    ctx.beginPath(); ctx.roundRect(0, top, w, h - top, 6); ctx.fill();
+    ctx.fillStyle = INK.stage;
+    ctx.fillRect(0, top, w, h - top);
     // waveform: min/max per pixel column
     if (audio) {
-      ctx.fillStyle = '#7b8696';
+      ctx.fillStyle = '#4e4c47';
       const perPx = span / w;
       for (let x = 0; x < w; x++) {
         const ta = t0 + x * perPx, tb = ta + perPx;
@@ -125,7 +126,7 @@ export default function WaveSync(props: {
         ctx.fillRect(x, mid - Math.min(waveH / 2, hi * k), 1, Math.max(1, Math.min(waveH / 2, hi * k) + Math.min(waveH / 2, -lo * k)));
       }
     } else {
-      ctx.fillStyle = '#6b7684'; ctx.font = '12px Inter, "Segoe UI", sans-serif';
+      ctx.fillStyle = INK.stone; ctx.font = `13px ${FONT}`;
       ctx.fillText('Reading the soundtrack…', 12, mid);
     }
     // note ticks (bright on a heard attack, faded otherwise) + faint guide into the waveform
@@ -134,20 +135,20 @@ export default function WaveSync(props: {
       if (s < t0 - 0.05 || s > t0 + span + 0.05) continue;
       const x = Math.round(X(s));
       const on = attacks.length ? nearestDist(attacks, s) * 1000 <= MATCH_MS : true;
-      ctx.fillStyle = on ? '#2FD3B5' : 'rgba(47,211,181,0.32)';
+      ctx.fillStyle = on ? INK.paper : 'rgba(242,239,232,0.3)';
       ctx.fillRect(x - 1, top + 6, 2.5, TICKS - 6);
-      ctx.fillStyle = on ? 'rgba(47,211,181,0.22)' : 'rgba(47,211,181,0.07)';
+      ctx.fillStyle = on ? 'rgba(242,239,232,0.2)' : 'rgba(242,239,232,0.06)';
       ctx.fillRect(x, waveTop, 1, waveH);
     }
     // playhead
     const px = Math.round(X(time));
-    ctx.fillStyle = '#e8eaed'; ctx.fillRect(px, top, 2, h - top);
+    ctx.fillStyle = INK.live; ctx.fillRect(px - 1, top, 2, h - top);
     if (drag?.kind === 'nudge' && drag.moved) {
       const label = `${drag.d >= 0 ? '+' : '−'}${Math.abs(drag.d * 1000).toFixed(0)} ms`;
-      ctx.font = '600 12px Inter, "Segoe UI", sans-serif';
+      ctx.font = `600 12px ${FONT}`;
       const tw = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(11,14,18,0.92)'; ctx.fillRect(px + 8, top + 8, tw + 14, 20);
-      ctx.fillStyle = '#2FD3B5'; ctx.fillText(label, px + 15, top + 22);
+      ctx.fillStyle = INK.paper; ctx.fillRect(px + 8, top + 8, tw + 14, 20);
+      ctx.fillStyle = INK.ground; ctx.fillText(label, px + 15, top + 22);
     }
   });
 
@@ -201,9 +202,9 @@ export default function WaveSync(props: {
       <div className="wave-foot">
         <span className="legend"><i className="lg-tick" />Notes <i className="lg-tick faded" />no sound there <i className="lg-wave" />Audio</span>
         <span className="zoom">
-          <button type="button" className="btn small" onClick={() => zoom(1 / 1.6)} aria-label="Zoom in">+</button>
+          <button type="button" className="btn small" onClick={() => zoom(1 / 1.6)} aria-label="Zoom in"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8M6 2v8" stroke="currentColor" strokeWidth="1.6" /></svg></button>
           <span className="span-label">{span < 10 ? span.toFixed(1) : Math.round(span)} s</span>
-          <button type="button" className="btn small" onClick={() => zoom(1.6)} aria-label="Zoom out">−</button>
+          <button type="button" className="btn small" onClick={() => zoom(1.6)} aria-label="Zoom out"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" strokeWidth="1.6" /></svg></button>
           <button type="button" className="btn small" onClick={() => { setSpan(Math.max(2, dur)); setStart(0); setFollow(false); }}>Whole video</button>
           <button type="button" className={'btn small' + (follow ? ' on' : '')} onClick={() => setFollow(true)}>Follow playhead</button>
         </span>

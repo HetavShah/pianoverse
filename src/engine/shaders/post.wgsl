@@ -69,6 +69,7 @@ struct BG {
   alphaOut: f32, q1: f32, q2: f32, q3: f32,
 };
 @group(1) @binding(8) var<uniform> BGU: BG;
+@group(1) @binding(9) var cardTex: texture_2d<f32>;   // opening title / end card, premultiplied
 
 fn hueRot(c: vec3f, a: f32) -> vec3f {
   let k = vec3f(0.57735);
@@ -165,7 +166,11 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   if (BGU.alphaOut > 0.5) {
     // effects only, on a transparent background: over the original video this gives light + video * (1 - alpha)
     let a = clamp(max(max(max(Lc.r, Lc.g), Lc.b), clamp(L.a, 0.0, 0.8)), 0.0, 1.0);
-    return vec4f(select(vec3f(0.0), clamp(Lc / max(a, 1e-4), vec3f(0.0), vec3f(1.0)), a > 1e-4), a * (1.0 - F.fade));
+    let C = textureSampleLevel(cardTex, samp, i.uv, 0.0);
+    let ca = a * (1.0 - F.fade);
+    let a2 = ca + C.a * (1.0 - ca);
+    let c2 = clamp(Lc, vec3f(0.0), vec3f(1.0)) * (1.0 - F.fade) * (1.0 - C.a) + C.rgb;
+    return vec4f(select(vec3f(0.0), clamp(c2 / max(a2, 1e-4), vec3f(0.0), vec3f(1.0)), a2 > 1e-4), a2);
   }
   var out = base + Lc * (vec3f(1.0) - base * 0.55);
 
@@ -174,5 +179,8 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   out += vec3f(gn * 2.0 * 9.0 / 255.0 * l * (1.0 - l) * F.grainAmt);
   // dip to black or white between shots
   out = mix(out, vec3f(F.fadeWhite), F.fade);
+  // opening title / end card on top
+  let C = textureSampleLevel(cardTex, samp, i.uv, 0.0);
+  out = clamp(out, vec3f(0.0), vec3f(1.0)) * (1.0 - C.a) + C.rgb;
   return vec4f(clamp(out, vec3f(0.0), vec3f(1.0)), 1.0);
 }

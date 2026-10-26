@@ -158,6 +158,7 @@ export interface Look {
   saberThick: number;
   saberFlicker: number; // plasma fringe height
   saberReact: number; // flare where you play
+  saberIdle: number; // glow of the line where nothing is played (0 = lit only where you play)
   saberTint: number; // 0 = palette colour, 1 = note colours where you play
   saberStyle: SaberStyle;
   saberOpacity: number;
@@ -208,6 +209,9 @@ export interface Look {
   partAdditive: number; // how much light they add
   partBright: number;
   partRays: boolean; // particles stretch along their motion
+  partSparks: number; // extra layers on every hit: sparks that arc and fall,
+  partGlitter: number; // fine glitter that hangs and twinkles,
+  partGlow: number; // and soft glows that rise
   partRayLen: number;
   // background
   bgDarken: number;
@@ -251,13 +255,13 @@ export const DEFAULT_LOOK: Look = {
   noteTexture: 'ice', texMode: 'tint', texScale: 1, texRelief: 1, texShine: 1, texSolid: 0.85, texReflect: false, texReflectivity: 1, texLive: 0,
   texMirror: false, texOpacity: 1, texBlend: 1, texBright: 0, texContrast: 1, texHue: 0, texSat: 1,
   texEmboss: false, texEmbossDepth: 1, texRgbOpacity: 0, texCutOn: false, texCutThresh: 0.5, texCutOpacity: 0,
-  saberBright: 1, saberThick: 1, saberFlicker: 1, saberReact: 1, saberTint: 1,
+  saberBright: 1, saberThick: 1, saberFlicker: 1, saberReact: 1, saberIdle: 1, saberTint: 1,
   saberStyle: 'plasma', saberOpacity: 1, saberOffset: 0, saberCustom: false, saberColor: '#8cf5e1',
   flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3,
   keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
   partAmount: 1, partRise: 1, partSwirl: 1, partWind: 0, partGravity: 0, partLife: 1, partSize: 1, partTwinkle: 1, partHaze: 1, partStars: 1, partColor: 1, partVelocity: true,
   partSpeed: 1, partMode: 'plume', partShape: 'heart', partShapeSize: 1, partShapeHold: 1, partShapeDir: 'cw', partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
-  partSpread: 0, partOpacity: 1, partAlphaF: 0, partAdditive: 1, partBright: 1, partRays: false, partRayLen: 1,
+  partSpread: 0, partOpacity: 1, partAlphaF: 0, partAdditive: 1, partBright: 1, partRays: false, partRayLen: 1, partSparks: 1, partGlitter: 1, partGlow: 1,
   bgDarken: 1, bgContrast: 1, bgSaturation: 1, bgVignette: 1,
   footOpacity: 1, footScale: 1, footX: 0, footY: 0, footRot: 0, footCropT: 0, footCropB: 0, footCropL: 0, footCropR: 0, footBright: 0, footHue: 0,
   bgColorOn: false, bgColor: '#000000', bgImageOn: false, bgImage: '',
@@ -537,6 +541,7 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     ] },
     { title: 'Saber', controls: [
       { key: 'saberBright', kind: 'slider', label: 'Brightness', min: 0, max: 2.5, step: 0.01, fmt: pct },
+      { key: 'saberIdle', kind: 'slider', label: 'Glow where you don’t play', min: 0, max: 1, step: 0.01, fmt: pct, hint: 'Lower it and the saber lights up only where notes land' },
       { key: 'saberOpacity', kind: 'slider', label: 'Opacity', min: 0, max: 1, step: 0.01, fmt: pct },
       { key: 'saberOffset', kind: 'slider', label: 'Position', min: -1.5, max: 1.5, step: 0.01, fmt: (v) => v.toFixed(2), hint: 'Moves the saber above (+) or below (−) the back edge of the keys' },
       { key: 'saberThick', kind: 'slider', label: 'Scale', min: 0.3, max: 3, step: 0.01, fmt: x },
@@ -577,6 +582,11 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
       { key: 'partSpeed', kind: 'slider', label: 'Particle speed', min: 0, max: 3, step: 0.01, fmt: x },
       { key: 'partLife', kind: 'slider', label: 'Particle lifetime', min: 0.3, max: 3, step: 0.01, fmt: x },
       { key: 'partShapeHold', kind: 'slider', label: 'Time to trace a shape', min: 0.5, max: 2, step: 0.01, fmt: (v) => `${(6.3 * v).toFixed(1)} s`, hint: 'How long sparks take to go once round a shape (in shape sections too)' },
+    ] },
+    { title: 'Layers on every hit', controls: [
+      { key: 'partSparks', kind: 'slider', label: 'Sparks', min: 0, max: 3, step: 0.01, fmt: pct, hint: 'Bright sparks that fly out and fall' },
+      { key: 'partGlitter', kind: 'slider', label: 'Glitter', min: 0, max: 3, step: 0.01, fmt: pct, hint: 'Fine dust that hangs in the air and twinkles' },
+      { key: 'partGlow', kind: 'slider', label: 'Glow', min: 0, max: 3, step: 0.01, fmt: pct, hint: 'Soft light that rises from each key' },
     ] },
     { title: 'Particle turbulence', fold: true, controls: [
       { key: 'partSwirl', kind: 'slider', label: 'Turbulence', min: 0, max: 3, step: 0.01, fmt: pct },
@@ -675,9 +685,20 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
 
 export interface Preset { id: string; name: string; builtIn?: boolean; look: Partial<Look> }
 
-export const BUILT_IN_PRESETS: Preset[] = [
-  { id: 'interstellar-teal', name: 'Interstellar Teal', builtIn: true, look: {} },
-];
+const parts = (id: string) => PARTICLE_PRESETS.find((p) => p.id === id)!.set;
+/** the looks in the gallery: each a complete style (colours, notes, saber, particles, finish) */
+export const BUILT_IN_PRESETS: Preset[] = ([
+  { id: 'interstellar-teal', name: 'Interstellar Teal', look: {} },
+  { id: 'ember', name: 'Ember', look: { palette: 'ember', saberStyle: 'flame', ...parts('explode'), noteGlow: 1.2, bloom: 1.15, relight: 1.3, partSparks: 2 } },
+  { id: 'neon-night', name: 'Neon Night', look: { palette: 'neon', noteDim: '2d', note2d: 'hollow', saberStyle: 'electric', ...parts('streaks'), bloom: 1.35, fringe: 1.8, bgDarken: 1.5, bgSaturation: 0.55 } },
+  { id: 'aurora', name: 'Aurora', look: { palette: 'aurora', gradMap: 'time', colorCycle: 16, noteDim: '2d', note2d: 'soft', saberStyle: 'soft', ...parts('twirl'), bloomWide: 1.4 } },
+  { id: 'swan', name: 'Swan', look: { palette: 'swan', saberStyle: 'soft', ...parts('default'), partColor: 0.2, partAmount: 0.75, partStars: 1.6, bgSaturation: 0.45, relight: 0.6, saberIdle: 0.15 } },
+  { id: 'gold-leaf', name: 'Gold Leaf', look: { palette: 'gold', texOn: true, noteTexture: 'foil', texMode: 'natural', saberStyle: 'straight', saberCustom: true, saberColor: '#ffd27a', ...parts('streaks'), partColor: 0.8, bgSaturation: 0.7, saberIdle: 0.2, partSparks: 1.6 } },
+  { id: 'ink', name: 'Ink', look: { colorBy: 'single', colorA: '#f2efe8', noteDim: '2d', note2d: 'filled', saberStyle: 'straight', saberCustom: true, saberColor: '#ffffff', ...parts('fast'), partColor: 0, bgSaturation: 0, bgContrast: 1.35, grain: 2, bloom: 0.6, relight: 0.4, saberIdle: 0.1 } },
+  { id: 'synthwave', name: 'Synthwave', look: { palette: 'synthwave', note3d: 'angled', saberStyle: 'electric', ...parts('straight'), fringe: 2.2, bgVignette: 1.5, bgSaturation: 0.7 } },
+  { id: 'ocean-gem', name: 'Ocean Gem', look: { palette: 'ocean', note3d: 'gem', ...parts('fountain') } },
+  { id: 'crystal', name: 'Crystal', look: { palette: 'swan', texOn: true, noteTexture: 'crystal', texMode: 'glow', saberStyle: 'soft', ...parts('turb'), partColor: 0.5, saberIdle: 0.12, partGlitter: 1.8 } },
+] as Preset[]).map((p) => ({ ...p, builtIn: true }));
 
 /** settings that belong to a video rather than a look (kept when a preset is applied) */
 export const PER_VIDEO_KEYS: (keyof Look)[] = ['noteAngle', 'splitNote'];
