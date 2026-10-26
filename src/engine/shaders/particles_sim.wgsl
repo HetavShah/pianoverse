@@ -118,7 +118,7 @@ fn fountain(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let bright = (0.9 + 0.7 * rnd(st)) * (0.8 + 0.5 * E.vn) * fade;
   var star = 0.0;
   if (rnd(st) < 0.02 * PP.stars) { star = 1.0; }
-  let col = mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix);
+  let col = mix(vec3f(1.0), vec3f(0.22) + E.col * 0.78, PP.colorMix);
   return finishP(pos, v, age, plife, bright, star, col, st);
 }
 
@@ -157,7 +157,7 @@ fn spray(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let vel = v0 * (1.0 - ex) + vec2f(0.0, -38.0);
   var star = 0.0;
   if (rnd(st) < 0.012 * PP.stars) { star = 1.0; }
-  let col = mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix);
+  let col = mix(vec3f(1.0), vec3f(0.22) + E.col * 0.78, PP.colorMix);
   return finishP(pos, vel, age, plife, bright, star, col, st);
 }
 
@@ -196,7 +196,7 @@ fn vortex(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let bright = (0.9 + 0.7 * rnd(st)) * (0.8 + 0.5 * E.vn) * mix(1.0, depth, e);
   var star = 0.0;
   if (rnd(st) < 0.015 * PP.stars) { star = 1.0; }
-  let col = mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix);
+  let col = mix(vec3f(1.0), vec3f(0.22) + E.col * 0.78, PP.colorMix);
   return finishP(pos, vel, age, plife, bright, star, col, st);
 }
 
@@ -305,7 +305,7 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   o.star = select(0.0, 1.0, !isDust && rnd(st) < 0.03 * PP.stars);
   o.z = 0.0;
   o.pad = 0.0;
-  o.col = vec4f(mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix), tw);
+  o.col = vec4f(mix(vec3f(1.0), vec3f(0.22) + E.col * 0.78, PP.colorMix), tw);
   return o;
 }
 
@@ -323,7 +323,7 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let u = E.pad0;
   let up = normalize(PP.up + vec2f(0.0, -1e-4));
   let base = atan2(up.y, up.x);
-  let tint = mix(vec3f(1.0), vec3f(0.55) + E.col * 0.45, PP.colorMix);
+  let tint = mix(vec3f(1.0), vec3f(0.2) + E.col * 0.8, PP.colorMix);
   var o: Particle;
   if (kf < nS) {
     // trail: a bright head that shoots up from the key, slowing and bending a little, a fading tail behind it
@@ -337,10 +337,10 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let ex = 1.0 - exp(-kd * age);
     let g = vec2f(PP.wind * u * 2.0, u * 3.0 * (1.0 + PP.gravity));
     // a gentle sideways bend as the air takes it, so trails curve instead of flying dead straight
-    let side = vec2f(-up.y, up.x) * gaussR(st) * u * 1.6;
+    let side = vec2f(-up.y, up.x) * gaussR(st) * u * 2.6;
     let pos = E.pos + v0 * ex / kd + 0.5 * g * age * age + side * age * age;
     let vel = v0 * (1.0 - ex) + g * age + side * 2.0 * age;
-    let bright = (2.2 + 1.4 * rnd(st)) * (0.8 + 0.5 * E.vn);
+    let bright = (1.1 + 0.8 * rnd(st)) * (0.8 + 0.5 * E.vn);
     var star = 0.0;
     if (rnd(st) < 0.06 * PP.stars) { star = 1.0; }
     o = finishP(pos, vel, age, plife, bright, star, mix(E.col, vec3f(1.0), 0.3), st);
@@ -383,20 +383,21 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   }
   if (kf < nS + nD + nG) {
     // glow: a soft light that rises from the hit and fades, lighting the air above the key
-    let plife = (0.9 + 0.8 * rnd(st)) * PP.lifeMul;
+    // smoke: a faint tinted haze that swells as it rises and lingers behind the dots
+    let plife = (1.6 + 1.2 * rnd(st)) * PP.lifeMul;
     let age = t - E.start;
     if (age < 0.0 || age > plife) { return off; }
-    let p0 = E.pos + up * u * (0.3 + 0.4 * rnd(st)) + vec2f(-up.y, up.x) * gaussR(st) * u * 0.3;
-    var pos = p0 + up * u * (1.2 + 1.2 * rnd(st)) * PP.rise * age;
-    pos += turbVel(pos, t) * age * 0.12 * PP.swirl;
-    let env = smoothstep(0.0, 0.12, age) * pow(clamp(1.0 - age / plife, 0.0, 1.0), 1.6);
+    let p0 = E.pos + up * u * (0.8 + 0.8 * rnd(st)) + vec2f(-up.y, up.x) * gaussR(st) * u * 0.6;
+    var pos = p0 + up * u * (0.9 + 0.9 * rnd(st)) * PP.rise * age;
+    pos += turbVel(pos, t) * age * 0.18 * PP.swirl;
+    let env = smoothstep(0.0, 0.3, age) * pow(clamp(1.0 - age / plife, 0.0, 1.0), 1.4);
     o.pos = pos;
     o.vel = vec2f(0.0);
-    o.b = env * (0.5 + 0.45 * E.vn);
+    o.b = env * (0.22 + 0.18 * E.vn);
     o.star = 0.0;
-    o.z = u * (0.7 + 0.5 * rnd(st)) * (1.0 + 0.6 * age);   // radius in video px
+    o.z = u * (1.2 + 0.6 * rnd(st)) * (1.0 + 0.8 * age);   // radius in video px
     o.pad = 2.0;
-    o.col = vec4f(mix(E.col, vec3f(1.0), 0.2), 1.0);
+    o.col = vec4f(E.col * 0.8, 1.0);
     return o;
   }
   return off;
@@ -454,7 +455,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let dt = min(1.0 / 60.0, ts - et);
       let f = turbVel(ep, et);
       ev.x += (f.x * 0.9 * PP.swirl + PP.wind * 70.0 - ev.x) * 1.4 * dt;
-      ev.y += (f.y * 1.6 * PP.swirl - 95.0 * PP.rise + PP.gravity * 150.0 - ev.y) * 0.9 * dt;
+      ev.y += (f.y * 1.6 * PP.swirl - 72.0 * PP.rise + PP.gravity * 150.0 - ev.y) * 0.9 * dt;   // compact clouds, not tall columns
       ep += ev * dt;
       et += dt;
     }
@@ -462,7 +463,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     vel = ev * 0.25 + vec2f(gaussR(&st), gaussR(&st)) * 14.0;
     bright = (0.45 + 0.55 * rnd(&st)) * (0.7 + 0.5 * E.vn);
     if (rnd(&st) < 0.012 * PP.stars) { star = 1.0; }
-    col = mix(vec3f(1.0), vec3f(0.6) + E.col * 0.4, PP.colorMix);
+    col = mix(vec3f(1.0), vec3f(0.22) + E.col * 0.78, PP.colorMix);
   } else {
     // small burst right at the hit point
     if (f32(k) >= E.count) { parts[id] = o; return; }
@@ -476,7 +477,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     vel = vec2f(cos(a), sin(a)) * sp;
     bright = 0.7 + 0.6 * rnd(&st);
     if (rnd(&st) < 0.05 * PP.stars) { star = 1.0; }
-    col = mix(vec3f(1.0), vec3f(0.65) + E.col * 0.35, PP.colorMix);
+    col = mix(vec3f(1.0), vec3f(0.3) + E.col * 0.7, PP.colorMix);
   }
   let twPh = rnd(&st) * 6.2831853;
   let tf = 6.0 + 20.0 * rnd(&st);
@@ -486,7 +487,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let dt = min(1.0 / 40.0, t - pt);
     let f = turbVel(pos, pt);
     // drift with the air current and rise back along the notes' lane
-    let goal = vec2f(f.x * 0.55, f.y * 0.8) * PP.swirl + PP.up * 42.0 * PP.rise + vec2f(PP.wind * 50.0, PP.gravity * 110.0);
+    let goal = vec2f(f.x * 0.55, f.y * 0.8) * PP.swirl + PP.up * 30.0 * PP.rise + vec2f(PP.wind * 50.0, PP.gravity * 110.0);
     vel += (goal - vel) * 2.2 * dt;
     pos += vel * dt;
     pt += dt;

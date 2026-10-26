@@ -48,7 +48,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
   if ((DP.rays > 0.5 || spark) && sp > 1.0 && !isStar) {
     // a streak along the particle's motion; trails put the particle at the head with a tail behind
     let dir = P.vel / sp;
-    let len = max(half, sp * select(0.045 * DP.rayLen, 0.17, spark) * F.partSize);
+    let len = max(half, sp * select(0.045 * DP.rayLen, 0.28, spark) * F.partSize);
     let nrm = vec2f(-dir.y, dir.x);
     let back = select(0.0, len, spark);
     p = P.pos - dir * back + dir * (c.x * (len + half)) + nrm * (c.y * half);
@@ -82,8 +82,10 @@ fn fs(i: VOut) -> @location(0) vec4f {
   let rr = dot(lp, lp);
   let sig = max(0.75, 0.6 / F.scale) * F.partSize * i.ray.w * thin;
   let norm = sq(0.75 / sig);
-  var g = (0.962 * norm * exp(-rr / (2.0 * sig * sig)) + 0.072 * F.partHaze * exp(-rr / (13.52 * F.partSize * F.partSize))) * 1.3;
-  var rgb = i.col.rgb * i.col.a * g * taper;
+  // a white-hot centre inside a halo of the particle's own colour
+  let core = 0.962 * norm * exp(-rr / (2.0 * sig * sig)) * 1.3;
+  let halo = 0.072 * F.partHaze * exp(-rr / (13.52 * F.partSize * F.partSize)) * 1.3;
+  var rgb = (mix(i.col.rgb, vec3f(1.0), 0.5) * core + i.col.rgb * halo * 1.6) * i.col.a * taper;
   if (i.star > 0.5) {
     let x = i.local.x;
     let y = i.local.y;
