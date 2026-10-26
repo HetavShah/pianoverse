@@ -11,7 +11,7 @@ import { ago, fileExists, loadFromStore, makeThumb, newId, saveToStore } from '.
 import { Step, STEPS, VideoIssue, WS } from './ui/workspace';
 import Home from './ui/Home';
 import { loadBrand, loadPresets, saveBrand } from './ui/presetStore';
-import { applyPreset, BUILT_IN_PRESETS, Look, Preset } from './engine/look';
+import { applyPreset, BUILT_IN_PRESETS, Preset } from './engine/look';
 import { Brand, DEFAULT_BRAND, loadTitleFonts } from './engine/titles';
 import ImportStep from './ui/steps/ImportStep';
 import NotesStep from './ui/steps/NotesStep';
@@ -70,8 +70,6 @@ export default function App() {
     if (brandSave.current) window.clearTimeout(brandSave.current);
     brandSave.current = window.setTimeout(() => { saveBrand(b).catch(toastError); }, 400);
   }, []);
-  // a look shown while the pointer rests on a gallery card (not part of the project until clicked)
-  const [lookPreview, setLookPreview] = useState<Partial<Look> | null>(null);
   const frameTimes = useRef<number[]>([]);
   const wantNewProject = useRef(false);
   const editCopyOf = useRef<string | null>(null);
@@ -111,10 +109,9 @@ export default function App() {
   const noNotes = !!project && project.notes.length === 0;
   const renderProject = useMemo(() => {
     if (!project) return null;
-    const p = lookPreview ? { ...project, look: lookPreview } : project;
-    if (!(sweep || noNotes)) return p;
-    return { ...p, notes: testNotes(project.keyboard.lowestNote, project.keyboard.keys, duration || project.video.frames / project.video.fps) };
-  }, [project, sweep, noNotes, duration, lookPreview]);
+    if (!(sweep || noNotes)) return project;
+    return { ...project, notes: testNotes(project.keyboard.lowestNote, project.keyboard.keys, duration || project.video.frames / project.video.fps) };
+  }, [project, sweep, noNotes, duration]);
 
   const camStep = route === 'project' && step === 'camera';
   const previewing = route === 'project' && (step === 'style' || camStep);
@@ -161,7 +158,6 @@ export default function App() {
   }, [camOn, camAspect, gpuName, draw, previewing]);
   useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (previewing) draw(); } }, [layers, draw, previewing]);
   useEffect(() => { if (rendererRef.current) { rendererRef.current.setBrand(brand); if (previewing) draw(); } }, [brand, gpuName, draw, previewing]);
-  useEffect(() => { if (!previewing || step !== 'style') setLookPreview(null); }, [previewing, step]);
   const attachPreview = useCallback((c: HTMLCanvasElement | null) => {
     const r = rendererRef.current;
     if (!c || !r) return;
@@ -436,7 +432,7 @@ export default function App() {
     time, duration, playing, togglePlay, seek, frameTick,
     calib, notes: notesApi, renderer: rendererRef.current, layers, setLayers, scale, setScale, sweep, setSweep,
     pick, onFiles, loop, setLoop, presets, defaultPresetId, refreshPresets, goStep, goHome,
-    brand, setBrand, previewLook: setLookPreview,
+    brand, setBrand,
   };
 
   const ready = !!project && !!video && !videoIssue;

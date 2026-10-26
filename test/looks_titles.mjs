@@ -52,12 +52,28 @@ check('eleven built-in looks', n === 11, `${n}`);
 await page.waitForFunction((n) => document.querySelectorAll('.look-card .pic img').length >= n, n, { timeout: 120000 }).catch(() => {});
 check('every look has a picture of this video', (await page.locator('.look-card .pic img').count()) === n);
 const before = await P();
-await cards.nth(1).hover(); await page.waitForTimeout(400);
-const hovered = await page.evaluate(() => window.pianoverse.renderer.project.look.palette);
-check('resting on Ember shows it on the preview', hovered === 'ember', hovered);
-check('…without changing the project', (await P()).presetId === before.presetId);
+const mainLook = () => page.evaluate(() => JSON.stringify(window.pianoverse.renderer.project.look ?? {}));
+const look0 = await mainLook();
+await cards.nth(1).hover();
+await page.waitForFunction(() => true);
+const srcs = new Set();
+for (let i = 0; i < 40 && srcs.size < 3; i++) { srcs.add(await cards.nth(1).locator('img').getAttribute('src')); await page.waitForTimeout(250); }
+check('resting on a card plays a short loop inside it', srcs.size >= 3, `${srcs.size} different pictures`);
+check('…and leaves the main preview alone', (await mainLook()) === look0);
+check('…and the project', (await P()).presetId === before.presetId);
 await page.mouse.move(700, 450); await page.waitForTimeout(300);
-check('moving away goes back', (await page.evaluate(() => window.pianoverse.renderer.project.look?.palette)) !== 'ember');
+check('moving away changes nothing', (await mainLook()) === look0 && (await P()).presetId === before.presetId);
+// a frame of another size (a phone clip, the editing copy) must not leave the preview blank
+const lit = await page.evaluate(async () => {
+  const r = window.pianoverse.renderer, v = document.querySelector('video');
+  const small = document.createElement('canvas'); small.width = 540; small.height = 960; small.getContext('2d').drawImage(v, 0, 0, 540, 960);
+  await r.capture(small, v.currentTime);
+  const fc = document.createElement('canvas'); fc.width = v.videoWidth; fc.height = v.videoHeight; fc.getContext('2d').drawImage(v, 0, 0);
+  const a = await r.capture(fc, v.currentTime);
+  let s = 0; for (let i = 0; i < a.data.length; i += 4 * 101) s += a.data[i] + a.data[i + 1] + a.data[i + 2];
+  return s / (a.data.length / (4 * 101));
+});
+check('the picture survives a change of frame size', lit > 8, lit.toFixed(1));
 await shot('1-looks');
 await cards.nth(6).click(); await page.waitForTimeout(400);
 check('click uses the look', (await P()).presetId === 'ink');

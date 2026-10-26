@@ -1127,8 +1127,7 @@ export class Renderer {
         size: [w, h], format: 'rgba8unorm',
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       });
-      delete this.groups['comp1-on'];
-      delete this.groups['comp1-off'];
+      this.dropCompGroups();
     }
     this.device.queue.copyExternalImageToTexture({ source }, { texture: this.videoTex }, [w, h]);
   }
