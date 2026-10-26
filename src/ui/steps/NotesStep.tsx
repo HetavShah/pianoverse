@@ -34,6 +34,12 @@ export default function NotesStep({ ws }: { ws: WS }) {
   const outside = out.below + out.above;
   const busy = n.busy;
   const c = center ?? src?.offset ?? 0;
+  // sync check: do note starts land on attacks heard in the audio? Correct notes on a pedalled piece land on clear
+  // attacks about 70% of the time; notes shifted against the video fall to chance (about 25%)
+  const inSync = score === null ? null : score >= 0.45;
+  const syncLabel = inSync === null ? null : (
+    <span className={'sync-state' + (inSync ? '' : ' off')} title="Whether the notes start where you hear attacks in the audio">{inSync ? 'Sync looks good' : 'Out of sync'}</span>
+  );
 
   return (
     <div className="page">
@@ -65,14 +71,16 @@ export default function NotesStep({ ws }: { ws: WS }) {
           <div className={'banner' + (src.confidence !== undefined && src.confidence < 0.5 ? ' warn' : '')}>
             <span className={'check' + (src.confidence !== undefined && src.confidence < 0.5 ? ' warn' : '')} aria-hidden="true" />
             <b>{src.confidence === undefined ? 'Placed by hand' : src.confidence >= 0.5 ? 'Aligned automatically' : 'Not sure about the alignment: check by ear'}</b>
-            <span className="mono dim">offset {fmtOffset(src.offset)}{score !== null ? ` · match ${Math.round(score * 100)}%` : ''}</span>
+            <span className="mono dim">offset {fmtOffset(src.offset)}</span>
+            {syncLabel}
             <button type="button" className="btn small" onClick={n.autoAlign}>Re-run alignment</button>
           </div>
         ) : (
           <div className="banner">
             <span className="check" aria-hidden="true" />
             <b>{src.name}</b>
-            <span className="mono dim">{src.notes.length} notes{score !== null ? ` · match ${Math.round(score * 100)}%` : ''}</span>
+            <span className="mono dim">{src.notes.length} notes</span>
+            {syncLabel}
             <button type="button" className="btn small" onClick={() => setShowDetect(true)}>Detection settings</button>
           </div>
         )}
