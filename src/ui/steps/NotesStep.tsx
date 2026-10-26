@@ -4,7 +4,7 @@ import { outOfRange, pitchRange } from '../../engine/notes';
 import { useClickTrack } from '../clicks';
 import PickButton from '../PickButton';
 import Dial from '../Dial';
-import { sourceOf } from '../useNotes';
+import { sourceOf, type NoteFinder } from '../useNotes';
 import WaveSync, { attackTimes, matchScore } from '../WaveSync';
 import type { WS } from '../workspace';
 
@@ -15,6 +15,10 @@ export default function NotesStep({ ws }: { ws: WS }) {
   const [clickOn, setClickOn] = useState(true);
   const [sens, setSens] = useState(0.5);
   const [showDetect, setShowDetect] = useState(false);
+  // which note finder: piano (most accurate on piano) or any instrument; remembered on this computer
+  const [finder, setFinderState] = useState<NoteFinder>(() => { try { return localStorage.getItem('pv.finder') === 'any' ? 'any' : 'piano'; } catch { return 'piano'; } });
+  const setFinder = (f: NoteFinder) => { setFinderState(f); try { localStorage.setItem('pv.finder', f); } catch { /* per-computer convenience */ } };
+  const runDetect = () => n.detect(0.7 - 0.4 * sens, finder);
   useEffect(() => { n.prepareAudio(); }, [n.prepareAudio]);
   const placed = project?.notes ?? [];
   useClickTrack(clickOn, ws.playing, ws.videoEl.current, placed);
@@ -41,7 +45,7 @@ export default function NotesStep({ ws }: { ws: WS }) {
           </div>
           <div className="seg big" role="radiogroup" aria-label="Where the notes come from">
             <PickButton what="midi" className={'seg-btn' + (src?.kind === 'midi' ? ' on' : '')} onPick={ws.pick} onFiles={ws.onFiles} disabled={!!busy}>From MIDI file</PickButton>
-            <button type="button" className={'seg-btn' + (src && src.kind === 'audio' ? ' on' : '')} disabled={!!busy} onClick={() => n.detect(0.7 - 0.4 * sens)}>Detect from audio</button>
+            <button type="button" className={'seg-btn' + (src && src.kind === 'audio' ? ' on' : '')} disabled={!!busy} onClick={runDetect}>Detect from audio</button>
           </div>
         </div>
 
@@ -128,12 +132,21 @@ export default function NotesStep({ ws }: { ws: WS }) {
         </label>
         <details className="side-details" open={showDetect} onToggle={(e) => setShowDetect((e.target as HTMLDetailsElement).open)}>
           <summary>Audio detection settings</summary>
-          <label className="field">
-            <span>Fewer notes</span>
-            <input type="range" min={0} max={1} step={0.05} value={sens} onChange={(e) => setSens(Number(e.target.value))} aria-label="Detection sensitivity" />
-            <span>More</span>
-          </label>
-          <button type="button" className="btn small" disabled={!!busy} onClick={() => n.detect(0.7 - 0.4 * sens)}>Detect notes again</button>
+          <div className="seg" role="radiogroup" aria-label="Note finder">
+            <button type="button" className={finder === 'piano' ? 'on' : ''} onClick={() => setFinder('piano')} aria-pressed={finder === 'piano'}>Piano</button>
+            <button type="button" className={finder === 'any' ? 'on' : ''} onClick={() => setFinder('any')} aria-pressed={finder === 'any'}>Any instrument</button>
+          </div>
+          <p className="help">{finder === 'piano'
+            ? 'Made for piano: finds the most notes, with their loudness and the sustain pedal. Slower on the first run while it loads.'
+            : 'Works on any instrument or a mix, but adds more stray notes on piano.'}</p>
+          {finder === 'any' && (
+            <label className="field">
+              <span>Fewer notes</span>
+              <input type="range" min={0} max={1} step={0.05} value={sens} onChange={(e) => setSens(Number(e.target.value))} aria-label="Detection sensitivity" />
+              <span>More</span>
+            </label>
+          )}
+          <button type="button" className="btn small" disabled={!!busy} onClick={runDetect}>Detect notes again</button>
           {src && <button type="button" className="btn small ghost" disabled={!!busy} onClick={n.clear}>Remove notes</button>}
         </details>
       </aside>

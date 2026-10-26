@@ -18,6 +18,27 @@ export function loadAudio(url: string): Promise<VideoAudio> {
   return p;
 }
 
+const pianoCache = new Map<string, Promise<Float32Array>>();
+/** the soundtrack, mono, at the piano note finder's rate (44.1 kHz) */
+export function loadPianoAudio(url: string, rate: number): Promise<Float32Array> {
+  let p = pianoCache.get(url);
+  if (!p) {
+    p = (async () => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Could not read the video file (${res.status})`);
+      const ctx = new OfflineAudioContext(1, 1, rate);
+      let buf: AudioBuffer;
+      try { buf = await ctx.decodeAudioData(await res.arrayBuffer()); } catch { throw new Error("This video's sound couldn't be read. Does it have an audio track?"); }
+      const chans: Float32Array[] = [];
+      for (let c = 0; c < buf.numberOfChannels; c++) chans.push(buf.getChannelData(c));
+      return mixDown(chans);
+    })();
+    pianoCache.set(url, p);
+    p.catch(() => pianoCache.delete(url));
+  }
+  return p;
+}
+
 async function decode(url: string): Promise<VideoAudio> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not read the video file (${res.status})`);
