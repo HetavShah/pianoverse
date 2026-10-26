@@ -56,5 +56,8 @@ export interface WS {
   /** the brand kit (name, handle, logo) used by the cards */
   brand: import('../engine/titles').Brand;
   setBrand: (b: import('../engine/titles').Brand) => void;
+  /** zoomed in on the preview: the part of the video shown (null = all of it) */
+  inspect: import('../engine/renderer').View | null;
+  setInspect: (v: import('../engine/renderer').View | null) => void;
   goHome: () => void;
 }

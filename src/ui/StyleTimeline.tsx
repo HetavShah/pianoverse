@@ -35,7 +35,7 @@ export default function StyleTimeline(props: {
   const sceneList = sdrag ? scenes.map((s) => (s.id === sdrag.id ? sdrag.cur : s)) : scenes;
   const ref = useRef<HTMLCanvasElement>(null);
   const [w, setW] = useState(1000);
-  const [drag, setDrag] = useState<{ mode: 'new' | 'a' | 'b'; x0: number; t0: number; moved: boolean; r: [number, number] | null } | null>(null);
+  const [drag, setDrag] = useState<{ mode: 'new' | 'a' | 'b' | 'scrub'; x0: number; t0: number; moved: boolean; r: [number, number] | null } | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const dur = duration || 1;
   const cal = project.calibration;
@@ -147,7 +147,7 @@ export default function StyleTimeline(props: {
     <section className="style-timeline">
       <div className="tl-head">
         <b>The take</b>
-        <span className="dim">{range ? <>Section <span className="mono">{fmt(range[0], true)} – {fmt(range[1], true)}</span></> : 'Click to jump. Drag across to pick a section to loop.'}</span>
+        <span className="dim">{range ? <>Section <span className="mono">{fmt(range[0], true)} – {fmt(range[1], true)}</span></> : 'Click to jump, or drag the playhead. Drag across to pick a section to loop.'}</span>
         {range && <button type="button" className="btn small ghost" onClick={() => onRange(null)}>Clear section</button>}
         <span className="spacer" />
         <span className="tl-legend">{grid.bpm ? <span className="mono">{Math.round(grid.bpm)} bpm</span> : null}{trackOn && <><i className="sw locked" />Locked <i className="sw unsure" />Unsure <i className="sw lost" />Lost <i className="sw fix" />Fix</>}</span>
@@ -167,7 +167,7 @@ export default function StyleTimeline(props: {
         </div>
         <canvas
           ref={ref}
-          style={{ height: H, cursor: drag || sdrag ? 'ew-resize' : 'pointer' }}
+          style={{ height: H, cursor: drag?.mode === 'scrub' ? 'grabbing' : drag || sdrag ? 'ew-resize' : hover !== null && Math.abs(xOf(hover) - xOf(time)) < 8 ? 'grab' : 'pointer' }}
           onPointerDown={(e) => {
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
             const t = tAt(e.clientX);
@@ -183,6 +183,8 @@ export default function StyleTimeline(props: {
               setSdrag({ id: hit.id, edge, t0: t, s0: hit, cur: hit });
               return;
             }
+            // the playhead (or anywhere on the ruler): drag to scrub through the take
+            if (Math.abs(x - xOf(time)) < 8 || y < RULER) { onSeek(t); setDrag({ mode: 'scrub', x0: x, t0: t, moved: true, r: null }); return; }
             if (range && Math.abs(x - xOf(range[0])) < 7) setDrag({ mode: 'a', x0: x, t0: t, moved: false, r: range });
             else if (range && Math.abs(x - xOf(range[1])) < 7) setDrag({ mode: 'b', x0: x, t0: t, moved: false, r: range });
             else setDrag({ mode: 'new', x0: x, t0: t, moved: false, r: null });
@@ -199,6 +201,7 @@ export default function StyleTimeline(props: {
               return;
             }
             if (!drag) { setHover(t); return; }
+            if (drag.mode === 'scrub') { onSeek(t); return; }
             const x = e.clientX - ref.current!.getBoundingClientRect().left;
             const moved = drag.moved || Math.abs(x - drag.x0) > 4;
             if (!moved) return;
@@ -214,7 +217,7 @@ export default function StyleTimeline(props: {
               setSdrag(null);
               return;
             }
-            if (drag) {
+            if (drag && drag.mode !== 'scrub') {
               if (!drag.moved) onSeek(tAt(e.clientX));
               else if (drag.r && drag.r[1] - drag.r[0] >= 0.2) onRange(drag.r);
             }

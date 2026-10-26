@@ -1,6 +1,6 @@
 import { userTextureFiles } from './ui/textureStore';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DEFAULT_LAYERS, Layers, Renderer } from './engine/renderer';
+import { DEFAULT_LAYERS, Layers, Renderer, View } from './engine/renderer';
 import { CalibratedProject, testNotes } from './engine/calibration';
 import { UpdatePill, updateStatusText, useUpdater } from './updater';
 import { calibrationFromTracking, newProject, useCalibration } from './ui/useCalibration';
@@ -118,15 +118,19 @@ export default function App() {
   // on the Camera step the preview looks through the camera; everywhere else it shows the whole video
   const camOn = camStep && !!project?.cameraTrack?.on;
   const camRef = useRef<{ p: CalibratedProject; dur: number } | null>(null);
+  // zoomed in on the Style preview to check detail: the part of the video shown (null = all of it)
+  const [inspect, setInspect] = useState<View | null>(null);
+  const inspectRef = useRef<View | null>(null);
+  inspectRef.current = camOn ? null : inspect;
   camRef.current = camOn && project ? { p: project, dur: duration || project.video.frames / (project.video.fps || 30) } : null;
   const draw = useCallback((t?: number) => {
     const r = rendererRef.current;
     const v = videoRef.current;
     if (!r || !v || v.readyState < 2 || !v.videoWidth) return;
-    if ((window as unknown as { __pvHeadless?: boolean }).__pvHeadless) return; // automated tests capture offscreen
     const tt = t ?? v.currentTime;
     const cam = camRef.current;
-    if (cam) { const f = cameraFrameAt(cam.p, tt, cam.dur); r.setView(f.view, f.fade); } else r.setView(null);
+    if (cam) { const f = cameraFrameAt(cam.p, tt, cam.dur); r.setView(f.view, f.fade); } else r.setView(inspectRef.current);
+    if ((window as unknown as { __pvHeadless?: boolean }).__pvHeadless) return; // automated tests capture offscreen
     r.render(v, tt);
     const now = performance.now();
     const ft = frameTimes.current;
@@ -157,6 +161,8 @@ export default function App() {
     if (previewing) draw();
   }, [camOn, camAspect, gpuName, draw, previewing]);
   useEffect(() => { if (rendererRef.current) { rendererRef.current.layers = layers; if (previewing) draw(); } }, [layers, draw, previewing]);
+  useEffect(() => { if (previewing) draw(); }, [inspect, draw, previewing]);
+  useEffect(() => { setInspect(null); }, [step, project?.id]);
   useEffect(() => { if (rendererRef.current) { rendererRef.current.setBrand(brand); if (previewing) draw(); } }, [brand, gpuName, draw, previewing]);
   const attachPreview = useCallback((c: HTMLCanvasElement | null) => {
     const r = rendererRef.current;
@@ -432,7 +438,7 @@ export default function App() {
     time, duration, playing, togglePlay, seek, frameTick,
     calib, notes: notesApi, renderer: rendererRef.current, layers, setLayers, scale, setScale, sweep, setSweep,
     pick, onFiles, loop, setLoop, presets, defaultPresetId, refreshPresets, goStep, goHome,
-    brand, setBrand,
+    brand, setBrand, inspect, setInspect,
   };
 
   const ready = !!project && !!video && !videoIssue;

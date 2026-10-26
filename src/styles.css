@@ -593,7 +593,11 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .cam-pop { position: absolute; bottom: 58px; width: 440px; padding: 14px 16px; background: var(--raise); border: 1px solid var(--rule-2); display: grid; gap: 10px; z-index: 5; cursor: default; }
 .cam-pop small { font-size: 12px; color: var(--stone); }
 .cam-pop .seg button { height: 32px; padding: 0 4px; font-size: 13px; }
-.cam-playhead { position: absolute; top: 0; bottom: 6px; width: 2px; margin-left: -1px; background: var(--live); pointer-events: none; z-index: 3; }
+.cam-playhead { position: absolute; top: 0; bottom: 6px; width: 2px; margin-left: -1px; background: var(--live); z-index: 3; cursor: grab; touch-action: none; }
+.cam-playhead::before { content: ''; position: absolute; top: 0; left: -6px; width: 14px; height: 100%; }  /* a wider grip than the line */
+.cam-playhead::after { content: ''; position: absolute; top: 0; left: -4px; width: 10px; height: 5px; background: var(--live); }
+.cam-playhead:active { cursor: grabbing; }
+.cam-ruler, .cam-notes { touch-action: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -630,3 +634,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 
 .style-side > * { flex-shrink: 0; }
 .style-side > .preset-bar { flex-shrink: 0; }
+
+/* zoomed preview: how far in, and back to the whole frame */
+.zoom-chip { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 10px; background: rgba(12,12,11,0.82); color: var(--paper); font-size: 12px; z-index: 4; }
+.zoom-chip button { border: 0; background: none; color: var(--paper); font: inherit; font-weight: 700; cursor: pointer; padding: 2px 4px; box-shadow: inset 0 -1px 0 var(--live); }
+.preview-frame { touch-action: none; }

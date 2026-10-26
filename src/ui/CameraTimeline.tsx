@@ -1,6 +1,6 @@
 // Camera timeline: the notes for orientation, then the shots. Click a shot to edit it, click a join (the marker
 // between two shots) to choose its transition, drag a join to move the cut (it snaps to beats).
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as PE } from 'react';
 import { INK } from './palette';
 import Dial from './Dial';
 import type { CalibratedProject } from '../engine/calibration';
@@ -72,6 +72,11 @@ export default function CameraTimeline(props: {
     const r = lane.current!.getBoundingClientRect();
     return Math.max(0, Math.min(dur, ((clientX - r.left) / r.width) * dur));
   };
+  // press and drag on the ruler, the notes or the playhead to scrub through the take
+  const scrub = {
+    onPointerDown: (e: PE<HTMLElement>) => { e.currentTarget.setPointerCapture(e.pointerId); onSeek(tAt(e.clientX)); },
+    onPointerMove: (e: PE<HTMLElement>) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) onSeek(tAt(e.clientX)); },
+  };
   const join = selJoin !== null ? shots[selJoin] : null;
   const onBeat = join ? grid.beats.some((b) => Math.abs(b - join.start) < 0.03) : false;
   const ticks: number[] = [];
@@ -93,8 +98,8 @@ export default function CameraTimeline(props: {
           <span style={{ height: 62 }} title="The shots of your video and the transitions between them"><b>Shots</b><small>{shots.length} shot{shots.length === 1 ? '' : 's'}</small></span>
         </div>
         <div className="cam-lanes" ref={lane}>
-          <div className="cam-ruler">{ticks.map((s) => <span key={s} className={X(s) > w - 40 ? 'end' : ''} style={{ left: X(s) }}>{fmt(s)}</span>)}</div>
-          <canvas ref={notesRef} className="cam-notes" onPointerDown={(e) => onSeek(tAt(e.clientX))} />
+          <div className="cam-ruler" {...scrub}>{ticks.map((s) => <span key={s} className={X(s) > w - 40 ? 'end' : ''} style={{ left: X(s) }}>{fmt(s)}</span>)}</div>
+          <canvas ref={notesRef} className="cam-notes" {...scrub} />
           <div
             className="cam-shots"
             onPointerDown={(e) => { if (e.target === e.currentTarget) { onSelectJoin(null); onSeek(tAt(e.clientX)); } }}
@@ -140,7 +145,7 @@ export default function CameraTimeline(props: {
               </div>
             )}
           </div>
-          <div className="cam-playhead" style={{ left: X(time) }} />
+          <div className="cam-playhead" style={{ left: X(time) }} {...scrub} title="Drag to scrub" />
         </div>
       </div>
     </section>

@@ -36,6 +36,34 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
   const [guides, setGuides] = useState(false);
   const [flash, setFlash] = useState<{ n: number; play: boolean }>({ n: 0, play: false });
   const origRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const pan = useRef<{ x: number; y: number; v: { x: number; y: number; w: number; h: number } | null; moved: boolean } | null>(null);
+  const inspectRef = useRef(ws.inspect);
+  inspectRef.current = ws.inspect;
+  const W = project?.video.width ?? 1, Hh = project?.video.height ?? 1;
+  /** keep a zoom window inside the video */
+  const fitView = (x: number, y: number, w: number) => {
+    const h = w * (Hh / W);
+    return { x: Math.min(W - w, Math.max(0, x)), y: Math.min(Hh - h, Math.max(0, y)), w, h };
+  };
+
+  // scroll on the preview: zoom in and out round the pointer (the effects are redrawn sharp at every zoom)
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+      const v = inspectRef.current ?? { x: 0, y: 0, w: W, h: Hh };
+      const z = Math.min(8, Math.max(1, (W / v.w) * Math.exp(-e.deltaY * 0.0016)));
+      if (z <= 1.01) { ws.setInspect(null); return; }
+      const w = W / z;
+      ws.setInspect(fitView(v.x + fx * v.w - fx * w, v.y + fy * v.h - fy * (w * Hh / W), w));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [W, Hh, ws.setInspect]); // eslint-disable-line react-hooks/exhaustive-deps
   const v = ws.videoEl.current;
 
   // "Original": the plain video frame, drawn on top of the effects canvas
@@ -43,8 +71,10 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
     const cv = origRef.current;
     if (!original || !cv || !v || !v.videoWidth) return;
     cv.width = v.videoWidth / 2; cv.height = v.videoHeight / 2;
-    cv.getContext('2d')!.drawImage(v, 0, 0, cv.width, cv.height);
-  }, [original, v, ws.time, ws.frameTick]);
+    const iv = ws.inspect;
+    if (iv) cv.getContext('2d')!.drawImage(v, iv.x, iv.y, iv.w, iv.h, 0, 0, cv.width, cv.height);
+    else cv.getContext('2d')!.drawImage(v, 0, 0, cv.width, cv.height);
+  }, [original, v, ws.time, ws.frameTick, ws.inspect]);
 
   // 1–8 pick a layer, in the order of the list
   useEffect(() => {
@@ -129,9 +159,25 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
         <div className="preview-stage">
           <div
             className="preview-frame"
-            style={{ aspectRatio: `${project.video.width} / ${project.video.height}` }}
-            onClick={() => { setFlash({ n: flash.n + 1, play: !ws.playing }); ws.togglePlay(); }}
-            title={ws.playing ? 'Click to pause' : 'Click to play'}
+            ref={frameRef}
+            onPointerDown={(e) => { if (e.button !== 0) return; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); pan.current = { x: e.clientX, y: e.clientY, v: ws.inspect, moved: false }; }}
+            onPointerMove={(e) => {
+              const p = pan.current;
+              if (!p) return;
+              if (!p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 5) return;
+              p.moved = true;
+              if (!p.v) return;
+              // drag: move round the zoomed video
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              ws.setInspect(fitView(p.v.x - ((e.clientX - p.x) / r.width) * p.v.w, p.v.y - ((e.clientY - p.y) / r.height) * p.v.h, p.v.w));
+            }}
+            onPointerUp={() => {
+              const p = pan.current;
+              pan.current = null;
+              if (p && !p.moved) { setFlash({ n: flash.n + 1, play: !ws.playing }); ws.togglePlay(); }
+            }}
+            style={{ aspectRatio: `${project.video.width} / ${project.video.height}`, cursor: ws.inspect ? (pan.current?.moved ? 'grabbing' : 'grab') : 'pointer' }}
+            title={ws.inspect ? 'Drag to look around · scroll to zoom · click to play or pause' : 'Scroll to zoom in · click to play or pause'}
           >
             <canvas ref={attachPreview} className="preview-canvas" />
             {original && <canvas ref={origRef} className="preview-canvas over" />}
@@ -147,6 +193,12 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
                 {flash.play
                   ? <svg width="34" height="34" viewBox="0 0 24 24" fill="#fff"><path d="M7 4.5v15l12-7.5z" /></svg>
                   : <svg width="34" height="34" viewBox="0 0 24 24" fill="#fff"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>}
+              </div>
+            )}
+            {ws.inspect && (
+              <div className="zoom-chip" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+                <span className="mono">{Math.round((project.video.width / ws.inspect.w) * 100)}%</span>
+                <button type="button" onClick={() => ws.setInspect(null)}>Fit</button>
               </div>
             )}
             {noNotes && <div className="badge">Key sweep · add notes in step 2</div>}

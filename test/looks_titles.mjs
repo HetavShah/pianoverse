@@ -114,6 +114,30 @@ const clear = await page.evaluate(async () => {
   return s;
 });
 check('the middle of the video has no card on it', clear > 0);
+// zoom and pan on the preview, drag the playhead
+await page.keyboard.press('2'); await seek(26);
+const fr = await page.locator('.preview-frame').boundingBox();
+await page.mouse.move(fr.x + fr.width * 0.5, fr.y + fr.height * 0.55);
+for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, -240); await page.waitForTimeout(80); }
+const zoomTxt = await page.locator('.zoom-chip .mono').textContent().catch(() => '');
+check('scrolling on the preview zooms in', parseInt(zoomTxt) > 150, zoomTxt);
+const playing0 = await page.evaluate(() => !document.querySelector('video').paused);
+await page.mouse.down(); await page.mouse.move(fr.x + fr.width * 0.3, fr.y + fr.height * 0.4, { steps: 6 }); await page.mouse.up();
+await page.waitForTimeout(200);
+check('dragging pans without starting playback', (await page.evaluate(() => !document.querySelector('video').paused)) === playing0 && !!(await page.$('.zoom-chip')));
+await shot('5-zoomed');
+await page.click('.zoom-chip button'); await page.waitForTimeout(200);
+check('Fit goes back to the whole frame', !(await page.$('.zoom-chip')));
+const tl = await page.locator('.style-timeline canvas').boundingBox();
+const tBefore = await page.evaluate(() => document.querySelector('video').currentTime);
+const dur2 = await page.evaluate(() => document.querySelector('video').duration);
+const phx = tl.x + (tBefore / dur2) * tl.width;
+await page.mouse.move(phx, tl.y + 60); await page.mouse.down();
+await page.mouse.move(phx + tl.width * 0.2, tl.y + 60, { steps: 8 }); await page.mouse.up();
+await page.waitForTimeout(400);
+const tAfter = await page.evaluate(() => document.querySelector('video').currentTime);
+check('dragging the playhead scrubs', tAfter - tBefore > dur2 * 0.15, `${tBefore.toFixed(1)} → ${tAfter.toFixed(1)}`);
+check('…without making a loop section', !(await P()).loop && !(await page.textContent('.tl-head')).includes('Section'));
 console.log(fails ? `${fails} FAILED` : 'all passed');
 await b.close();
 process.exit(fails ? 1 : 0);
