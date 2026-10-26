@@ -171,6 +171,7 @@ export interface Look {
   streakLen: number;
   streakBright: number;
   impactTime: number; // seconds the flash lasts
+  flashStar: number; // cross of light on each hit, held while the note sounds (0 = off)
   // lighting
   keyBright: number; // key glow
   keyAnticipate: number; // seconds keys light before a note lands
@@ -257,7 +258,7 @@ export const DEFAULT_LOOK: Look = {
   texEmboss: false, texEmbossDepth: 1, texRgbOpacity: 0, texCutOn: false, texCutThresh: 0.5, texCutOpacity: 0,
   saberBright: 1, saberThick: 1, saberFlicker: 1, saberReact: 1, saberIdle: 1, saberTint: 1,
   saberStyle: 'plasma', saberOpacity: 1, saberOffset: 0, saberCustom: false, saberColor: '#8cf5e1',
-  flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3,
+  flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3, flashStar: 0,
   keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
   partAmount: 1, partRise: 1, partSwirl: 1, partWind: 0, partGravity: 0, partLife: 1, partSize: 1, partTwinkle: 1, partHaze: 1, partStars: 1, partColor: 1, partVelocity: true,
   partSpeed: 1, partMode: 'plume', partShape: 'heart', partShapeSize: 1, partShapeHold: 1, partShapeDir: 'cw', partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
@@ -560,6 +561,7 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     { title: 'Flash', controls: [
       { key: 'flashSize', kind: 'slider', label: 'Size', min: 0.2, max: 3, step: 0.01, fmt: x },
       { key: 'flashBright', kind: 'slider', label: 'Brightness', min: 0, max: 2.5, step: 0.01, fmt: pct },
+      { key: 'flashStar', kind: 'slider', label: 'Star flare', min: 0, max: 2.5, step: 0.01, fmt: pct, hint: 'A cross of light on each key you play' },
       { key: 'impactTime', kind: 'slider', label: 'Length', min: 0.3, max: 3, step: 0.05, fmt: s1 },
     ] },
     { title: 'Streak', controls: [
@@ -697,6 +699,12 @@ export const BUILT_IN_PRESETS: Preset[] = ([
   { id: 'ink', name: 'Ink', look: { colorBy: 'single', colorA: '#f2efe8', noteDim: '2d', note2d: 'filled', saberStyle: 'straight', saberCustom: true, saberColor: '#ffffff', ...parts('fast'), partColor: 0, bgSaturation: 0, bgContrast: 1.35, grain: 2, bloom: 0.6, relight: 0.4, saberIdle: 0.1 } },
   { id: 'synthwave', name: 'Synthwave', look: { palette: 'synthwave', note3d: 'angled', saberStyle: 'electric', ...parts('straight'), fringe: 2.2, bgVignette: 1.5, bgSaturation: 0.7 } },
   { id: 'ocean-gem', name: 'Ocean Gem', look: { palette: 'ocean', note3d: 'gem', ...parts('fountain') } },
+  { id: 'concert', name: 'Concert', look: {
+    palette: 'gold', noteDim: '2d', note2d: 'filled', noteRound: 1.92, noteGlow: 0.6, noteOpacity: 0.95, noteRim: 0.6,
+    saberStyle: 'straight', saberIdle: 0.06, saberCustom: true, saberColor: '#d9d4ff', saberThick: 0.8, saberTint: 1,
+    flashStar: 1.3, flashSize: 1.3, streakLen: 0.6, keyBright: 1.3, relight: 1.5,
+    ...parts('default'), partColor: 1.25, partSparks: 1.3, partGlitter: 1.2, partGlow: 1.2,
+    bgDarken: 1.6, bgSaturation: 0.4, bloom: 1.1 } },
   { id: 'crystal', name: 'Crystal', look: { palette: 'swan', texOn: true, noteTexture: 'crystal', texMode: 'glow', saberStyle: 'soft', ...parts('turb'), partColor: 0.5, saberIdle: 0.12, partGlitter: 1.8 } },
 ] as Preset[]).map((p) => ({ ...p, builtIn: true }));
 

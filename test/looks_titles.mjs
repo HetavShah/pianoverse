@@ -48,7 +48,7 @@ await page.keyboard.press('0'); await page.waitForTimeout(300);
 check('0 opens Looks', (await page.textContent('.insp-head h2')) === 'Looks');
 const cards = page.locator('.look-card');
 const n = await cards.count();
-check('ten built-in looks', n === 10, `${n}`);
+check('eleven built-in looks', n === 11, `${n}`);
 await page.waitForFunction((n) => document.querySelectorAll('.look-card .pic img').length >= n, n, { timeout: 120000 }).catch(() => {});
 check('every look has a picture of this video', (await page.locator('.look-card .pic img').count()) === n);
 const before = await P();

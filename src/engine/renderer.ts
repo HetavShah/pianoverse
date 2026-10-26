@@ -668,6 +668,15 @@ export class Renderer {
             dot(tg.x, tg.y, tg.unit * 0.45 * lk.flashSize, scaleC(lighten(col, 0.5), 0.8 * e * lk.flashBright));
             if (lk.streakLen > 0) streak(tg.x, tg.y, tg.along, tg.unit * 1.8 * lk.streakLen, 1.2, scaleC(lighten(col, 0.4), 0.4 * e * lk.streakBright));
           }
+          if (lk.flashStar > 0) {
+            // star flare: a cross of light on the key, bright on the hit and glowing softly while the note is held
+            const k = lk.flashStar * (Math.exp(-tt * 5 * (1.3 / lk.impactTime)) * (0.8 + 0.5 * vn) + (held ? 0.28 : 0));
+            const ul = Math.hypot(U[0], U[1]) || 1;
+            const c2 = lighten(col, 0.7);
+            streak(tg.x, tg.y, [U[0] / ul, U[1] / ul], tg.unit * 1.1 * lk.flashStar, 0.9, scaleC(c2, 0.55 * k));
+            streak(tg.x, tg.y, tg.along, tg.unit * 2.6 * lk.flashStar, 0.8, scaleC(c2, 0.45 * k));
+            dot(tg.x, tg.y, tg.unit * 0.35 * lk.flashSize, scaleC(c2, 0.5 * k));
+          }
         }
       }
       const since = t - n.s;
