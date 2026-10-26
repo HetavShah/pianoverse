@@ -1,6 +1,7 @@
 // Calibration editor: the current video frame with the keyboard outline, draggable corners and saber ends.
 // Wheel zooms around the cursor, dragging empty space pans, double-click fits, arrow keys nudge the selected handle.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FONT, INK } from './palette';
 import { apply, inv, planeToImage, Pt, Quad } from '../engine/geometry';
 import { isBlack } from '../engine/calibration';
 
@@ -30,7 +31,7 @@ type Handle = { kind: 'corner'; i: number } | { kind: 'saber'; side: 0 | 1 };
 interface View { z: number; cx: number; cy: number } // zoom and the video point at the canvas centre
 
 const LABELS = ['Low key · back', 'High key · back', 'High key · front', 'Low key · front'];
-const ACCENT = '#2FD3B5';
+const ACCENT = INK.live;
 const SABER_OUT = 2.6; // white keys beyond each end
 
 export default function CalibrateCanvas(p: CalibrateCanvasProps) {
@@ -85,7 +86,7 @@ export default function CalibrateCanvas(p: CalibrateCanvasProps) {
     const v = live.current.video;
     const [ox, oy] = T(0, 0);
     if (v && v.readyState >= 2) ctx.drawImage(v, ox, oy, p.videoW * scale, p.videoH * scale);
-    else { ctx.fillStyle = '#111'; ctx.fillRect(ox, oy, p.videoW * scale, p.videoH * scale); }
+    else { ctx.fillStyle = INK.ground; ctx.fillRect(ox, oy, p.videoW * scale, p.videoH * scale); }
     const g = geometry();
     if (!g) return;
     const { H } = g;
@@ -100,8 +101,8 @@ export default function CalibrateCanvas(p: CalibrateCanvasProps) {
     const BLACK_OFF: Record<number, number> = { 1: 1, 3: 2, 6: 4, 8: 5, 10: 6 };
     const ord = (q: number) => { const o = Math.floor(q / 12), r = q - o * 12; return o * 7 + (r in WHITE_OFF ? WHITE_OFF[r] : BLACK_OFF[r]); };
     const base = ord(p.lowestNote);
-    ctx.fillStyle = 'rgba(47,211,181,0.10)';
-    ctx.strokeStyle = 'rgba(47,211,181,0.6)';
+    ctx.fillStyle = 'rgba(242,239,232,0.10)';
+    ctx.strokeStyle = 'rgba(242,239,232,0.55)';
     for (let n = p.lowestNote; n < p.lowestNote + p.keys; n++) {
       if (!isBlack(n)) continue;
       const c = ord(n) - base;
@@ -117,8 +118,7 @@ export default function CalibrateCanvas(p: CalibrateCanvasProps) {
     // saber line
     const ey = (x: number) => p.edge.a + p.edge.b * x;
     ctx.save();
-    ctx.shadowColor = ACCENT; ctx.shadowBlur = 10;
-    ctx.strokeStyle = '#9ff5e4'; ctx.lineWidth = 2.4;
+    ctx.strokeStyle = ACCENT; ctx.lineWidth = 2.4;
     const seg = (x0: number, x1: number) => {
       ctx.beginPath();
       for (let i = 0; i <= 40; i++) {
@@ -129,7 +129,7 @@ export default function CalibrateCanvas(p: CalibrateCanvasProps) {
       ctx.stroke();
     };
     seg(-0.2, p.whiteKeys + 0.2);
-    ctx.shadowBlur = 0; ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(159,245,228,0.7)';
+    ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(233,84,45,0.75)';
     seg(-SABER_OUT, -0.2); seg(p.whiteKeys + 0.2, p.whiteKeys + SABER_OUT);
     ctx.restore();
   }, [geometry, p.videoW, p.videoH, p.whiteKeys, p.lowestNote, p.keys, p.edge]);
@@ -145,7 +145,7 @@ export default function CalibrateCanvas(p: CalibrateCanvasProps) {
     if (!cv) return;
     const ctx = cv.getContext('2d')!;
     ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
-    ctx.fillStyle = '#08090b';
+    ctx.fillStyle = INK.stage;
     ctx.fillRect(0, 0, size.w, size.h);
     ctx.imageSmoothingEnabled = true;
     drawScene(ctx, toScreen, sc);
@@ -162,24 +162,24 @@ export default function CalibrateCanvas(p: CalibrateCanvasProps) {
       ctx.save();
       if (h.kind === 'corner') {
         ctx.beginPath(); ctx.arc(x, y, hot ? 9 : 7.5, 0, Math.PI * 2);
-        ctx.fillStyle = p.fixed ? '#f6c453' : active ? ACCENT : 'rgba(11,13,16,0.85)';
+        ctx.fillStyle = p.fixed ? INK.warn : active ? ACCENT : 'rgba(22,22,21,0.85)';
         ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = p.fixed ? '#f6c453' : ACCENT; ctx.stroke();
-        ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fillStyle = active ? '#062a24' : '#fff'; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = p.fixed ? INK.warn : ACCENT; ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fillStyle = active ? INK.ground : INK.paper; ctx.fill();
         // label
         const label = LABELS[h.i];
-        ctx.font = '600 11px Inter, "Segoe UI", system-ui, sans-serif';
+        ctx.font = `600 11px ${FONT}`;
         const tw = ctx.measureText(label).width;
         const back = h.i < 2;
         const lx = x - tw / 2 - 8, ly = back ? y - 32 : y + 14;
-        ctx.fillStyle = 'rgba(11,13,16,0.82)';
-        ctx.beginPath(); ctx.roundRect(lx, ly, tw + 16, 20, 6); ctx.fill();
-        ctx.fillStyle = hot ? ACCENT : '#e8eaed';
+        ctx.fillStyle = hot ? INK.paper : 'rgba(22,22,21,0.86)';
+        ctx.fillRect(lx, ly, tw + 16, 20);
+        ctx.fillStyle = hot ? INK.ground : INK.paper;
         ctx.fillText(label, lx + 8, ly + 14);
       } else {
         ctx.translate(x, y); ctx.rotate(Math.PI / 4);
         const s = hot ? 7 : 5.5;
-        ctx.fillStyle = active ? ACCENT : '#062a24';
+        ctx.fillStyle = active ? ACCENT : INK.ground;
         ctx.strokeStyle = ACCENT; ctx.lineWidth = 2;
         ctx.fillRect(-s, -s, s * 2, s * 2); ctx.strokeRect(-s, -s, s * 2, s * 2);
       }
@@ -206,7 +206,7 @@ export default function CalibrateCanvas(p: CalibrateCanvasProps) {
       ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
       ctx.fillStyle = '#000'; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
       drawScene(ctx, (x, y) => [(x - drag.pt![0]) * k + cx, (y - drag.pt![1]) * k + cy], k);
-      ctx.strokeStyle = '#ff5d73'; ctx.lineWidth = 1;
+      ctx.strokeStyle = INK.paper; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(cx - 12, cy); ctx.lineTo(cx - 3, cy); ctx.moveTo(cx + 3, cy); ctx.lineTo(cx + 12, cy);
       ctx.moveTo(cx, cy - 12); ctx.lineTo(cx, cy - 3); ctx.moveTo(cx, cy + 3); ctx.lineTo(cx, cy + 12); ctx.stroke();
       ctx.restore();

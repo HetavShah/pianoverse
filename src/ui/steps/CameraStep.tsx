@@ -2,12 +2,15 @@
 // (Cut, Glide, Punch, Dip to black or white), in the frame shape you'll post. Auto camera builds a first edit
 // from the music; everything can be changed on the timeline. Export follows the camera.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Dial from '../Dial';
 import {
   ASPECTS, Aspect, AutoSettings, autoCamera, CameraTrack, DEFAULT_DUR, maxZoom, newCameraTrack, Shot, shotId, shotIndexAt, ShotKind, Transition,
 } from '../../engine/camera';
 import { estimateBeats, nearestBeat } from '../../engine/beats';
 import { cameraFrameAt, cameraPath } from '../exportRun';
 import CameraTimeline from '../CameraTimeline';
+import Transport from '../Transport';
+import { INK } from '../palette';
 import type { WS } from '../workspace';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
@@ -67,7 +70,7 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
     g.fillStyle = 'rgba(0,0,0,0.55)';
     g.fillRect(0, 0, cv.width, r.y); g.fillRect(0, r.y + r.h, cv.width, cv.height - r.y - r.h);
     g.fillRect(0, r.y, r.x, r.h); g.fillRect(r.x + r.w, r.y, cv.width - r.x - r.w, r.h);
-    g.strokeStyle = '#2FD3B5'; g.lineWidth = 2; g.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+    g.strokeStyle = INK.live; g.lineWidth = 2; g.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
   }, [ws.time, ws.frameTick, project, on, duration, track, ws.videoEl]);
 
   // Delete removes the selected cut
@@ -158,25 +161,11 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
             <small>{on ? 'Your video · what the camera sees' : 'Camera off: the whole video'}</small>
           </div>
         </div>
-        <div className="transport-row">
-          <button type="button" className="btn icon ghost" onClick={() => ws.seek(Math.max(0, ws.time - 5))} aria-label="Back 5 seconds" title="Back 5 s">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM19 5v14l-10-7z" /></svg>
-          </button>
-          <button type="button" className="play" onClick={ws.togglePlay} aria-label={ws.playing ? 'Pause' : 'Play'}>
-            {ws.playing ? <svg width="18" height="18" viewBox="0 0 24 24" fill="#0B0D10"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg> : <svg width="18" height="18" viewBox="0 0 24 24" fill="#0B0D10"><path d="M7 4.5v15l12-7.5z" /></svg>}
-          </button>
-          <button type="button" className="btn icon ghost" onClick={() => ws.seek(Math.min(ws.duration, ws.time + 5))} aria-label="Forward 5 seconds" title="Forward 5 s">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM5 5v14l10-7z" /></svg>
-          </button>
-          <span className="time">{fmtT(ws.time)} <span className="dim">/ {fmtT(ws.duration)}</span></span>
-          <button type="button" className={'btn icon' + (ws.loop.on ? ' on' : ' ghost')} onClick={() => ws.setLoop({ ...ws.loop, on: !ws.loop.on })} aria-label="Loop" title="Loop">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" /></svg>
-          </button>
-        </div>
       </main>
 
       <aside className="style-side">
-        <button type="button" className="btn primary wide" disabled={!on} onClick={() => rebuild(track.auto)}>✦ Auto camera</button>
+        <div className="insp-head"><h2>Camera</h2></div>
+        <button type="button" className="btn primary wide" disabled={!on} onClick={() => rebuild(track.auto)}>Auto camera</button>
         <div className={'cam-auto' + (on ? '' : ' off')}>
           <div className="cam-opt"><span className="section-label">Cuts</span>
             <Seg3 value={track.auto.cuts} options={[['none', 'None'], ['bars', 'On bars'], ['often', 'Often']]} onChange={(v) => setAuto({ cuts: v })} /></div>
@@ -194,14 +183,12 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
             <div className="row"><h2>Shot {shotI + 1}</h2><span className="mono dim small-text">{fmtT(shot.start)} – {fmtT(shots[shotI + 1]?.start ?? duration)}</span></div>
             <Seg3 value={shot.kind} options={[['wide', 'Wide'], ['follow', 'Follow'], ['close', 'Close-up']]} onChange={(k) => setKind(shotI, k)} />
             {shot.kind === 'follow' && (
-              <label className="cam-len"><span>How close</span>
-                <input type="range" min={0.7} max={1.8} step={0.05} value={shot.zoom} onChange={(e) => setShot(shotI, { zoom: Number(e.target.value) })} aria-label="How close" />
-                <span className="mono">{shot.zoom.toFixed(2)}×</span></label>
+              <div className="ctl"><div className="ctl-head"><span>How close</span><span className="mono val">{shot.zoom.toFixed(2)}×</span></div>
+                <Dial value={shot.zoom} min={0.7} max={1.8} step={0.05} label="How close" fmt={(v) => `${v.toFixed(2)}×`} base={1} onChange={(v) => setShot(shotI, { zoom: v })} /></div>
             )}
             {shot.kind === 'close' && (
-              <label className="cam-len"><span>Zoom</span>
-                <input type="range" min={1.1} max={Math.max(1.2, zMax)} step={0.05} value={Math.min(shot.zoom, zMax)} onChange={(e) => setShot(shotI, { zoom: Number(e.target.value) })} aria-label="Zoom" />
-                <span className="mono">{Math.min(shot.zoom, zMax).toFixed(2)}×</span></label>
+              <div className="ctl"><div className="ctl-head"><span>Zoom</span><span className="mono val">{Math.min(shot.zoom, zMax).toFixed(2)}×</span></div>
+                <Dial value={Math.min(shot.zoom, zMax)} min={1.1} max={Math.max(1.2, zMax)} step={0.05} label="Zoom" fmt={(v) => `${v.toFixed(1)}×`} base={2} onChange={(v) => setShot(shotI, { zoom: v })} /></div>
             )}
             <p className="help">
               {shot.kind === 'wide' ? 'The whole video.' : shot.kind === 'follow' ? 'Keeps your hands in frame, closer when they are together.' : 'A fixed close-up. Drag the box in the small picture to frame it.'}
@@ -215,6 +202,8 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
         {!on && <p className="help">The camera is off: the video is exported as it is, in the size you pick on the Export step.</p>}
       </aside>
 
+      <div className="score">
+      <Transport ws={ws} loopHint="Loop" />
       {on ? (
         <CameraTimeline
           project={project} shots={shots} grid={grid} time={ws.time} duration={duration} zMax={zMax}
@@ -226,7 +215,8 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
           onTransition={setTransition}
           onRemoveJoin={removeJoin}
         />
-      ) : <div className="style-timeline cam-timeline" />}
+      ) : <div className="style-timeline cam-timeline"><p className="help">Turn the camera on to edit shots and cuts on the beat.</p></div>}
+      </div>
     </div>
   );
 }

@@ -32,7 +32,9 @@ export default function ImportStep({ ws }: { ws: WS }) {
 
         {video ? (
           <div className={'file-card' + (videoIssue ? ' warn' : '')}>
-            <div className="thumb">{thumb ? <img src={thumb} alt="" /> : <span className="ph" />}</div>
+            <div className="thumb">{thumb ? <img src={thumb} alt="" /> : (
+              <span className="ph"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="5" width="13" height="14" /><path d="M16 10l5-3v10l-5-3" /></svg></span>
+            )}</div>
             <div className="info">
               <span className="kind">Video</span>
               <b>{video.name}</b>
@@ -55,13 +57,15 @@ export default function ImportStep({ ws }: { ws: WS }) {
               {(videoIssue?.kind === 'unsupported' || videoIssue?.kind === 'error') && video.path && (
                 <button type="button" className="btn primary small" onClick={ws.convert}>Convert video</button>
               )}
-              <PickButton what="video" className="btn small" onPick={ws.pick} onFiles={ws.onFiles}>Replace</PickButton>
+              {videoIssue?.kind === 'missing'
+                ? <PickButton what="video" className="btn primary small" onPick={ws.pick} onFiles={ws.onFiles}>Choose the video again</PickButton>
+                : <PickButton what="video" className="btn small" onPick={ws.pick} onFiles={ws.onFiles}>Replace</PickButton>}
             </div>
           </div>
         ) : (
           <div className="file-card empty">
             <div className="icon">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2FD3B5" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="5" width="13" height="14" rx="2" /><path d="M16 10l5-3v10l-5-3" /></svg>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="5" width="13" height="14" rx="2" /><path d="M16 10l5-3v10l-5-3" /></svg>
             </div>
             <div className="info">
               <span className="kind">Video</span>
@@ -74,7 +78,7 @@ export default function ImportStep({ ws }: { ws: WS }) {
 
         <div className={'file-card' + (midi ? '' : ' empty dashed')}>
           <div className="icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2FD3B5" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M8 5v8M12 5v8M16 5v8M3 13h18" /></svg>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M8 5v8M12 5v8M16 5v8M3 13h18" /></svg>
           </div>
           <div className="info">
             <span className="kind">MIDI{midi ? '' : ' · optional'}</span>
@@ -86,7 +90,7 @@ export default function ImportStep({ ws }: { ws: WS }) {
             ) : (
               <>
                 <b>Add the MIDI recorded with this take</b>
-                <small>No MIDI? You can detect the notes from the audio in the next step.</small>
+                <small>{ready ? 'No MIDI? You can detect the notes from the audio in the next step.' : 'Add the video first; the MIDI is lined up with its sound.'}</small>
               </>
             )}
           </div>
@@ -129,7 +133,7 @@ export default function ImportStep({ ws }: { ws: WS }) {
 
       <footer className="page-foot">
         <button type="button" className="btn" onClick={ws.goHome}>{project ? 'Back to projects' : 'Cancel'}</button>
-        <button type="button" className="btn primary" disabled={!ready} onClick={() => ws.goStep('notes')}>Continue to notes and sync <span aria-hidden="true">→</span></button>
+        <button type="button" className="btn primary" disabled={!ready} onClick={() => ws.goStep('notes')}>Continue to notes and sync <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
       </footer>
     </div>
   );

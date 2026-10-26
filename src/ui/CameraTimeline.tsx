@@ -1,6 +1,8 @@
 // Camera timeline: the notes for orientation, then the shots. Click a shot to edit it, click a join (the marker
 // between two shots) to choose its transition, drag a join to move the cut (it snaps to beats).
 import { useEffect, useRef, useState } from 'react';
+import { INK } from './palette';
+import Dial from './Dial';
 import type { CalibratedProject } from '../engine/calibration';
 import { pal } from '../engine/project';
 import type { BeatGrid } from '../engine/beats';
@@ -54,7 +56,7 @@ export default function CameraTimeline(props: {
     const g = cv.getContext('2d')!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
-    g.fillStyle = '#0b0e12'; g.beginPath(); g.roundRect(0, 0, w, h, 6); g.fill();
+    g.fillStyle = INK.stage; g.fillRect(0, 0, w, h);
     let lo = 127, hi = 0;
     for (const n of project.notes) { lo = Math.min(lo, n.p); hi = Math.max(hi, n.p); }
     const rows = Math.max(1, hi - lo + 1);
@@ -125,12 +127,11 @@ export default function CameraTimeline(props: {
                   ))}
                 </div>
                 {join.in !== 'cut' && (
-                  <label className="cam-len">
-                    <span>Length</span>
-                    <input type="range" min={DUR_RANGE[join.in][0]} max={DUR_RANGE[join.in][1]} step={0.05} value={join.inDur}
-                      onChange={(e) => onTransition(selJoin, join.in, Number(e.target.value))} aria-label="Transition length" />
-                    <span className="mono">{join.inDur.toFixed(2)} s</span>
-                  </label>
+                  <div className="ctl">
+                    <div className="ctl-head"><span>Length</span><span className="mono val">{join.inDur.toFixed(2)} s</span></div>
+                    <Dial value={join.inDur} min={DUR_RANGE[join.in][0]} max={DUR_RANGE[join.in][1]} step={0.05} label="Transition length" fmt={(v) => `${v.toFixed(2)} s`} base={DEFAULT_DUR[join.in]}
+                      onChange={(v) => onTransition(selJoin, join.in, v)} />
+                  </div>
                 )}
                 <div className="row">
                   <small>{join.in === 'cut' ? 'Jumps straight to the next shot.' : join.in === 'glide' ? 'Moves smoothly into the next framing.' : join.in === 'punch' ? 'A quick push in, then settles back.' : `Fades to ${join.in === 'dipWhite' ? 'white' : 'black'}, then into the next shot.`}</small>

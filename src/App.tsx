@@ -28,10 +28,6 @@ type RVFCVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
 };
 
-const Logo = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="none" stroke="#2FD3B5" strokeWidth="1.8" /><path d="M8 6.5v7M12 5v9M16 7.5v6" stroke="#2FD3B5" strokeWidth="1.8" strokeLinecap="round" /><path d="M5.5 17.5h13" stroke="#E8EAED" strokeWidth="1.8" strokeLinecap="round" /></svg>
-);
-
 export default function App() {
   const videoRef = useRef<RVFCVideo>(null);
   const rendererRef = useRef<Renderer | null>(null);
@@ -437,20 +433,27 @@ export default function App() {
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); onFiles(e.dataTransfer.files); }}>
       <header className="topbar">
-        <button type="button" className="brand" onClick={goHome} title="Projects"><Logo /><span>Pianoverse</span></button>
-        {route === 'project' && <span className="project-name">{project?.name ?? 'New project'}</span>}
+        <button type="button" className="brand" onClick={goHome} title="Projects">Pianoverse</button>
+        {route === 'project' && <span className="project-name" title={project?.name}>{project?.name ?? 'New project'}</span>}
         {route === 'project' && (
           <nav className="stepper" aria-label="Steps">
-            {STEPS.map((s, i) => {
-              const done = doneStep(s.id);
-              const disabled = s.id !== 'import' && !ready;
-              return (
-                <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done ? ' done' : '')} disabled={disabled}
-                  onClick={() => goStep(s.id)}>
-                  <span className="dot">{done && step !== s.id ? '✓' : i + 1}</span>{s.label}
-                </button>
-              );
-            })}
+            <span className="trail">
+              {STEPS.slice(0, 3).map((s, i) => {
+                const done = doneStep(s.id);
+                return (
+                  <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done ? ' done' : '')} disabled={s.id !== 'import' && !ready}
+                    onClick={() => goStep(s.id)} aria-current={step === s.id ? 'step' : undefined}>
+                    <span className="dot">{i + 1}</span>{s.label}{done && step !== s.id && <svg className="tick" width="11" height="11" viewBox="0 0 12 12" aria-label="done"><path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>}
+                  </button>
+                );
+              })}
+            </span>
+            <span className="rooms">
+              {STEPS.slice(3).map((s) => (
+                <button key={s.id} type="button" className={'step-btn room' + (step === s.id ? ' on' : '')} disabled={!ready}
+                  onClick={() => goStep(s.id)} aria-current={step === s.id ? 'page' : undefined}>{s.label}</button>
+              ))}
+            </span>
           </nav>
         )}
         <div className="top-right">

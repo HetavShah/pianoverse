@@ -41,7 +41,7 @@ export default function ShapePicker({ value, onPick }: { value: string; onPick: 
           <div key={t.id} className={'tex mine' + (value === 'user:' + t.id ? ' on' : '')} title={t.name}>
             <button type="button" className="tex-pick" onClick={() => onPick('user:' + t.id)}><SvgThumb t={t} /><span>{t.name}</span></button>
             <button type="button" className="tex-del" aria-label={`Remove ${t.name}`} title="Remove from your shapes"
-              onClick={async () => { if (value === 'user:' + t.id) onPick('heart'); await deleteTexture(t.id); }}>×</button>
+              onClick={async () => { if (value === 'user:' + t.id) onPick('heart'); await deleteTexture(t.id); }}><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.7" /></svg></button>
           </div>
         ))}
         <button type="button" className="tex add" onClick={upload} disabled={busy} title="Use your own SVG drawing. Simple line art works best: the sparks trace its outlines.">
