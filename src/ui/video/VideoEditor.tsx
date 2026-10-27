@@ -17,7 +17,6 @@ const SHAPES: { id: string; label: string; r: number | null }[] = [
 const fmt = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 const MIN = 64; // smallest crop, video pixels
 const MIN_LEN = 1; // shortest trim, seconds
-const STRIP = 12; // filmstrip pictures
 
 type Drag = { kind: 'move' | 'nw' | 'ne' | 'sw' | 'se'; x: number; y: number; c: Rect } | null;
 
@@ -31,6 +30,7 @@ export default function VideoEditor({ ws }: { ws: WS }) {
   const [shape, setShape] = useState<string>('free');
   const cv = useRef<HTMLCanvasElement>(null);
   const drag = useRef<Drag>(null);
+  /** filmstrip pictures, '' while one is still being drawn */
   const [strip, setStrip] = useState<string[]>([]);
 
   const setEdit = (patch: { trim?: [number, number] | undefined; crop?: Rect | undefined }) => {
@@ -72,17 +72,25 @@ export default function VideoEditor({ ws }: { ws: WS }) {
     if (!src || !duration) return;
     let stop = false;
     const el = document.createElement('video');
+    // like the main video: without this the desktop app won't let a canvas read its pixels, and every picture fails
+    el.crossOrigin = 'anonymous';
     el.muted = true; el.preload = 'auto'; el.src = src;
-    const pics: string[] = [];
     const c = document.createElement('canvas');
     (async () => {
       await new Promise<void>((res, rej) => { el.onloadeddata = () => res(); el.onerror = () => rej(new Error('video')); });
-      const h = 54, w = Math.round(h * (el.videoWidth / el.videoHeight));
+      // as many pictures, in the video's own shape, as fill the bar: nothing is stretched or zoomed
+      const box = bar.current?.getBoundingClientRect();
+      const bh = box?.height || 54, bw = box?.width || 900;
+      const aspect = el.videoWidth / el.videoHeight;
+      const n = Math.max(4, Math.min(40, Math.ceil(bw / (bh * aspect))));
+      const h = Math.round(bh * (window.devicePixelRatio || 1)), w = Math.round(h * aspect);
       c.width = w; c.height = h;
-      for (let i = 0; i < STRIP && !stop; i++) {
-        await new Promise<void>((res) => { el.onseeked = () => res(); el.currentTime = ((i + 0.5) / STRIP) * duration; });
+      const pics: string[] = Array(n).fill('');
+      setStrip([...pics]);
+      for (let i = 0; i < n && !stop; i++) {
+        await new Promise<void>((res) => { el.onseeked = () => res(); el.currentTime = ((i + 0.5) / n) * duration; });
         c.getContext('2d')!.drawImage(el, 0, 0, w, h);
-        pics.push(c.toDataURL('image/jpeg', 0.7));
+        pics[i] = c.toDataURL('image/jpeg', 0.75);
         if (!stop) setStrip([...pics]);
       }
     })().catch(() => {});
@@ -185,14 +193,9 @@ export default function VideoEditor({ ws }: { ws: WS }) {
       </div>
 
       <div className="ve-trim">
-        <MiniTransport ws={ws}>
-          <span className="small-text">Start <b className="mono">{fmt(trimA)}</b></span>
-          <span className="small-text">End <b className="mono">{fmt(trimB)}</b></span>
-          <span className="small-text dim">Length <span className="mono">{fmt(trimB - trimA)}</span></span>
-        </MiniTransport>
         <div className="ve-bar" ref={bar} onPointerDown={onTrimDown} onPointerMove={onTrimMove} onPointerUp={() => { tdrag.current = null; }}
           role="group" aria-label="Trim: drag the two handles">
-          <div className="ve-strip">{strip.map((s, i) => <img key={i} src={s} alt="" />)}</div>
+          <div className="ve-strip">{strip.map((s, i) => (s ? <img key={i} src={s} alt="" /> : <span key={i} className="ve-strip-wait" />))}</div>
           <div className="ve-off" style={{ left: 0, width: pc(trimA) }} />
           <div className="ve-off" style={{ left: pc(trimB), right: 0 }} />
           <div className="ve-keep" style={{ left: pc(trimA), width: `calc(${pc(trimB)} - ${pc(trimA)})` }} />
@@ -200,6 +203,11 @@ export default function VideoEditor({ ws }: { ws: WS }) {
           <div className="ve-handle b" style={{ left: pc(trimB) }} title="End" />
           <div className="ve-head-line" style={{ left: pc(ws.time) }} />
         </div>
+        <MiniTransport ws={ws}>
+          <span className="small-text">Start <b className="mono">{fmt(trimA)}</b></span>
+          <span className="small-text">End <b className="mono">{fmt(trimB)}</b></span>
+          <span className="small-text dim">Length <span className="mono">{fmt(trimB - trimA)}</span></span>
+        </MiniTransport>
         <div className="row">
           <button type="button" className="btn small" onClick={() => setTrim(ws.time, trimB)} disabled={ws.time >= trimB - MIN_LEN} title="Start the video at the playhead"><Icon name="trimStart" />Start here</button>
           <button type="button" className="btn small" onClick={() => setTrim(trimA, ws.time)} disabled={ws.time <= trimA + MIN_LEN} title="End the video at the playhead"><Icon name="trimEnd" />End here</button>

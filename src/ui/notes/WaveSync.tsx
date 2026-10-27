@@ -64,8 +64,10 @@ export default function WaveSync(props: {
   attacks: number[];
   /** the part of the video kept on the Video step: only that is shown */
   range: [number, number];
+  /** the transport, right under the waveform */
+  transport?: React.ReactNode;
 }) {
-  const { audio, notes, time, duration, playing, onNudge, onSeek, attacks, range } = props;
+  const { audio, notes, time, duration, playing, onNudge, onSeek, attacks, range, transport } = props;
   const ref = useRef<HTMLCanvasElement>(null);
   const [width, setWidth] = useState(900);
   const [height, setHeight] = useState(() => { try { return Number(localStorage.getItem(LS_HEIGHT)) || 230; } catch { return 230; } });
@@ -219,6 +221,7 @@ export default function WaveSync(props: {
         onPointerMove={(e) => { if (drag?.kind === 'resize') setHeight(Math.max(140, Math.min(560, drag.v0 + e.clientY - drag.y))); }}
         onPointerUp={() => { if (drag?.kind === 'resize') { try { localStorage.setItem(LS_HEIGHT, String(height)); } catch { /* convenience only */ } } setDrag(null); }}
       />
+      {transport}
       <div className="wave-foot">
         <span className="legend"><i className="lg-tick" />Notes <i className="lg-tick faded" />no sound there <i className="lg-wave" />Audio</span>
         <span className="zoom">

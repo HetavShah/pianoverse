@@ -108,7 +108,6 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
           )}
         </div>
         <div className="cal-timeline">
-          <MiniTransport ws={ws} />
           {cal?.cameraMoves ? (
             <div className="scrub-col">
               <QualityStrip project={project} duration={ws.duration} onSeek={ws.seek} />
@@ -122,6 +121,7 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
           ) : (
             <div className="scrub-col"><ScrubBar time={ws.time} duration={ws.duration} trim={project.edit?.trim ? trimRange(project, ws.duration) : null} onSeek={ws.seek} /></div>
           )}
+          <MiniTransport ws={ws} />
         </div>
       </div>
 

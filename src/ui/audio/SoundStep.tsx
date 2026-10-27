@@ -61,13 +61,6 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
         <p className="sub">Shape how the sound starts and ends, and how it sounds. Your video file isn't changed.</p>
 
         <div className="sound-card">
-          <MiniTransport ws={ws}>
-            <button type="button" className={'btn small' + (live.bypass ? ' on' : '')} disabled={!live.active}
-              onPointerDown={() => live.setBypass(true)} onPointerUp={() => live.setBypass(false)} onPointerLeave={() => live.setBypass(false)}
-              onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); live.setBypass(true); } }}
-              onKeyUp={() => live.setBypass(false)}
-              title="Hold to hear the sound as recorded, without your settings"><Icon name="compareSound" />Hold for original</button>
-          </MiniTransport>
           <div className="sound-ends">
             <div className="sound-end">
               <div className="sound-end-head">
@@ -86,6 +79,13 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
             </div>
           </div>
           <SoundWave {...wave} className="overview" />
+          <MiniTransport ws={ws}>
+            <button type="button" className={'btn small' + (live.bypass ? ' on' : '')} disabled={!live.active}
+              onPointerDown={() => live.setBypass(true)} onPointerUp={() => live.setBypass(false)} onPointerLeave={() => live.setBypass(false)}
+              onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); live.setBypass(true); } }}
+              onKeyUp={() => live.setBypass(false)}
+              title="Hold to hear the sound as recorded, without your settings"><Icon name="compareSound" />Hold for original</button>
+          </MiniTransport>
           <div className="sound-legend small-text">
             <span><i className="sw-orig" /> As recorded</span>
             <span><i className="sw-shaped" /> With your settings</span>

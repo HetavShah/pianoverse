@@ -95,13 +95,15 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
         )}
 
         <div className="wave-card">
+          <WaveSync
+            range={kept}
+            transport={
           <MiniTransport ws={ws}>
             <label className="toggle-inline" title="A click on every note, to hear whether the notes and the audio line up">
               <input type="checkbox" checked={clickOn} onChange={(e) => setClickOn(e.target.checked)} /> Click on each note
             </label>
           </MiniTransport>
-          <WaveSync
-            range={kept}
+            }
             audio={n.audio}
             notes={placed}
             attacks={attacks}
