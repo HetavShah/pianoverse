@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { CalibratedProject } from '../../engine/calibration';
 import { UpdatePill, updateStatusText, useUpdater } from '../../updater';
 import { inTauri } from '../services/media';
+import Icon from '../components/icons';
 import { FLOW_STEPS, STEPS, Step } from './workspace';
 
 const Tick = () => <svg className="tick" width="11" height="11" viewBox="0 0 12 12" aria-label="done"><path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
@@ -43,14 +44,14 @@ export default function TopBar(props: {
             {STEPS.slice(0, FLOW_STEPS).map((s, i) => (
               <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done(s.id) ? ' done' : '')} disabled={s.id !== 'import' && !ready}
                 onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'step' : undefined}>
-                <span className="dot">{i + 1}</span>{s.label}{done(s.id) && step !== s.id && <Tick />}
+                <Icon name={s.id} size={15} />{s.label}{done(s.id) && step !== s.id && <Tick />}
               </button>
             ))}
           </span>
           <span className="rooms">
             {STEPS.slice(FLOW_STEPS).map((s) => (
               <button key={s.id} type="button" className={'step-btn room' + (step === s.id ? ' on' : '')} disabled={!ready}
-                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'page' : undefined}>{s.label}</button>
+                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'page' : undefined}><Icon name={s.id} size={15} />{s.label}</button>
             ))}
           </span>
         </nav>
@@ -75,9 +76,9 @@ export default function TopBar(props: {
           {menu && (
             <div className="menu" onMouseLeave={() => setMenu(false)}>
               <div className="menu-head"><b>Pianoverse {updater.version && `v${updater.version}`}</b><small>{updateStatusText(updater.phase) || (inTauri() ? '' : 'Browser preview')}</small></div>
-              {inTauri() && <button type="button" onClick={() => updater.check()}>Check for updates</button>}
-              <button type="button" onClick={() => { setMenu(false); props.onShortcuts(); }}>Keyboard shortcuts <kbd>?</kbd></button>
-              {project && <button type="button" onClick={() => { setMenu(false); props.onSaveFile(); }}>Save project file…</button>}
+              {inTauri() && <button type="button" onClick={() => updater.check()}><Icon name="update" />Check for updates</button>}
+              <button type="button" onClick={() => { setMenu(false); props.onShortcuts(); }}><Icon name="shortcuts" />Keyboard shortcuts <kbd>?</kbd></button>
+              {project && <button type="button" onClick={() => { setMenu(false); props.onSaveFile(); }}><Icon name="save" />Save project file…</button>}
               <div className="menu-foot dim">{props.gpuError ? `Graphics: ${props.gpuError}` : `Graphics: ${props.gpuName || '…'}`}</div>
             </div>
           )}

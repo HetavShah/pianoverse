@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import NotesStep from '../notes/NotesStep';
 import type { WS } from '../app/workspace';
+import Icon from '../components/icons';
 import SoundStep from './SoundStep';
 
 type Tab = 'notes' | 'sound';
-const TABS: { id: Tab; label: string }[] = [{ id: 'notes', label: 'Notes and sync' }, { id: 'sound', label: 'Sound' }];
+const TABS: { id: Tab; label: string; icon: 'notesSync' | 'sound' }[] = [{ id: 'notes', label: 'Notes and sync', icon: 'notesSync' }, { id: 'sound', label: 'Sound', icon: 'sound' }];
 // the page last open, for coming back to the step during the session
 let lastTab: Tab = 'notes';
 
@@ -19,7 +20,7 @@ export default function AudioStep({ ws }: { ws: WS }) {
       <div className="seg big" role="tablist" aria-label="Audio">
         {TABS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-            {t.label}{t.id === 'sound' && ws.sound.active && <span className="tab-dot" aria-label="changed" />}
+            <Icon name={t.icon} />{t.label}{t.id === 'sound' && ws.sound.active && <span className="tab-dot" aria-label="changed" />}
           </button>
         ))}
       </div>

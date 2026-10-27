@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { WS } from '../app/workspace';
 import { sourceRect, trimRange } from '../../engine/project';
+import Icon from '../components/icons';
 import { inTauri } from '../services/media';
 import {
   detectEncoders, Encoders, encoderLabel, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
@@ -259,7 +260,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
         )}
         {run.kind === 'error' && <div className="ex-error"><b>The export stopped</b><pre>{run.message}</pre></div>}
 
-        <button type="button" className="btn primary big" onClick={start} disabled={running || !enc || !s.out}>{run.kind === 'done' ? 'Export again' : 'Export video'}</button>
+        <button type="button" className="btn primary big" onClick={start} disabled={running || !enc || !s.out}><Icon name="export" size={18} />{run.kind === 'done' ? 'Export again' : 'Export video'}</button>
         <button type="button" className="btn" onClick={savePng} disabled={running}>Save current frame as PNG</button>
         {msg && <small className="dim">{msg}</small>}
       </aside>
