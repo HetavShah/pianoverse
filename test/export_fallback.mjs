@@ -15,7 +15,7 @@ await page.exposeFunction('pvFrame', async () => {
   framesIn++;
   const enc = starts[starts.length - 1];
   if (enc === 'h264_qsv' && framesIn > 3) throw new Error('stalled');
-  if (enc === 'libx264' && framesIn === 5) await new Promise((r) => setTimeout(r, 6000));   // a slow moment
+  if (enc === 'libx264' && framesIn === 5) await new Promise((r) => setTimeout(r, 15000));   // a slow moment
 });
 await page.exposeFunction('pvFinish', () => { finished++; return 'C:\\\\out.mp4'; });
 await page.addInitScript(() => {
@@ -37,7 +37,9 @@ await page.evaluate(() => window.pianoverseSetLoop({ on: false, range: [10, 10.4
 await page.click('label:has-text("Only the selected part") input'); await page.waitForTimeout(300);
 ok(/Intel Quick Sync/.test(await page.locator('.ex-stats').innerText()), 'the pretend Quick Sync is picked');
 await page.click('button:has-text("Export video")');
-const waitText = await page.waitForSelector('.ex-wait', { timeout: 10 * 60 * 1000 }).then((e) => e.innerText()).catch(() => '');
+// (the test machine draws in software, so "the graphics card" may show first)
+const waitText = await page.waitForFunction(() => /encoder/.test(document.querySelector('.ex-wait')?.textContent ?? ''), null, { timeout: 10 * 60 * 1000 })
+  .then(() => page.locator('.ex-wait').innerText()).catch(() => '');
 ok(/Waiting for the encoder/.test(waitText), 'a slow step says what it waits for  ' + JSON.stringify(waitText));
 await page.waitForSelector('.ex-done, .ex-error', { timeout: 15 * 60 * 1000 });
 const done = await page.locator('.ex-done, .ex-error').innerText();
