@@ -23,6 +23,14 @@ const CASES = [
   ['concert-camera', 'Concert', 24.2, {}, { output: [1080, 1920], view: { x: 200, y: 700, w: 500, h: 888.9 }, fade: [0.3, 0] }],
   ['concert-titles', 'Concert', 1.0, { titles: { intro: { on: true, title: 'Interstellar', subtitle: 'Hans Zimmer', credit: '', dur: 4.5 } } }, null],
   ['lagoon-alpha', 'Lagoon', 24.2, {}, { alpha: true }],
+  ['lagoon-labels-bars', 'Lagoon', 24.2, { look: { labels: true, barLines: true, barOpacity: 0.6 }, noteSource: { bars: [22, 23.5, 25, 26.5, 28], offset: 0.1 } }, null],
+  ['plume', 'Lagoon', 24.4, { look: { partMode: 'plume', partRays: true } }, null],
+  ['spray', 'Lagoon', 24.4, { look: { partMode: 'spray' } }, null],
+  ['vortex', 'Lagoon', 24.4, { look: { partMode: 'vortex' } }, null],
+  ['shape', 'Lagoon', 25.0, { look: { partMode: 'shape', partShape: 'heart' } }, null],
+  ['shape-section', 'Concert', 25.0, { particleScenes: [{ id: 's1', start: 23, end: 27, shape: 'star', size: 1, dir: 'cw' }] }, null],
+  ['texture-ice', 'Concert', 24.2, { look: { noteDim: '3d', note3d: 'glass', texOn: true, noteTexture: 'ice' } }, null],
+  ['background', 'Concert', 24.2, { look: { bgColorOn: true, bgColor: '#203040', footScale: 0.8, footRot: 5, footX: 0.05 } }, null],
 ];
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'] });
@@ -48,7 +56,7 @@ for (const [name, look, t, change, setup] of CASES) {
     const r = window.pianoverse.renderer, v = document.querySelector('video');
     const base = window.__goldenBase ??= r.project;
     if (Math.abs(v.currentTime - t) > 1e-3) { v.currentTime = t; await new Promise((res) => v.addEventListener('seeked', res, { once: true })); }
-    r.setProject({ ...base, look: r.project.look, presetId: r.project.presetId, ...change });
+    r.setProject({ ...base, presetId: r.project.presetId, ...change, look: { ...r.project.look, ...(change.look ?? {}) } });
     r.setOutput(setup?.output ?? null);
     r.setView(setup?.view ?? null, setup?.fade ?? null);
     r.alphaOut = !!setup?.alpha;
