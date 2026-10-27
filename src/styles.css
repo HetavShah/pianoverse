@@ -207,7 +207,7 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .file-card .thumb { width: 72px; height: 128px; overflow: hidden; background: var(--stage); flex: none; }
 .file-card .thumb .ph { display: grid; place-items: center; width: 100%; height: 100%; color: var(--dim); border: 1px solid var(--rule-2); }
 .file-card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.file-card .icon { width: 72px; height: 72px; display: grid; place-items: center; flex: none; color: var(--stone); border: 1px solid var(--rule-2); }
+.file-card .file-icon { width: 72px; height: 72px; display: grid; place-items: center; flex: none; color: var(--stone); border: 1px solid var(--rule-2); }
 .file-card .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .file-card .kind { font-size: 12px; font-weight: 600; color: var(--stone); }
 .file-card .info b { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

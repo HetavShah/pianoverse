@@ -134,9 +134,11 @@ for (const w of [1366, 1100]) {
     if (wide > 1) ok(false, `${step} at ${w}px is ${wide}px wider than the window`);
     const sideways = await page.evaluate(() => [...document.querySelectorAll('.page-side, .style-side, .page-main')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.className));
     if (sideways.length) ok(false, `${step} at ${w}px: a panel scrolls sideways  ${sideways.join(', ')}`);
+    const bigIcons = await page.evaluate(() => [...document.querySelectorAll('button svg.icon, label svg.icon, a svg.icon')].filter((e) => e.getBoundingClientRect().width > 26).length);
+    if (bigIcons) ok(false, `${step} at ${w}px: ${bigIcons} button icon(s) drawn oversized`);
   }
 }
-ok(true, 'pages fit the window at 1366 and 1100 px, and no panel scrolls sideways');
+ok(true, 'pages fit the window at 1366 and 1100 px, no panel scrolls sideways, no icon is oversized');
 ok(errors.length === 0, 'no errors  ' + errors.join(' | '));
 console.log(fails ? `${fails} FAILED` : 'all passed');
 await b.close();

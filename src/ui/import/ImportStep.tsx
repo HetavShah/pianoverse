@@ -61,7 +61,7 @@ export default function ImportStep({ ws }: { ws: WS }) {
           </div>
         ) : (
           <div className="file-card empty">
-            <div className="icon">
+            <div className="file-icon">
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="5" width="13" height="14" rx="2" /><path d="M16 10l5-3v10l-5-3" /></svg>
             </div>
             <div className="info">
