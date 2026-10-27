@@ -181,7 +181,7 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
         </Item>
         <Item n={6} done={!!kb.fit && c.fitting === null} active={trackDone && !kb.fit} title="Line up the keys"
           sub={c.fitting !== null ? 'Matching the keys to the picture…'
-            : kb.fit && (kb.fit.x0 || kb.fit.k || kb.fit.sh) ? 'The keys are lined up with the ones in the video, so lights and notes sit on the right keys'
+            : kb.fit && (kb.fit.x0 || kb.fit.k || kb.fit.sh) ? 'The keys are lined up with the ones in the video, so notes land on the right keys'
             : kb.fit ? 'The keys already matched the video'
             : 'Matches every key to the ones in the video'}>
           {c.fitting !== null

@@ -546,6 +546,7 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     { title: 'Saber', controls: [
       { key: 'saberBright', kind: 'slider', label: 'Brightness', min: 0, max: 2.5, step: 0.01, fmt: pct },
       { key: 'saberIdle', kind: 'slider', label: 'Glow where you don’t play', min: 0, max: 1, step: 0.01, fmt: pct, hint: 'Lower it and the saber lights up only where notes land' },
+      { key: 'keyHeld', kind: 'slider', label: 'Glow over held notes', min: 0, max: 2.5, step: 0.01, fmt: pct, when: (l) => l.saberIdle < 1 },
       { key: 'saberOpacity', kind: 'slider', label: 'Opacity', min: 0, max: 1, step: 0.01, fmt: pct },
       { key: 'saberOffset', kind: 'slider', label: 'Position', min: -1.5, max: 1.5, step: 0.01, fmt: (v) => v.toFixed(2), hint: 'Moves the saber above (+) or below (−) the back edge of the keys' },
       { key: 'saberThick', kind: 'slider', label: 'Scale', min: 0.3, max: 3, step: 0.01, fmt: x },
@@ -628,11 +629,6 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     ] },
   ],
   lighting: [
-    { title: 'Keys', controls: [
-      { key: 'keyBright', kind: 'slider', label: 'Key glow', min: 0, max: 2.5, step: 0.01, fmt: pct },
-      { key: 'keyAnticipate', kind: 'slider', label: 'Light up before landing', min: 0, max: 1.5, step: 0.05, fmt: s1 },
-      { key: 'keyHeld', kind: 'slider', label: 'Glow while held', min: 0, max: 2.5, step: 0.01, fmt: pct },
-    ] },
     { title: 'On your hands', controls: [
       { key: 'relight', kind: 'slider', label: 'Coloured light', min: 0, max: 2.5, step: 0.01, fmt: pct },
       { key: 'relightRadius', kind: 'slider', label: 'Light radius', min: 0.3, max: 3, step: 0.01, fmt: x },

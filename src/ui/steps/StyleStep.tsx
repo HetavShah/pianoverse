@@ -21,7 +21,7 @@ const PANELS: Panel[] = [
   { id: 'saber', label: 'Saber', kind: (l) => SABER_STYLES.find((x) => x.id === l.saberStyle)?.label ?? 'Plasma', toggle: 'saber' },
   { id: 'impact', label: 'Impact', kind: () => 'Flash', toggle: 'impact' },
   { id: 'particles', label: 'Particles', kind: (l) => PARTICLE_PRESETS.find((p) => Object.entries(p.set).every(([k, v]) => sameValue(l[k as keyof Look], v)))?.label ?? 'Custom', toggle: 'particles' },
-  { id: 'lighting', label: 'Lighting', kind: () => 'Relight', toggle: 'keys' },
+  { id: 'lighting', label: 'Lighting', kind: () => 'Relight' },
   { id: 'background', label: 'Background', kind: (l) => (l.bgImageOn ? 'Image' : l.bgColorOn ? 'Colour' : 'Footage') },
   { id: 'finish', label: 'Glow and film', kind: () => 'Bloom', toggle: 'bloom' },
 ];

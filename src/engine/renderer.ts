@@ -685,15 +685,12 @@ export class Renderer {
       if (dd > 0) {
         const near = lk.keyAnticipate > 0 ? 1 - Math.min(1, dd / lk.keyAnticipate) : 0;
         if (near > 0) {
-          if (L.keys) keyQuad(n.p, scaleC(col, 0.45 * near * near * lk.keyBright));
           const [lx, ly] = at(sB);
           if (L.impact) light(lx, ly, tg.unit * 3 * lk.relightRadius, col, 0.35 * near);
         }
       } else if (t <= n.e || dd >= -lk.impactTime) {
         const tt = -dd;
         const held = t <= n.e;
-        const glow = Math.max(Math.exp(-tt * 6), held ? (0.3 + 0.05 * Math.sin(t * 7 + n.p)) * lk.keyHeld : 0);
-        if (L.keys) keyQuad(n.p, scaleC(lighten(col, 0.2), glow * lk.keyBright * 1.15));
         if (L.impact) {
           const [lx, ly] = at(tg.unit * 0.6);
           light(lx, ly, tg.unit * (4 + 2 * vn) * lk.relightRadius, col, (0.55 + 0.5 * vn) * Math.exp(-tt * 3.5) + (held ? 0.12 : 0));
