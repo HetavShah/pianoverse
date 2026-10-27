@@ -327,8 +327,10 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let tint = mix(vec3f(1.0), vec3f(0.2) + E.col * 0.8, PP.colorMix);
   var o: Particle;
   if (kf < nS && PP.sparkFan > 0.5) {
-    // fan: a wide spray of short white sparks that shoot out of the key, slow quickly and burn out
-    let ts = E.start + rnd(st) * 0.03;
+    // fan: a wide spray of short white sparks that shoot out of the key, slow quickly and burn out;
+    // half burst out on the strike, the rest keep coming while the key is held
+    let hold = max(E.pad1, 0.02);
+    let ts = E.start + select(rnd(st) * 0.03, rnd(st) * hold, kf >= nS * 0.5 && hold > 0.1);
     let plife = (0.22 + 0.45 * rnd(st)) * PP.lifeMul;
     let age = t - ts;
     if (age < 0.0 || age > plife) { return off; }
@@ -403,7 +405,9 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   if (kf < nS + nD + nG && PP.smokeFountain > 0.5) {
     // fountain smoke: soft plumes thrown up from the key that arc over and sink, like a palm or a fountain
     let plife = (1.7 + 1.1 * rnd(st)) * PP.lifeMul;
-    let ts = E.start + rnd(st) * 0.08;
+    let j = kf - nS - nD;                          // which puff: half on the strike, the rest through the hold
+    let hold = max(E.pad1, 0.02);
+    let ts = E.start + select(rnd(st) * 0.08, rnd(st) * hold, j >= nG * 0.5 && hold > 0.1);
     let age = t - ts;
     if (age < 0.0 || age > plife) { return off; }
     // each puff leaves the key on its own path: up a column, then curling out to one side and sinking
@@ -446,24 +450,29 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   return off;
 }
 
-// FLOATING DUST: fine specks spread over the space above the keys (pos..vel is that box), drifting slowly up and
-// sideways and twinkling, there all the time. count = how many; pad0 = pixels per key.
+// FLOATING DUST: fine specks in a band over the keyboard (from its back edge pos..vel, up to pad1 px along the
+// rise direction (life, rate)), drifting slowly up and twinkling, there all the time. Denser near the keys.
+// count = how many; pad0 = pixels per key.
 fn ambient(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   var off: Particle;
   off.pos = vec2f(-10000.0);
   off.b = 0.0;
   if (f32(k) >= E.count) { return off; }
-  let lo = E.pos;
-  let sz = max(E.vel - E.pos, vec2f(1.0));
   let u = E.pad0;
-  let p0 = lo + vec2f(rnd(st), rnd(st)) * sz;
-  let drift = vec2f(gaussR(st) * 0.35 + PP.wind, -(0.25 + 0.5 * rnd(st)) * PP.rise) * u;
+  let H = max(E.pad1, 1.0);
+  let upv = vec2f(E.life, E.rate);
+  let along = E.vel - E.pos;
+  let s0 = rnd(st);
+  let h0 = pow(rnd(st), 1.6) * H;
   let ph = rnd(st) * 6.2831853;
-  var p = p0 + drift * t + vec2f(sin(t * 0.37 + ph), cos(t * 0.29 + ph * 1.7)) * u * 0.6;
-  p = lo + ((p - lo) % sz + sz) % sz;              // wrap round the box
-  // dimmer near the box's top and bottom, so the wrap is never seen
-  let fy = (p.y - lo.y) / sz.y;
-  let edge = smoothstep(0.0, 0.12, fy) * smoothstep(1.0, 0.8, fy);
+  let rise = (0.25 + 0.5 * rnd(st)) * u * PP.rise;
+  let side = (gaussR(st) * 0.3 + PP.wind) * u / max(length(along), 1.0);
+  let h = (h0 + rise * t) % H;                     // drift up, wrapping back to the keys
+  let s = fract(s0 + side * t);
+  var p = E.pos + along * s + upv * h + vec2f(sin(t * 0.37 + ph), cos(t * 0.29 + ph * 1.7)) * u * 0.5;
+  // fade towards the top of the band and the keyboard's ends, so neither the wrap nor the band's edge is seen
+  let fy = h / H;
+  let edge = smoothstep(0.0, 0.08, fy) * (1.0 - smoothstep(0.45, 1.0, fy)) * smoothstep(0.0, 0.06, s) * smoothstep(1.0, 0.94, s);
   let tw = 0.5 + 0.5 * sin(t * (0.8 + 2.5 * rnd(st)) + ph);
   var o: Particle;
   o.pos = p;

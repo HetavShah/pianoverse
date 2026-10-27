@@ -476,16 +476,17 @@ export class Renderer {
     const lk = this.look;
     if (!(lk.partAmbient > 0) || !this.proj) return null;
     const kb = this.kb, nK = this.whiteKeys;
+    // a band over the keyboard: along its back edge, up to about nine keys high (not the whole room)
     const a = kb.P(0, kb.edgeY(0)), b = kb.P(nK, kb.edgeY(nK));
-    const bottom = Math.max(this.srcH * 0.2, Math.min(this.srcH, (a[1] + b[1]) / 2));
     // tinted by the look: the average colour of the notes
     let r = 0, g = 0, bl = 0;
     const n = Math.min(64, this.notes.length);
     for (let i = 0; i < n; i++) { const c = this.notes[Math.floor((i * this.notes.length) / n)].col; r += c[0]; g += c[1]; bl += c[2]; }
     const col = n ? [r / n, g / n, bl / n] : [0.6, 0.9, 1];
     const unit = kb.unit(nK / 2, kb.edgeY(nK / 2));
-    const count = Math.min(PER_EMIT, Math.round(700 * lk.partAmbient));
-    return new Float32Array([0, 0, 0, count, 0, 0, this.srcW, bottom, col[0], col[1], col[2], 0.5, 9973, 7, unit, 0]);
+    const count = Math.min(PER_EMIT, Math.round(420 * lk.partAmbient));
+    const ul = Math.hypot(this.up[0], this.up[1]) || 1;
+    return new Float32Array([0, this.up[0] / ul, this.up[1] / ul, count, a[0], a[1], b[0], b[1], col[0], col[1], col[2], 0.5, 9973, 7, unit, unit * 9]);
   }
 
   private buildEmitters() {
@@ -508,12 +509,15 @@ export class Renderer {
       if (lk.partMode !== 'shape' && !sc) { // a shape section keeps its outline clean
         const amt = 1; // the layers have their own amounts; Particle count is the main effect's
         const fan = lk.partSparkStyle === 'fan';
-        const nS = Math.round((fan ? 16 + 22 * vv : 3 + 4 * vv) * lk.partSparks * amt);
+        // fan sparks and fountain smoke keep coming for as long as the key is held (half at the strike, half spread
+        // over the hold), like a held note pouring into the saber
+        const hold = Math.min(dur, 6);
+        const nS = Math.min(400, Math.round((fan ? 16 + 22 * vv + 40 * hold : 3 + 4 * vv) * lk.partSparks * amt));
         const nD = Math.round((30 + 45 * vv) * lk.partGlitter * amt);
-        const nG = lk.partGlow > 0 ? 1 + Math.round((lk.partSmokeStyle === 'fountain' ? 14 + 10 * vv : 1 + vv) * lk.partGlow) : 0;
+        const nG = lk.partGlow > 0 ? 1 + Math.min(150, Math.round((lk.partSmokeStyle === 'fountain' ? 14 + 10 * vv + 12 * hold : 1 + vv) * lk.partGlow)) : 0;
         if (nS + nD + nG > 0) {
           const k = Math.min(1, (PER_EMIT - 8) / (nS + nD + nG));
-          rows.push({ start: n.s, end: n.s + 0.4 + 3.4 * lk.partLife, data: [n.s, Math.round(nG * k), Math.round(nS * k), Math.round(nD * k), tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 13, 6, tg.unit, dur] });
+          rows.push({ start: n.s, end: n.s + hold + 0.4 + 3.4 * lk.partLife, data: [n.s, Math.round(nG * k), Math.round(nS * k), Math.round(nD * k), tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 13, 6, tg.unit, dur] });
         }
       }
       const jobs: { mode: string; slot: number; dir: number; size: number }[] = [];
