@@ -1,5 +1,5 @@
 // Playing the video: play and pause, seeking, the playhead, looping (the whole video or a selected part) and
-// staying inside the part kept on the Import step (the trim). Every decoded frame is handed to onFrame, which
+// staying inside the part kept on the Video step (the trim). Every decoded frame is handed to onFrame, which
 // draws the preview.
 import { MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { trimRange } from '../../engine/project';
@@ -25,7 +25,7 @@ export function usePlayback(videoRef: MutableRefObject<HTMLVideoElement | null>,
   const [loop, setLoop] = useState<Loop>({ on: false, range: null });
   const loopRef = useRef(loop);
   loopRef.current = loop;
-  /** the part of the video kept on the Import step (null: all of it) */
+  /** the part of the video kept on the Video step (null: all of it) */
   const trimRef = useRef<[number, number] | null>(null);
   trimRef.current = project?.edit?.trim && duration ? trimRange(project, duration) : null;
 
@@ -37,7 +37,7 @@ export function usePlayback(videoRef: MutableRefObject<HTMLVideoElement | null>,
     if (v.requestVideoFrameCallback) {
       const tick = (_now: number, meta: { mediaTime: number }) => {
         if (stop) return;
-        // the part kept on the Import step: play inside it (loop round it, or stop at its end)
+        // the part kept on the Video step: play inside it (loop round it, or stop at its end)
         const tr = trimRef.current;
         const lp = loopRef.current;
         if (tr && !(lp.on && lp.range)) {

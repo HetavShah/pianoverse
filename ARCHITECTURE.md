@@ -23,17 +23,19 @@ command-line export or a future web version. Screens depend on the engine, never
 
 ## How a video becomes an effect video
 
-1. **Import**: a video (and optionally its MIDI) becomes a project (`engine/project.ts`). Trim and crop are
-   saved on the project; the video file is never changed.
-2. **Notes and sync**: notes come from the MIDI or from a note finder listening to the audio (`engine/ml`), and
-   are lined up with the video by matching note starts to the attacks heard in the audio (`engine/audio/sync.ts`).
-3. **Calibrate**: four corners mark the keyboard, the tracker follows it through every frame
+1. **Import**: a video becomes a project (`engine/project.ts`).
+2. **Video**: trim and crop, saved on the project; the video file is never changed.
+3. **Audio**, two pages. *Notes and sync*: notes come from the MIDI or from a note finder listening to the audio
+   (`engine/ml`), and are lined up with the video by matching note starts to the attacks heard in the audio
+   (`engine/audio/sync.ts`). *Sound*: how the sound starts and ends, its tone and loudness (`engine/audio/sound.ts`).
+4. **Calibrate**: four corners mark the keyboard, the tracker follows it through every frame
    (`engine/vision/tracker.ts`), and the key fit lines the key layout up with the picture (`engine/vision/keyFit.ts`).
    The result is one homography per frame: keyboard plane → video pixels.
-4. **Style / Light / Camera**: the look (`engine/look`), the video's lighting (`engine/lighting.ts`) and the
+5. **Style / Light / Camera**: the look (`engine/look`), the video's lighting (`engine/lighting.ts`) and the
    virtual camera (`engine/camera.ts`) are all settings on the project.
-5. **Export**: every frame is drawn by the same renderer as the preview and piped to FFmpeg (`ui/export/exportRun.ts`
-   → `src-tauri/src/export.rs`).
+6. **Export**: every frame is drawn by the same renderer as the preview and piped to FFmpeg (`ui/export/exportRun.ts`
+   → `src-tauri/src/export.rs`). With Sound settings, the soundtrack is rendered by the same audio chain as the
+   preview and handed to FFmpeg as a WAV file.
 
 ## Engine
 
@@ -47,7 +49,7 @@ command-line export or a future web version. Screens depend on the engine, never
 | `titles.ts` | The opening title and end card |
 | `render/` | The WebGPU renderer (below) |
 | `ml/` | Note finders (below) |
-| `audio/` | One FFT, sync (onset envelope and alignment), beat tracking, the audio worker |
+| `audio/` | One FFT, sync (onset envelope and alignment), beat tracking, the audio worker, and the sound (below) |
 | `vision/` | Keyboard tracking (features, RANSAC homography) and the key fit |
 | `notes.ts` | MIDI parsing and note sources |
 | `calibration.ts`, `geometry.ts` | Keyboard presets, homography maths |
@@ -99,6 +101,31 @@ createNoteFinder('piano' | 'any')   // factory; each model's code loads on first
   16-second windows and folds in the sustain pedal. Kept step for step identical to the reference implementation.
 - `basicPitch.ts`: Spotify's Basic Pitch for any instrument (TensorFlow.js).
 
+### The sound (`engine/audio`)
+
+| File | Job |
+|---|---|
+| `sound.ts` | The `Sound` settings, and `soundAt(sound, span, t)`: the level, muffling and reverb send at any moment |
+| `soundChain.ts` | `SoundChain`: the Web Audio nodes the sound runs through, for the preview and the export alike |
+| `synth.ts` | Sounds made in code: the hall and ring-out reverbs (impulse responses) and the riser |
+| `loudness.ts` | Integrated loudness in LUFS (ITU-R BS.1770), for evening it out to −14 LUFS |
+| `mixdown.ts` | The export's soundtrack: rendered offline, written as a 16-bit WAV |
+
+```
+in → bass → treble → muffle → level ─┬──────────────────────┬→ mix → master → limiter → soft clip → out
+                        │            └→ hall send → hall reverb ┘ ↑
+                        └→ ring send → ring-out reverb ───────────┤
+                                       riser ─────────────────────┘
+```
+
+**One description of time, two drivers.** What changes over time is one pure function, `soundAt`. The preview
+(`ui/app/useSound.ts`) routes the video element into an `AudioContext` and calls `chain.follow(t)` every frame; the
+export builds the same chain in an `OfflineAudioContext` and calls `chain.schedule()`, which turns `soundAt` into
+automation curves. Same nodes, same function: what you hear while editing is what ends up in the file. The riser and
+the reverbs are made from seeded noise, so they are the same every time too.
+
+The video element is only routed into Web Audio once the sound is changed: until then it plays its sound directly.
+
 ## UI
 
 ```
@@ -107,7 +134,7 @@ ui/
                history (undo), workspace (what every step receives), TopBar, testHooks
   components/  shared widgets: Dial, Transport, ScrubBar, PickButton, toast, Shortcuts, palette
   services/    storage and platform: projects, presets, textures, media picking, audio decoding, saving files
-  home/ import/ notes/ calibrate/ style/ light/ camera/ export/
+  home/ import/ video/ audio/ notes/ calibrate/ style/ light/ camera/ export/
                one folder per screen: the step component and everything only it uses
 ```
 
@@ -135,6 +162,7 @@ ui/
 | Flyweight | `fftOf(n)` | FFT tables made once per size and shared |
 | Cache keyed by identity | `BindGroups` | A replaced texture changes the key, so a stale bind group can't be used and nothing is invalidated by hand |
 | Data-driven UI | `lookSchema.ts` | Adding a setting to a panel is one line |
+| One function, two drivers | `soundAt` + `SoundChain.follow` / `schedule` | The live preview and the offline export can't drift apart: both read the same description of the sound |
 
 Patterns deliberately **not** used:
 
@@ -163,6 +191,10 @@ rows, a new `Kind` and its case in `shaders/particles_sim.wgsl`, and the option 
 **Add a note finder**: a class implementing `NoteFinder` in `engine/ml/`, a branch in `createNoteFinder`, and
 the option in the Notes step.
 
+**Add a sound transition**: an id and label in `SOUND_STARTS` or `SOUND_ENDS` and its case in `soundAt`
+(`engine/audio/sound.ts`), shaping the level, the muffle and the ring send. A transition that needs a sound of its
+own (like the riser) makes it in `synth.ts` and plays it from `SoundChain`.
+
 **Add a step**: its id and label in `STEPS` (`ui/app/workspace.ts`), a folder under `ui/` with its component,
 and a line in `App.tsx`'s router.
 
@@ -177,6 +209,8 @@ Browser tests drive the real app in Chromium with software WebGPU (`npx vite pre
   camera, titles, textures and the transparent export, compared pixel by pixel with recorded copies
   (`node test/golden.mjs record` after an intended visual change). Rendering is deterministic, so a refactor
   must show `max 0`.
-- **UI flows**: `undo_flow`, `looks_titles`, `camera_ui`, `light_edit`, `calibrate_flow`, `app_screens`,
+- **Sound**: `node test/sound_engine.mjs` renders the sample's sound with each setting in Chromium and checks the
+  levels, the limiter and the loudness; `test/unit/sound.test.ts` checks the transitions and the loudness meter.
+- **UI flows**: `audio_flow`, `undo_flow`, `looks_titles`, `camera_ui`, `light_edit`, `calibrate_flow`, `app_screens`,
   `export_e2e` and others in `test/`.
 - Scripts starting with `_` are tools for demos and investigations, not tests.

@@ -194,7 +194,7 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
       </aside>
 
       <footer className="page-foot">
-        <button type="button" className="btn" onClick={() => ws.goStep('notes')}>Back</button>
+        <button type="button" className="btn" onClick={() => ws.goStep('audio')}>Back</button>
         <button type="button" className="btn primary" disabled={running} onClick={() => { ws.setProject({ ...project, progress: { ...project.progress, calibrated: true } }); ws.goStep('style'); }}>Continue to style <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
       </footer>
     </div>

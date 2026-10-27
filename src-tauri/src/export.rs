@@ -1,6 +1,7 @@
 //! Export: the WebView renders every frame on the GPU and sends the pixels here; FFmpeg encodes them
 //! (on the graphics card when it can: NVIDIA NVENC, AMD AMF, Intel Quick Sync; otherwise x264) and muxes
-//! the original audio. Frames arrive as raw RGBA through `export_frame`.
+//! the audio: the original, or the soundtrack rendered with the Sound settings (handed over first through
+//! `export_audio`). Frames arrive as raw RGBA through `export_frame`.
 
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -109,6 +110,35 @@ struct Job {
     out: PathBuf,
     log: Arc<Mutex<Vec<String>>>,
     frames: u64,
+    /// the rendered soundtrack, removed once the export is done
+    temp_audio: Option<PathBuf>,
+}
+
+/// The rendered soundtrack's file (one at a time; the next export replaces it).
+const SOUND_FILE: &str = "export-sound.wav";
+
+fn sound_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join(SOUND_FILE))
+}
+
+/// The export's soundtrack as a WAV file (the request body), rendered in the window with the Sound settings.
+/// Returns its path for `export_start`.
+#[tauri::command]
+pub fn export_audio(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("expected raw WAV bytes".into());
+    };
+    let path = sound_path(&app)?;
+    std::fs::write(&path, bytes).map_err(|e| format!("Could not save the soundtrack: {e}"))?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+fn remove_temp(p: &Option<PathBuf>) {
+    if let Some(p) = p {
+        let _ = std::fs::remove_file(p);
+    }
 }
 
 #[derive(Default)]
@@ -187,6 +217,7 @@ pub async fn export_start(app: AppHandle, state: State<'_, ExportState>, opts: E
     cmd.args(&args).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped());
     hide_window(&mut cmd);
     let mut child = cmd.spawn().map_err(|e| format!("Could not start the encoder: {e}"))?;
+    let temp_audio = opts.audio.as_ref().map(PathBuf::from).filter(|p| p.file_name().is_some_and(|n| n == SOUND_FILE));
     let log = Arc::new(Mutex::new(Vec::<String>::new()));
     let stderr = child.stderr.take().unwrap();
     let log2 = log.clone();
@@ -201,7 +232,7 @@ pub async fn export_start(app: AppHandle, state: State<'_, ExportState>, opts: E
         }
     });
     let stdin = child.stdin.take();
-    *state.0.lock().map_err(|e| e.to_string())? = Some(Job { child, stdin, part, out, log, frames: 0 });
+    *state.0.lock().map_err(|e| e.to_string())? = Some(Job { child, stdin, part, out, log, frames: 0, temp_audio });
     Ok(())
 }
 
@@ -235,6 +266,7 @@ pub async fn export_finish(state: State<'_, ExportState>) -> Result<String, Stri
     .await
     .map_err(|e| e.to_string())?;
     let (st, job) = status;
+    remove_temp(&job.temp_audio);
     let ok = st.map(|s| s.success()).unwrap_or(false);
     if !ok {
         let _ = std::fs::remove_file(&job.part);
@@ -252,6 +284,7 @@ pub fn export_cancel(state: State<'_, ExportState>) -> Result<(), String> {
         let _ = job.child.kill();
         let _ = job.child.wait();
         let _ = std::fs::remove_file(&job.part);
+        remove_temp(&job.temp_audio);
     }
     Ok(())
 }

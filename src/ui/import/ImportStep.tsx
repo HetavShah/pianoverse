@@ -1,11 +1,9 @@
+// Import step: the performance video and the project's basics (name, camera setup, keyboard).
 import { useEffect, useState } from 'react';
 import { noteName, PRESETS } from '../../engine/calibration';
-import { pitchRange } from '../../engine/notes';
 import PickButton from '../components/PickButton';
 import { makeThumb, fmtDur } from '../services/projectStore';
-import { sourceOf } from '../notes/useNotes';
 import type { WS } from '../app/workspace';
-import VideoEditor from './VideoEditor';
 
 export default function ImportStep({ ws }: { ws: WS }) {
   const { project, video, videoIssue } = ws;
@@ -18,9 +16,6 @@ export default function ImportStep({ ws }: { ws: WS }) {
     v.addEventListener('loadeddata', grab);
     return () => v.removeEventListener('loadeddata', grab);
   }, [v, video?.url, videoIssue]);
-  const src = project ? sourceOf(project) : null;
-  const midi = src?.kind === 'midi' ? src : null;
-  const range = midi ? pitchRange(midi.notes) : null;
   const kb = project?.keyboard;
   const preset = kb && PRESETS.find((p) => p.keys === kb.keys && p.lowestNote === kb.lowestNote);
   const ready = !!project && !!video && !videoIssue;
@@ -29,7 +24,7 @@ export default function ImportStep({ ws }: { ws: WS }) {
     <div className="page">
       <div className="page-main">
         <h1>Import your performance</h1>
-        <p className="sub">Add the video and the MIDI file recorded during the same take. Audio comes from the video.</p>
+        <p className="sub">Add the video of your performance. Its MIDI file and the sound come next, on Audio.</p>
 
         {video ? (
           <div className={'file-card' + (videoIssue ? ' warn' : '')}>
@@ -71,36 +66,12 @@ export default function ImportStep({ ws }: { ws: WS }) {
             <div className="info">
               <span className="kind">Video</span>
               <b>Choose the performance video</b>
-              <small>mp4, mov or webm · or drop it anywhere on this window</small>
+              <small>mp4, mov or webm · or drop it anywhere on this window (with its MIDI file too, if you have one)</small>
             </div>
             <div className="actions"><PickButton what="video" className="btn primary small" onPick={ws.pick} onFiles={ws.onFiles}>Choose video</PickButton></div>
           </div>
         )}
 
-        <div className={'file-card' + (midi ? '' : ' empty dashed')}>
-          <div className="icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M8 5v8M12 5v8M16 5v8M3 13h18" /></svg>
-          </div>
-          <div className="info">
-            <span className="kind">MIDI{midi ? '' : ' · optional'}</span>
-            {midi ? (
-              <>
-                <b>{midi.name}</b>
-                <small>{midi.notes.length} notes{range ? ` · ${noteName(range[0])} to ${noteName(range[1])}` : ''}{midi.sustain ? ' · sustain pedal found' : ''} · {fmtDur(midi.notes.length ? midi.notes[midi.notes.length - 1].e : 0)}</small>
-              </>
-            ) : (
-              <>
-                <b>Add the MIDI recorded with this take</b>
-                <small>{ready ? 'No MIDI? You can detect the notes from the audio in the next step.' : 'Add the video first; the MIDI is lined up with its sound.'}</small>
-              </>
-            )}
-          </div>
-          <div className="actions">
-            <PickButton what="midi" className="btn small" onPick={ws.pick} onFiles={ws.onFiles} disabled={!ready}>{midi ? 'Replace' : 'Add MIDI'}</PickButton>
-          </div>
-        </div>
-
-        {ready && <VideoEditor ws={ws} />}
       </div>
 
       <aside className="page-side">
@@ -136,7 +107,7 @@ export default function ImportStep({ ws }: { ws: WS }) {
 
       <footer className="page-foot">
         <button type="button" className="btn" onClick={ws.goHome}>{project ? 'Back to projects' : 'Cancel'}</button>
-        <button type="button" className="btn primary" disabled={!ready} onClick={() => ws.goStep('notes')}>Continue to notes and sync <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
+        <button type="button" className="btn primary" disabled={!ready} onClick={() => ws.goStep('video')}>Continue to video <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
       </footer>
     </div>
   );

@@ -1,12 +1,19 @@
 // Export end to end: drive the Export screen in the browser and pipe its frames into a real FFmpeg, using the
 // exact arguments the desktop app builds (printed by the Rust unit test in src-tauri/src/export.rs).
-// usage: node test/export_e2e.mjs <outDir>   env: SIZE (shorts|landscape|square|k4), FIT, CODEC, TRANSPARENT=1, FPS, PROJ, CLIP, RANGE=a,b
+// usage: node test/export_e2e.mjs <outDir>   env: SIZE (shorts|landscape|square|k4), FIT, CODEC, TRANSPARENT=1, FPS, PROJ, CLIP, RANGE=a,b,
+//        SOUND='{"end":"ring",...}' (Sound settings: the soundtrack is rendered in the page and handed over as a WAV)
 import { chromium } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync, renameSync } from 'node:fs';
+import { mkdirSync, renameSync, readFileSync, writeFileSync } from 'node:fs';
 const OUT = process.argv[2] ?? 'test/out/export'; mkdirSync(OUT, { recursive: true });
 const CLIP = process.env.CLIP ?? '/home/claude/sample15a.webm';
-const PROJ = process.env.PROJ ?? 'samples/interstellar-take1.pvproj.json';
+let PROJ = process.env.PROJ ?? 'samples/interstellar-take1.pvproj.json';
+if (process.env.SOUND) {
+  const p = JSON.parse(readFileSync(PROJ, 'utf8'));
+  p.sound = JSON.parse(process.env.SOUND);
+  PROJ = `${OUT}/project-with-sound.pvproj.json`;
+  writeFileSync(PROJ, JSON.stringify(p));
+}
 const RANGE = (process.env.RANGE ?? '2,4').split(',').map(Number);
 
 function argsFor(o) {
@@ -32,7 +39,7 @@ await page.exposeFunction('pvSinkStart', (json) => {
   const o = JSON.parse(json);
   out = `${OUT}/${o.codec === 'prores' ? 'effects.mov' : 'export.mp4'}`;
   part = out.replace(/\.(\w+)$/, '.part.$1');
-  const a = argsFor({ ...o, part, audio: o.codec === 'prores' ? null : CLIP });
+  const a = argsFor({ ...o, part, audio: o.codec === 'prores' ? null : (o.audio?.endsWith('sound.wav') ? o.audio : CLIP) });
   console.log('ffmpeg', a.join(' ').slice(0, 400));
   ff = spawn('ffmpeg', a, { stdio: ['pipe', 'ignore', 'pipe'] });
   errLog = '';
@@ -48,6 +55,7 @@ await page.exposeFunction('pvSinkFinish', () => new Promise((res, rej) => {
   ff.stdin.end();
 }));
 await page.exposeFunction('pvSinkCancel', () => { ff?.kill(); });
+await page.exposeFunction('pvSinkAudio', (b64) => { const f = `${OUT}/sound.wav`; writeFileSync(f, Buffer.from(b64, 'base64')); return f; });
 
 await page.goto('http://localhost:4173/'); await page.waitForTimeout(800);
 await page.setInputFiles('.row-actions input[type=file]', PROJ); await page.waitForTimeout(600);
@@ -62,6 +70,7 @@ await page.evaluate(() => {
     frame: (rgba) => window.pvSinkFrame(b64(rgba)),
     finish: () => window.pvSinkFinish(),
     cancel: () => window.pvSinkCancel(),
+    audio: (wav) => window.pvSinkAudio(b64(wav)),
   };
 });
 if (process.env.SIZE) await page.click(`.ex-size >> text=${{ shorts: 'Shorts', landscape: 'Landscape', square: 'Square', k4: '4K' }[process.env.SIZE]}`);

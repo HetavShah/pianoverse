@@ -686,3 +686,30 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .ve-handle.b { border-radius: 0 4px 4px 0; }
 .ve-head-line { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--paper); pointer-events: none; }
 @media (max-width: 900px) { .ve-body { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Video and Audio steps ---------- */
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; font-size: 13px; margin: 0; }
+.facts dt { color: var(--stone); }
+.facts dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audio-head { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
+.audio-head h1 { margin: 0; }
+.tab-dot { display: inline-block; width: 6px; height: 6px; margin-left: 7px; background: var(--live); vertical-align: middle; }
+.sound-card { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.sound-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sound-wave { position: relative; }
+.sound-wave canvas { display: block; width: 100%; height: 220px; cursor: pointer; touch-action: none; }
+.sound-wave-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.sound-wave-tag { position: absolute; top: 0; transform: translateX(6px); font-size: 11.5px; color: var(--stone); white-space: nowrap; pointer-events: none; }
+.sound-legend { display: flex; gap: 18px; color: var(--stone); }
+.sound-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sound-legend i { display: inline-block; width: 12px; height: 8px; }
+.sound-legend .sw-orig { background: var(--stone); opacity: 0.35; }
+.sound-legend .sw-shaped { background: var(--live); }
+.sound-legend .sw-riser { background: #9b8cff; }
+.page-side .ctl-section.first { border-top: 0; padding-top: 0; }
+.sound-ends { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.sound-end { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sound-end-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+.sound-wave.zoom canvas { height: 170px; }
+.sound-wave.overview canvas { height: 64px; }
+

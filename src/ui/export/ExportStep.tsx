@@ -67,7 +67,8 @@ export default function ExportStep({ ws }: { ws: WS }) {
   const sel = ws.loop.range;
   const trim = trimRange(project, duration);
   const part = s.onlySelection && sel ? [Math.max(trim[0], sel[0]), Math.min(trim[1], sel[1])] as [number, number] : null;
-  const length = part ? Math.max(0, part[1] - part[0]) : trim[1] - trim[0];
+  // a swell (Audio → Sound) comes before the video and a ring-out runs on past the end
+  const length = (part ? Math.max(0, part[1] - part[0]) : trim[1] - trim[0]) + ws.sound.lead + ws.sound.tail;
   const est = estimate(s, project, length);
   const { w: outW, h: outH } = outSize(s, project);
   const srcRect = sourceRect(project);
@@ -193,10 +194,17 @@ export default function ExportStep({ ws }: { ws: WS }) {
             <span className={hw ? 'ok-text' : 'dim'}>{encoder ? (hw ? 'Detected' : 'No graphics-card encoder found') : ''}</span>
           </div>
           {encErr && <small className="danger-text">{encErr}</small>}
-          <label className="toggle-row">
-            <span>Copy original audio without re-encoding<small>When the video's audio is AAC; otherwise it is converted at high quality.</small></span>
-            <input type="checkbox" checked={s.audioCopy} onChange={(e) => set({ audioCopy: e.target.checked })} disabled={running} />
-          </label>
+          {ws.sound.active ? (
+            <div className="toggle-row">
+              <span>Sound with your settings<small>Rendered with your Sound settings (Audio step){ws.sound.lead ? `, swelling in ${ws.sound.lead.toFixed(1)} s before the video` : ''}{ws.sound.tail ? `, ringing on ${ws.sound.tail.toFixed(1)} s after it` : ''}, then encoded at high quality.</small></span>
+              <button type="button" className="link inline small-text" onClick={() => ws.goStep('audio')}>Change</button>
+            </div>
+          ) : (
+            <label className="toggle-row">
+              <span>Copy original audio without re-encoding<small>When the video's audio is AAC; otherwise it is converted at high quality.</small></span>
+              <input type="checkbox" checked={s.audioCopy} onChange={(e) => set({ audioCopy: e.target.checked })} disabled={running} />
+            </label>
+          )}
           <label className="toggle-row">
             <span>Also export effects on a transparent background<small>For editing in DaVinci Resolve or Premiere (ProRes 4444 .mov, saved next to the video)</small></span>
             <input type="checkbox" checked={s.transparent} onChange={(e) => set({ transparent: e.target.checked })} disabled={running || (enc ? !enc.prores : false)} />
@@ -233,7 +241,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
         {run.kind === 'running' && (
           <div className="ex-progress">
             <div className="row">
-              <span>{run.p ? <>{run.p.phase === 'effects' ? 'Effects only ' : 'Rendering '}<span className="mono">{run.p.done.toLocaleString('en-US')} / {run.p.total.toLocaleString('en-US')}</span></> : 'Starting…'}</span>
+              <span>{run.p ? (run.p.phase === 'sound' ? 'Preparing the sound…' : <>{run.p.phase === 'effects' ? 'Effects only ' : 'Rendering '}<span className="mono">{run.p.done.toLocaleString('en-US')} / {run.p.total.toLocaleString('en-US')}</span></>) : 'Starting…'}</span>
               <span className="mono dim">{run.p && run.p.done > 10 ? `${fmtDur(run.p.eta)} left` : ''}</span>
             </div>
             <div className="bar"><i style={{ width: `${run.p ? (100 * run.p.done) / run.p.total : 0}%` }} /></div>

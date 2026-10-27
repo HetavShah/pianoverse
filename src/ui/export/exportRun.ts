@@ -1,12 +1,15 @@
 // Export: render every frame with the same engine as the preview and hand the pixels to an encoder.
 // In the desktop app the encoder is FFmpeg (NVENC / AMF / Quick Sync / x264, see src-tauri/src/export.rs).
 import type { Renderer } from '../../engine/render';
-import { loadTitleFonts } from '../../engine/titles';
+import { loadTitleFonts, resolveTitles } from '../../engine/titles';
 import type { CalibratedProject } from '../../engine/calibration';
 import { aspectInfo, cameraAt, CameraFrame, followPath, FollowPath } from '../../engine/camera';
 import { inTauri } from '../services/media';
 import { sourceRect, trimRange } from '../../engine/project';
 import { ExportSettings, SIZES } from '../../engine/exportSettings';
+import { resolveSound, soundActive, soundLead, soundTail } from '../../engine/audio/sound';
+import { renderSound, wavBytes } from '../../engine/audio/mixdown';
+import { loadSoundtrack, measureLoudness } from '../services/audio';
 export type { ExportSettings, SizeId } from '../../engine/exportSettings';
 export { SIZES } from '../../engine/exportSettings';
 
@@ -47,6 +50,8 @@ export interface Sink {
   frame(rgba: Uint8Array): Promise<void>;
   finish(): Promise<string>;
   cancel(): Promise<void>;
+  /** hand over the export's soundtrack (a WAV file); returns where the encoder can read it */
+  audio?(wav: Uint8Array): Promise<string>;
 }
 
 /** FFmpeg in the desktop app */
@@ -55,6 +60,7 @@ export const tauriSink: Sink = {
   async frame(rgba) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_frame', rgba); },
   async finish() { const { invoke } = await import('@tauri-apps/api/core'); return invoke<string>('export_finish'); },
   async cancel() { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_cancel'); },
+  async audio(wav) { const { invoke } = await import('@tauri-apps/api/core'); return invoke<string>('export_audio', wav); },
 };
 
 /** tests in a plain browser can provide their own encoder */
@@ -122,7 +128,7 @@ const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>((res) => {
   setTimeout(done, 4000);
 });
 
-export interface ExportProgress { phase: 'video' | 'effects'; done: number; total: number; elapsed: number; eta: number; preview?: string }
+export interface ExportProgress { phase: 'sound' | 'video' | 'effects'; done: number; total: number; elapsed: number; eta: number; preview?: string }
 
 /** render and encode; resolves with the saved file's path */
 export async function runExport(args: {
@@ -134,11 +140,16 @@ export async function runExport(args: {
 }): Promise<string[]> {
   const { renderer: r, video: v, project: p, settings: s, sink } = args;
   const { w: outW, h: outH } = outSize(s, p);
-  // only the part kept on the Import step (trim), and of that the selection if one is asked for
+  // only the part kept on the Video step (trim), and of that the selection if one is asked for
   const [t0, t1] = trimRange(p, args.duration);
   const from = Math.max(t0, args.range ? args.range[0] : t0);
   const to = Math.max(from + 1 / 30, Math.min(t1, args.range ? args.range[1] : t1));
-  const { frames, fps } = estimate(s, p, to - from);
+  // the sound: the video's own audio as it is, or (with Sound settings) rendered with them. A swell comes before the
+  // video (the picture holds its first frame, fading in) and a ring-out after it (it holds the last, fading out)
+  const sound = resolveSound(p.sound);
+  const shaped = soundActive(sound);
+  const tail = soundTail(sound), lead = soundLead(sound);
+  const { frames, fps } = estimate(s, p, lead + to - from + tail);
   const srcFps = p.video.fps || 30;
   const oldScale = r.scaleFactor;
   const oldOutput = r.output;
@@ -147,10 +158,22 @@ export async function runExport(args: {
   v.pause();
   const saved: string[] = [];
   const passes: ('video' | 'effects')[] = s.transparent ? ['video', 'effects'] : ['video'];
-  // the opening title and end card belong to what is exported (a section gets its own)
-  r.cardSpan = [from, to];
+  // the opening title and end card belong to what is exported (a section gets its own); the end card covers the ring-out
+  r.cardSpan = [from - lead, to + tail];
   await loadTitleFonts();
   try {
+    let audio: string | null = p.video.path ?? null;
+    if (shaped) {
+      if (!sink.audio) throw new Error('This exporter can\'t take a changed soundtrack.');
+      args.onProgress({ phase: 'sound', done: 0, total: 1, elapsed: 0, eta: 0 });
+      const url = v.currentSrc || v.src;
+      const src = await loadSoundtrack(url);
+      const lufs = sound.even ? await measureLoudness(url, [t0, t1]) : null;
+      audio = await sink.audio(wavBytes(await renderSound(src, sound, [from, to], lufs)));
+      if (args.cancelled()) throw new Error('cancelled');
+    }
+    const titles = resolveTitles(p.titles);
+    const fadeTail = tail > 0 && !titles.outro.on, fadeLead = lead > 0 && !titles.intro.on;
     for (const phase of passes) {
       // with the camera the frame is drawn at the output size, through the camera's window
       if (cam) { r.setOutput([outW, outH]); r.setScale(1); } else r.setScale(renderScale(s, p));
@@ -162,18 +185,22 @@ export async function runExport(args: {
       await sink.start({
         out, width, height, fps, outWidth: outW, outHeight: outH, fit: s.fit,
         codec: phase === 'effects' ? 'prores' : s.codec, encoder: enc, quality: s.quality,
-        audio: phase === 'effects' ? null : (p.video.path ?? null), audioCopy: s.audioCopy, start: from, duration: frames / fps,
+        audio: phase === 'effects' ? null : audio, audioCopy: s.audioCopy && !shaped, start: shaped ? 0 : from, duration: frames / fps,
       });
       const t0 = performance.now();
       let pending: Promise<void> | null = null;
       let lastSrc = -1;
       for (let i = 0; i < frames; i++) {
         if (args.cancelled()) { await pending?.catch(() => {}); await sink.cancel(); throw new Error('cancelled'); }
-        const t = from + i / fps;
-        // the video frame on screen at time t (frames repeat when exporting at a higher frame rate)
-        const si = Math.min(Math.floor(t * srcFps + 1e-6), Math.max(0, Math.floor(args.duration * srcFps) - 1));
+        const t = from - lead + i / fps;
+        // the video frame on screen at time t (frames repeat when exporting at a higher frame rate; during a
+        // ring-out the last one holds while the effects play on)
+        const si = Math.min(Math.floor(Math.max(from, Math.min(t, to - 0.5 / srcFps)) * srcFps + 1e-6), Math.max(0, Math.floor(args.duration * srcFps) - 1));
         if (si !== lastSrc) { await seekTo(v, (si + 0.5) / srcFps); lastSrc = si; }
-        if (cam) { const c = cameraFrameAt(p, t, args.duration); r.setView(c.view, c.fade); }
+        // the swell fades in from black and the ring-out fades to black (unless a title card is showing)
+        const dark = fadeTail && t > to ? smoothFade((t - to) / tail) : fadeLead && t < from ? 1 - smoothFade((t - (from - lead)) / lead) : 0;
+        if (cam) { const c = cameraFrameAt(p, Math.max(from, Math.min(t, to)), args.duration); r.setView(c.view, [Math.max(c.fade[0], dark), dark > c.fade[0] ? 0 : c.fade[1]]); }
+        else if (tail > 0 || lead > 0) r.setView(null, [dark, 0]);
         const img = await r.capture(videoFrame(v), t);
         if (pending) await pending;
         pending = sink.frame(img.data);
@@ -190,12 +217,15 @@ export async function runExport(args: {
   } finally {
     r.alphaOut = false;
     r.cardSpan = null;
-    if (cam) { r.setView(null); r.setOutput(oldOutput); }
+    if (cam) r.setOutput(oldOutput);
+    if (cam || tail > 0 || lead > 0) r.setView(null);
     r.setScale(oldScale);
     if (!wasPaused) v.play().catch(() => {});
   }
   return saved;
 }
+
+const smoothFade = (x: number) => { const u = Math.max(0, Math.min(1, x)); return u * u * (3 - 2 * u); };
 
 /** a small preview image of a captured frame */
 function thumb(img: { width: number; height: number; data: Uint8Array }): string {

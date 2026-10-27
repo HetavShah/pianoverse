@@ -1,4 +1,4 @@
-// Import step: trim the start and end of the video and crop its frame. Nothing is cut from the file itself: the
+// Video step: trim the start and end of the video and crop its frame. Nothing is cut from the file itself: the
 // project keeps the trim (seconds) and the crop (video pixels), and every step, the camera and the export follow them.
 import { useEffect, useRef, useState } from 'react';
 import type { Rect } from '../../engine/project';

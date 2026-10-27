@@ -1,4 +1,4 @@
-// Walk through the five-step flow as in the design and screenshot every screen.
+// Walk through the step flow as in the design and screenshot every screen.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 const OUT = 'test/out/design'; mkdirSync(OUT, { recursive: true });
@@ -16,12 +16,14 @@ await page.screenshot({ path: `${OUT}/1-import-empty.png` });
 await page.setInputFiles('.file-card .actions input[type=file]', CLIP);
 await page.waitForFunction(() => !!window.pianoverseProject, null, { timeout: 20000 });
 await page.waitForTimeout(800);
-const midiInput = (await page.$$('.file-card .actions input[type=file]')).at(-1);
-await midiInput.setInputFiles('test/fixtures/interstellar-shifted.mid');
-await page.waitForFunction(() => window.pianoverseProject?.noteSource?.confidence !== undefined, null, { timeout: 60000 });
-await page.waitForTimeout(500);
 await page.screenshot({ path: `${OUT}/2-import-filled.png` });
-await page.click('text=Continue to notes and sync');
+await page.click('text=Continue to video');
+await page.waitForTimeout(800);
+await page.screenshot({ path: `${OUT}/2b-video.png` });
+await page.click('text=Continue to audio');
+await page.waitForTimeout(800);
+await page.setInputFiles('.title-row input[type=file]', 'test/fixtures/interstellar-shifted.mid');
+await page.waitForFunction(() => window.pianoverseProject?.noteSource?.confidence !== undefined, null, { timeout: 60000 });
 await page.waitForTimeout(1500);
 await page.$eval('.page-foot', () => {});
 const v = await page.$('video');

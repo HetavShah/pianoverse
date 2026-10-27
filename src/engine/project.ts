@@ -40,10 +40,12 @@ export interface ProjectFile {
   cameraTrack?: import('./camera').CameraTrack;
   /** opening title and end card */
   titles?: Partial<import('./titles').Titles>;
-  /** trim and crop chosen on the Import step (the video file itself is never changed) */
+  /** trim and crop chosen on the Video step (the video file itself is never changed) */
   edit?: VideoEdit;
   /** the video's own lighting (Light step) */
   lighting?: Partial<import('./lighting').Lighting>;
+  /** the sound: start and end transitions, volume, tone, hall, loudness (Audio step → Sound) */
+  sound?: Partial<import('./audio/sound').Sound>;
 }
 
 export interface Rect { x: number; y: number; w: number; h: number }

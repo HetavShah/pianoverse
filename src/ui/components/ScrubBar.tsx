@@ -1,4 +1,4 @@
-// A plain timeline: click or drag to move the playhead. The parts trimmed off on the Import step are shaded.
+// A plain timeline: click or drag to move the playhead. The parts trimmed off on the Video step are shaded.
 import { useRef } from 'react';
 
 export default function ScrubBar({ time, duration, trim, onSeek }: {

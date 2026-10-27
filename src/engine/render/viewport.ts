@@ -1,6 +1,6 @@
 // What part of the video the frame shows, and at what size it is drawn.
 //
-// The frame is the whole video (or its crop from the Import step) unless an output size is set, in which case the
+// The frame is the whole video (or its crop from the Video step) unless an output size is set, in which case the
 // frame has that shape and shows a window of the video: the camera's window when one is set, otherwise the biggest
 // window of that shape in the middle. The render target is the frame's size times `scale` (preview quality).
 import type { Rect } from '../project';
@@ -12,7 +12,7 @@ export class Viewport {
   /** the video's size, in video pixels */
   srcW = 1080;
   srcH = 1920;
-  /** the part of the frame in use (Import step crop), or null for all of it */
+  /** the part of the frame in use (Video step crop), or null for all of it */
   crop: Rect | null = null;
   /** output size in pixels (camera or export shape), or null for the video's own size */
   outSize: [number, number] | null = null;

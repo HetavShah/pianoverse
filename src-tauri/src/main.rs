@@ -61,6 +61,7 @@ fn main() {
             media::convert_video,
             export::export_encoders,
             export::export_start,
+            export::export_audio,
             export::export_frame,
             export::export_finish,
             export::export_cancel,

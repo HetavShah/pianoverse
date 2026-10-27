@@ -6,10 +6,13 @@ import type { ConvertProgress, PickedVideo, PickKind } from '../services/media';
 import type { useCalibration } from '../calibrate/useCalibration';
 import type { useNotes } from '../notes/useNotes';
 
-export type Step = 'import' | 'notes' | 'calibrate' | 'style' | 'light' | 'camera' | 'export';
+export type Step = 'import' | 'video' | 'audio' | 'calibrate' | 'style' | 'light' | 'camera' | 'export';
+/** the first FLOW_STEPS are done in order; the rest are rooms visited in any order */
+export const FLOW_STEPS = 4;
 export const STEPS: { id: Step; label: string }[] = [
   { id: 'import', label: 'Import' },
-  { id: 'notes', label: 'Notes and sync' },
+  { id: 'video', label: 'Video' },
+  { id: 'audio', label: 'Audio' },
   { id: 'calibrate', label: 'Calibrate' },
   { id: 'style', label: 'Style' },
   { id: 'light', label: 'Light' },
@@ -63,4 +66,6 @@ export interface WS {
   goHome: () => void;
   /** draw the preview again (after changing something on the renderer directly) */
   redraw: () => void;
+  /** the live sound (Audio → Sound) */
+  sound: ReturnType<typeof import('./useSound').useSound>;
 }

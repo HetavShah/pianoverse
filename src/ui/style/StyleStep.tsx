@@ -41,7 +41,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
   const pan = useRef<{ x: number; y: number; v: { x: number; y: number; w: number; h: number } | null; moved: boolean } | null>(null);
   const inspectRef = useRef(ws.inspect);
   inspectRef.current = ws.inspect;
-  // the part of the frame in use (the crop on the Import step)
+  // the part of the frame in use (the crop on the Video step)
   const R = project ? sourceRect(project) : { x: 0, y: 0, w: 1, h: 1 };
   const W = R.w, Hh = R.h;
   /** keep a zoom window inside the video */

@@ -1,6 +1,8 @@
 // The video's soundtrack: decoded once per video, mono at 22.05 kHz, plus its onset envelope (for syncing) and a
 // waveform overview (for drawing). A note finder that listens at another rate gets its own copy (loadMonoAudio).
 import { mixDown } from '../../engine/audio/sync';
+import { integratedLoudness } from '../../engine/audio/loudness';
+import { EXPORT_RATE } from '../../engine/audio/mixdown';
 
 /** the rate the soundtrack is analysed at */
 const ANALYSIS_RATE = 22050;
@@ -64,4 +66,33 @@ async function decode(url: string): Promise<VideoAudio> {
     w.postMessage({ samples: mono, rate: ANALYSIS_RATE });
   });
   return { mono, rate: ANALYSIS_RATE, envelope, peaks, duration: buf.duration };
+}
+
+// ---------- the full-quality soundtrack, for the Sound settings and the export ----------
+
+let soundtrack: { url: string; buf: Promise<AudioBuffer> } | null = null;
+/** the soundtrack in stereo at the export's rate (only the latest video's is kept: it is large) */
+export function loadSoundtrack(url: string): Promise<AudioBuffer> {
+  if (soundtrack?.url === url) return soundtrack.buf;
+  const buf = (async () => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Could not read the video file (${res.status})`);
+    try { return await new OfflineAudioContext(2, 1, EXPORT_RATE).decodeAudioData(await res.arrayBuffer()); } catch { throw new Error("This video's sound couldn't be read. Does it have an audio track?"); }
+  })();
+  soundtrack = { url, buf };
+  buf.catch(() => { if (soundtrack?.buf === buf) soundtrack = null; });
+  return buf;
+}
+
+const loudness = new Map<string, Promise<number>>();
+/** how loud the soundtrack is between span[0] and span[1] seconds (LUFS) */
+export function measureLoudness(url: string, span: [number, number]): Promise<number> {
+  const key = `${span[0].toFixed(2)}|${span[1].toFixed(2)}|${url}`;
+  let p = loudness.get(key);
+  if (!p) {
+    p = loadSoundtrack(url).then((b) => integratedLoudness(Array.from({ length: b.numberOfChannels }, (_, c) => b.getChannelData(c)), b.sampleRate, span[0], span[1]));
+    loudness.set(key, p);
+    p.catch(() => loudness.delete(key));
+  }
+  return p;
 }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { CalibratedProject } from '../../engine/calibration';
 import { UpdatePill, updateStatusText, useUpdater } from '../../updater';
 import { inTauri } from '../services/media';
-import { STEPS, Step } from './workspace';
+import { FLOW_STEPS, STEPS, Step } from './workspace';
 
 const Tick = () => <svg className="tick" width="11" height="11" viewBox="0 0 12 12" aria-label="done"><path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
 
@@ -29,9 +29,9 @@ export default function TopBar(props: {
   const { inProject, project, step, ready } = props;
   const [menu, setMenu] = useState(false);
   const updater = useUpdater();
-  // the first three steps are done in order; the rest are rooms visited in any order
+  // the first steps are done in order; the rest are rooms visited in any order
   const done = (s: Step) =>
-    s === 'import' ? ready : s === 'notes' ? !!project?.notes.length : s === 'calibrate' ? !!project?.progress?.calibrated : s === 'camera' ? !!project?.cameraTrack : false;
+    s === 'import' || s === 'video' ? ready : s === 'audio' ? !!project?.notes.length : s === 'calibrate' ? !!project?.progress?.calibrated : s === 'camera' ? !!project?.cameraTrack : false;
 
   return (
     <header className="topbar">
@@ -40,7 +40,7 @@ export default function TopBar(props: {
       {inProject && (
         <nav className="stepper" aria-label="Steps">
           <span className="trail">
-            {STEPS.slice(0, 3).map((s, i) => (
+            {STEPS.slice(0, FLOW_STEPS).map((s, i) => (
               <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done(s.id) ? ' done' : '')} disabled={s.id !== 'import' && !ready}
                 onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'step' : undefined}>
                 <span className="dot">{i + 1}</span>{s.label}{done(s.id) && step !== s.id && <Tick />}
@@ -48,7 +48,7 @@ export default function TopBar(props: {
             ))}
           </span>
           <span className="rooms">
-            {STEPS.slice(3).map((s) => (
+            {STEPS.slice(FLOW_STEPS).map((s) => (
               <button key={s.id} type="button" className={'step-btn room' + (step === s.id ? ' on' : '')} disabled={!ready}
                 onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'page' : undefined}>{s.label}</button>
             ))}

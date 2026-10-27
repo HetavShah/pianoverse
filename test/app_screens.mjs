@@ -14,7 +14,8 @@ await page.setInputFiles('.file-card .actions input[type=file]', CLIP); await pa
 const seek = (t) => page.evaluate((t) => new Promise((res) => { const v = document.querySelector('video'); v.addEventListener('seeked', () => setTimeout(res, 400), { once: true }); v.currentTime = t; }), t);
 const step = async (name, file, wait = 1500) => { await page.click(`.stepper >> text=${name}`); await page.waitForTimeout(wait); await seek(9.2); await page.waitForTimeout(2500); await page.screenshot({ path: `${OUT}/${file}.png` }); console.log('shot', file); };
 await step('Import', 'screen-import');
-await step('Notes and sync', 'screen-sync', 2500);
+await step('Video', 'screen-video');
+await step('Audio', 'screen-sync', 2500);
 await step('Calibrate', 'screen-calibrate', 2500);
 await page.evaluate(() => { window.__pvHeadless = false; });
 await step('Style', 'screen-style', 2500);

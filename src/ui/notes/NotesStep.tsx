@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+// Audio → Notes and sync: where the notes come from (the MIDI file, or detected from the audio) and lining them up
+// with the video's sound.
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { noteName } from '../../engine/calibration';
 import { outOfRange, pitchRange } from '../../engine/notes';
 import { useClickTrack } from './clicks';
@@ -11,7 +13,7 @@ import type { WS } from '../app/workspace';
 
 const fmtOffset = (o: number) => (Math.abs(o) < 1 ? `${o >= 0 ? '+' : '−'}${Math.abs(o * 1000).toFixed(0)} ms` : `${o >= 0 ? '+' : '−'}${Math.abs(o).toFixed(3)} s`);
 
-export default function NotesStep({ ws }: { ws: WS }) {
+export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
   const { project, notes: n } = ws;
   const [clickOn, setClickOn] = useState(true);
   const [sens, setSens] = useState(0.5);
@@ -45,11 +47,9 @@ export default function NotesStep({ ws }: { ws: WS }) {
   return (
     <div className="page">
       <div className="page-main">
+        {head}
         <div className="title-row">
-          <div>
-            <h1>Notes and sync</h1>
-            <p className="sub">Each white tick is a note. It should sit on an attack in your audio.</p>
-          </div>
+          <p className="sub">Each white tick is a note. It should sit on an attack in your audio.</p>
           <div className="seg big" role="radiogroup" aria-label="Where the notes come from">
             <PickButton what="midi" className={'seg-btn' + (src?.kind === 'midi' ? ' on' : '')} onPick={ws.pick} onFiles={ws.onFiles} disabled={!!busy}>From MIDI file</PickButton>
             <button type="button" className={'seg-btn' + (src && src.kind === 'audio' ? ' on' : '')} disabled={!!busy} onClick={runDetect}>Detect from audio</button>
@@ -72,6 +72,7 @@ export default function NotesStep({ ws }: { ws: WS }) {
           <div className={'banner' + (src.confidence !== undefined && src.confidence < 0.5 ? ' warn' : '')}>
             <span className={'check' + (src.confidence !== undefined && src.confidence < 0.5 ? ' warn' : '')} aria-hidden="true" />
             <b>{src.confidence === undefined ? 'Placed by hand' : src.confidence >= 0.5 ? 'Aligned automatically' : 'Not sure about the alignment: check by ear'}</b>
+            <span className="dim" title="The MIDI file">{src.name}</span>
             <span className="mono dim">offset {fmtOffset(src.offset)}</span>
             {syncLabel}
             <button type="button" className="btn small" onClick={n.autoAlign}>Re-run alignment</button>
@@ -161,7 +162,7 @@ export default function NotesStep({ ws }: { ws: WS }) {
       </aside>
 
       <footer className="page-foot">
-        <button type="button" className="btn" onClick={() => ws.goStep('import')}>Back</button>
+        <button type="button" className="btn" onClick={() => ws.goStep('video')}>Back</button>
         <button type="button" className="btn primary" onClick={() => ws.goStep('calibrate')}>Continue to calibration <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
       </footer>
     </div>

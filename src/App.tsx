@@ -11,7 +11,8 @@ import { loadFromStore } from './ui/services/projectStore';
 import type { WS } from './ui/app/workspace';
 import Home from './ui/home/Home';
 import ImportStep from './ui/import/ImportStep';
-import NotesStep from './ui/notes/NotesStep';
+import VideoStep from './ui/video/VideoStep';
+import AudioStep from './ui/audio/AudioStep';
 import CalibrateStep from './ui/calibrate/CalibrateStep';
 import StyleStep from './ui/style/StyleStep';
 import LightStep from './ui/light/LightStep';
@@ -27,6 +28,7 @@ import { usePlayback } from './ui/app/usePlayback';
 import { usePreview } from './ui/app/usePreview';
 import { useSession } from './ui/app/useSession';
 import { useShortcuts } from './ui/app/useShortcuts';
+import { useSound } from './ui/app/useSound';
 import { exposeForTests } from './ui/app/testHooks';
 
 export default function App() {
@@ -69,6 +71,7 @@ export default function App() {
   onFrame.current = preview.redraw;
   useEffect(() => { preview.setInspect(null); }, [step, project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const sound = useSound(videoRef, { project, videoUrl: ready ? videoUrl : null, playing: playback.playing, duration: playback.duration });
   const autosave = useAutosave(project, { videoRef, videoOk: !videoIssue, renderer: preview.renderer, step });
   late.current = { time: playback.time, pause: playback.pause, resetPlayback: playback.reset, setDuration: playback.setDuration, forgetThumb: autosave.forgetThumb };
 
@@ -96,7 +99,7 @@ export default function App() {
     pick: session.pick, onFiles: session.onFiles, loop: playback.loop, setLoop: playback.setLoop,
     presets: library.presets, defaultPresetId: library.defaultPresetId, refreshPresets: library.refreshPresets,
     goStep: session.goStep, goHome: session.goHome, brand: library.brand, setBrand: library.setBrand,
-    inspect: preview.inspect, setInspect: preview.setInspect, redraw: () => preview.redraw(),
+    inspect: preview.inspect, setInspect: preview.setInspect, redraw: () => preview.redraw(), sound,
   };
 
   // the steps that draw with the graphics card need it
@@ -114,7 +117,8 @@ export default function App() {
       <div className="route">
         {route === 'home' && <Home onNew={session.startNewProject} onOpen={(id) => loadFromStore(id).then(session.openProject).catch(toastError)} onPick={session.pick} onFiles={session.onFiles} refreshKey={session.homeKey} />}
         {inProject && step === 'import' && <ImportStep ws={ws} />}
-        {inProject && ready && step === 'notes' && <NotesStep ws={ws} />}
+        {inProject && ready && step === 'video' && <VideoStep ws={ws} />}
+        {inProject && ready && step === 'audio' && <AudioStep ws={ws} />}
         {inProject && ready && step === 'calibrate' && <CalibrateStep ws={ws} />}
         {inProject && ready && step === 'style' && gpu(<StyleStep ws={ws} attachPreview={preview.attachPreview} fps={preview.fps} stats={showStats ? `${preview.fps} fps · ${preview.stats}` : ''} />)}
         {inProject && ready && step === 'light' && gpu(<LightStep ws={ws} attachPreview={preview.attachPreview} />)}

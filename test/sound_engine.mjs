@@ -1,0 +1,48 @@
+// The sound engine in a real browser: neutral settings leave the sound untouched, the limiter holds the ceiling,
+// evening the loudness reaches −14 LUFS, and each transition shapes the level as it should.
+// usage: node test/sound_engine.mjs [outDir]   (writes WAVs of each transition when outDir is given)
+import { chromium } from 'playwright';
+import { build } from 'esbuild';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+const OUT = process.argv[2];
+const js = (await build({ entryPoints: ['test/sound/entry.ts'], bundle: true, write: false, format: 'iife', target: 'es2022' })).outputFiles[0].text;
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--autoplay-policy=no-user-gesture-required'] });
+const page = await b.newPage();
+page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+await page.route('http://pv.test/**', (r) => r.request().url().endsWith('.mp4') ? r.fulfill({ body: readFileSync('samples/interstellar-take1.mp4'), contentType: 'video/mp4' }) : r.fulfill({ body: '<html></html>', contentType: 'text/html' }));
+await page.goto('http://pv.test/');
+await page.addScriptTag({ content: js });
+let fails = 0;
+const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
+console.log('loaded', await page.evaluate(() => pv.load('http://pv.test/a.mp4')));
+const sine = await page.evaluate(() => pv.neutralSine());
+ok(Math.abs(sine) < 0.15, `neutral chain keeps the level (${sine.toFixed(2)} dB)`);
+const span = [20, 30];
+const R = async (name, s, measured = false) => { const r = await page.evaluate(([s, span, m, k]) => pv.render(s, span, m, k), [s, span, measured, !!OUT]); if (OUT) { mkdirSync(OUT, { recursive: true }); writeFileSync(`${OUT}/${name}.wav`, Buffer.from(r.wav, 'base64')); } delete r.wav; return r; };
+const plain = await R('plain', { volume: 0.001 });
+console.log('plain', plain.lufsIn.toFixed(1), 'LUFS in →', plain.lufsOut.toFixed(1), 'out; peak', plain.peakDb.toFixed(1));
+ok(Math.abs(plain.lufsOut - plain.lufsIn) < 0.3, 'untouched settings: same loudness');
+const even = await R('even', { even: true }, true);
+ok(Math.abs(even.lufsOut + 14) < 1, `even loudness → ${even.lufsOut.toFixed(1)} LUFS`);
+ok(even.peakDb <= -0.3, `limiter ceiling: peak ${even.peakDb.toFixed(2)} dBFS`);
+const loud = await R('loud', { volume: 12 });
+ok(loud.peakDb <= -0.3, `+12 dB still under the ceiling: peak ${loud.peakDb.toFixed(2)} dBFS`);
+const fade = await R('fade', { start: 'fade', startLen: 2, end: 'fade', endLen: 3 });
+const L = fade.levels;
+ok(L[0] < plain.levels[0] - 15 && L[25] > L[5], `fade in rises (${L[0]} → ${L[5]} → ${L[25]})`);
+ok(L[99] < plain.levels[99] - 15, `fade out ends quiet (${L[99]} vs ${plain.levels[99]})`);
+const ring = await R('ring', { end: 'ring', endLen: 4 });
+ok(Math.abs(ring.seconds - 14) < 0.01, `ring-out adds 4 s (${ring.seconds} s)`);
+const after = ring.levels.slice(100);
+ok(after[2] > -45 && after[after.length - 1] < after[2] - 20, `ring-out decays after the end (${after[2]} → ${after[after.length - 1]})`);
+const swell = await R('swell', { start: 'swell', startLen: 3 });
+ok(Math.abs(swell.seconds - 13) < 0.01, `the swell adds 3 s before the video (${swell.seconds} s)`);
+ok(swell.levels[2] < swell.levels[27] - 12 && swell.levels[27] > plain.levels[0] - 10, `the swell rises into the first note (${swell.levels[2]} → ${swell.levels[27]}, first note ${plain.levels[0]})`);
+ok(Math.abs(swell.levels[40] - plain.levels[10]) < 0.5, `the performance after the swell is untouched (${swell.levels[40]} vs ${plain.levels[10]})`);
+const muffle = await R('muffle', { end: 'muffle', endLen: 3, start: 'open', startLen: 2 });
+ok(muffle.levels[99] < plain.levels[99] - 10, `muffle out sinks away (${muffle.levels[99]})`);
+const hall = await R('hall', { hall: 1 });
+ok(hall.lufsOut > plain.lufsOut && hall.lufsOut - plain.lufsOut < 4, `hall adds a moderate reverb (+${(hall.lufsOut - plain.lufsOut).toFixed(1)} LU)`);
+console.log(fails ? `${fails} FAILED` : 'all passed');
+await b.close();
+process.exit(fails ? 1 : 0);

@@ -41,7 +41,7 @@ export function useShortcuts(videoRef: React.MutableRefObject<HTMLVideoElement |
         if (k === 'KeyZ' && !e.shiftKey) { e.preventDefault(); x.undo(); }
         else if (k === 'KeyY' || (k === 'KeyZ' && e.shiftKey)) { e.preventDefault(); x.redo(); }
         else if (k === 'KeyS') { e.preventDefault(); toast('Pianoverse saves your project as you go'); }
-        else if (/^Digit[1-7]$/.test(k)) {
+        else if (/^Digit[1-8]$/.test(k)) {
           e.preventDefault();
           const s = STEPS[Number(k.slice(5)) - 1].id;
           if (s === 'import' || x.canLeaveImport) x.goStep(s);

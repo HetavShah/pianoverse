@@ -27,7 +27,7 @@ export interface SessionDeps {
 }
 
 /** the step a reopened project continues from */
-const resumeStep = (p: CalibratedProject): Step => (!p.notes.length ? 'notes' : !p.progress?.calibrated ? 'calibrate' : 'style');
+const resumeStep = (p: CalibratedProject): Step => (!p.notes.length ? 'audio' : !p.progress?.calibrated ? 'calibrate' : 'style');
 
 export function useSession(deps: SessionDeps) {
   const d = useRef(deps);

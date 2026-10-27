@@ -87,12 +87,12 @@ Pick a stretch of the timeline and the sparks from the notes played there trace 
 
 ---
 
-## Five steps from video to visualizer
+## From video to visualizer
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/screen-import.png" alt="Import screen with the video and project settings"><br><b>1 · Import</b> — drop in the performance video and the MIDI recorded with it. Pick the camera setup and keyboard size.</td>
-    <td width="50%"><img src="docs/images/screen-sync.png" alt="Notes and sync screen with the waveform and the notes lined up"><br><b>2 · Notes and sync</b> — the MIDI lines itself up with the audio; check it by ear and nudge it to the millisecond. No MIDI? Detect the notes from the audio.</td>
+    <td width="50%"><img src="docs/images/screen-import.png" alt="Import screen with the video and project settings"><br><b>1 · Import and Video</b> — drop in the performance video, pick the camera setup and keyboard size, then trim and crop it.</td>
+    <td width="50%"><img src="docs/images/screen-sync.png" alt="Notes and sync screen with the waveform and the notes lined up"><br><b>2 · Audio</b> — the MIDI lines itself up with the audio; check it by ear and nudge it to the millisecond. No MIDI? Detect the notes from the audio. On <b>Sound</b>: fade, open up or a riser at the start, fade, muffle or ring out at the end, tone, a concert hall, and loudness evened out for social media.</td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/images/screen-calibrate.png" alt="Calibrate screen with the keyboard corners and the saber line"><br><b>3 · Calibrate</b> — drag four corners onto the keys once; the keyboard is tracked through the whole clip.</td>
@@ -167,11 +167,12 @@ A few ideas that make it work:
 ## Try it
 
 1. Download the latest **`Pianoverse_…_x64-setup.exe`** from [Releases](https://github.com/HetavShah/pianoverse/releases/latest) and install it. From then on Pianoverse updates itself: when a new build is out, click **Install and restart** in the top bar.
-2. Click **New project** and choose your performance video (phone videos in HEVC are converted once, on the graphics card). Add the MIDI file recorded with it, or skip it.
-3. **Notes and sync**: the MIDI lines itself up with the video's sound; check it by ear with **Play click on each note**. No MIDI? **Detect from audio**.
-4. **Calibrate**: drag the four handles onto the corners of the keys, set the saber line, and track the clip if the camera moved.
-5. **Style**: play it back with every effect and shape each layer. Drag across the timeline to loop a section or add a shape section.
-6. **Export**: pick a size and click **Export video**. Videos are saved in `Videos\Pianoverse` unless you choose another place.
+2. Click **New project** and choose your performance video (phone videos in HEVC are converted once, on the graphics card).
+3. **Video**: trim it to the part you want and crop the frame, if you like.
+4. **Audio**: add the MIDI file recorded with the take; it lines itself up with the video's sound (check it by ear with **Play click on each note**). No MIDI? **Detect from audio**. On the **Sound** page, choose how the sound starts and ends and how it sounds.
+5. **Calibrate**: drag the four handles onto the corners of the keys, set the saber line, and track the clip if the camera moved.
+6. **Style**: play it back with every effect and shape each layer. Drag across the timeline to loop a section or add a shape section.
+7. **Export**: pick a size and click **Export video**. Videos are saved in `Videos\Pianoverse` unless you choose another place.
 
 Projects save themselves and appear on the Projects screen.
 
