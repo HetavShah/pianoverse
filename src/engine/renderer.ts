@@ -616,8 +616,14 @@ export class Renderer {
 
     const keyQuad = (p: number, c: RGB) => {
       if (keys.length / 48 >= MAX_KEYS) return;
+      // the whole key, back to front, plus a margin either side for the light that spills onto its neighbours
+      // (the black keys inside that area are dark, so the key shader keeps the light off them)
       const fp = kb.footprint(p);
-      const qd = fp.quad.map(([x, y]) => kb.P(x, y));
+      const x0 = fp.quad[0][0], x1 = fp.quad[1][0], mid = (x0 + x1) / 2, half = (x1 - x0) / 2;
+      const wHalf = fp.black ? half : 0.5, spill = fp.black ? 0.2 : 0.3;
+      const y0 = fp.black ? fp.quad[0][1] : 0.0, y1 = fp.black ? fp.quad[2][1] : 0.98;
+      const X0 = mid - wHalf - spill, X1 = mid + wHalf + spill;
+      const qd = ([[X0, y0], [X1, y0], [X1, y1], [X0, y1]] as [number, number][]).map(([x, y]) => kb.P(x, y));
       const uv = [[0, 0], [1, 0], [1, 1], [0, 1]];
       for (const i of [0, 1, 2, 0, 2, 3]) keys.push(qd[i][0], qd[i][1], uv[i][0], uv[i][1], c[0], c[1], c[2], fp.black ? 1 : 0);
     };
@@ -687,7 +693,7 @@ export class Renderer {
         const tt = -dd;
         const held = t <= n.e;
         const glow = Math.max(Math.exp(-tt * 6), held ? (0.3 + 0.05 * Math.sin(t * 7 + n.p)) * lk.keyHeld : 0);
-        if (L.keys) keyQuad(n.p, scaleC(lighten(col, 0.45), glow * lk.keyBright));
+        if (L.keys) keyQuad(n.p, scaleC(lighten(col, 0.2), glow * lk.keyBright * 1.15));
         if (L.impact) {
           const [lx, ly] = at(tg.unit * 0.6);
           light(lx, ly, tg.unit * (4 + 2 * vn) * lk.relightRadius, col, (0.55 + 0.5 * vn) * Math.exp(-tt * 3.5) + (held ? 0.12 : 0));
