@@ -13,6 +13,7 @@ import { resolveTitles } from '../../engine/titles';
 import StyleTimeline from './StyleTimeline';
 import type { WS } from '../app/workspace';
 import ShapeSections from './ShapeSections';
+import Icon from '../components/icons';
 import { sourceRect, type ParticleScene } from '../../engine/project';
 
 type Panel = { id: LayerId; label: string; kind: (l: Look) => string; toggle?: keyof Layers };
@@ -121,7 +122,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
       <nav className="style-layers" aria-label="Layers">
         <button type="button" className={'layer-row looks-row' + (sel === 'looks' ? ' on' : '')} onClick={() => setSel('looks')}
           aria-current={sel === 'looks' ? 'true' : undefined} title={`Looks · ${preset.name}${modified ? ' (changed)' : ''} (press 0)`}>
-          <span className="num" aria-hidden="true">00</span>
+          <span className="num" aria-hidden="true"><Icon name="looks" size={22} /></span>
           <span className="name">Looks</span>
         </button>
         {PANELS.map((l, i) => {
@@ -129,14 +130,14 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
           return (
             <button key={l.id} type="button" className={'layer-row' + (sel === l.id ? ' on' : '') + (hidden ? ' off' : '')} onClick={() => setSel(l.id)}
               aria-current={sel === l.id ? 'true' : undefined} title={`${l.label} · ${l.kind(look)}${hidden ? ' · hidden' : ''} (press ${i + 1})`}>
-              <span className="num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+              <span className="num" aria-hidden="true"><Icon name={l.id} size={22} /></span>
               <span className="name">{l.label}</span>
             </button>
           );
         })}
         <button type="button" className={'layer-row titles-row' + (sel === 'titles' ? ' on' : '')} onClick={() => setSel('titles')}
           aria-current={sel === 'titles' ? 'true' : undefined} title={`Titles · ${titlesKind} (press 9)`}>
-          <span className="num" aria-hidden="true">09</span>
+          <span className="num" aria-hidden="true"><Icon name="titles" size={22} /></span>
           <span className="name">Titles</span>
         </button>
       </nav>

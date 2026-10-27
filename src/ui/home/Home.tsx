@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Icon from '../components/icons';
 import PickButton from '../components/PickButton';
 import HomeBackdrop from './HomeBackdrop';
 import type { PickKind } from '../services/media';
@@ -26,8 +27,8 @@ export default function Home(props: {
             <p className="sub">Your piano video and its MIDI in, a falling-notes video out. Projects save as you work.</p>
           </div>
           <div className="row-actions">
-            <PickButton what="project" className="btn ghost" onPick={props.onPick} onFiles={props.onFiles}>Open project file…</PickButton>
-            <button type="button" className="btn primary big" onClick={props.onNew}>New project</button>
+            <PickButton what="project" className="btn ghost" onPick={props.onPick} onFiles={props.onFiles}><Icon name="openFile" />Open project file…</PickButton>
+            <button type="button" className="btn primary big" onClick={props.onNew}><Icon name="newProject" size={18} />New project</button>
           </div>
         </div>
         </section>

@@ -166,7 +166,10 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .home-hero > .title-row { position: relative; z-index: 1; }
 .home-hero .sub { color: var(--paper); opacity: 0.8; }
 .home-backdrop { position: absolute; inset: 0; pointer-events: none; overflow: hidden; background: var(--stage); }
-.home-backdrop video { width: 100%; height: 100%; object-fit: cover; object-position: 70% 50%; display: block; }
+.home-backdrop video { position: absolute; top: 0; right: 0; height: 100%; width: auto; max-width: 78%; aspect-ratio: 1440 / 580; object-fit: cover; object-position: 60% 50%; display: block;
+  /* at about its own size on the right (never stretched across a wide screen), fading into the ground on its left and at its foot */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%), linear-gradient(180deg, #000 60%, transparent 100%); -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 34%), linear-gradient(180deg, #000 60%, transparent 100%); mask-composite: intersect; }
 /* the footage sits behind the type: darker under the title on the left, and it settles into the ground at the foot */
 .home-backdrop .scrim { position: absolute; inset: 0; background:
   linear-gradient(90deg, rgba(22, 22, 21, 0.9) 0%, rgba(22, 22, 21, 0.6) 38%, rgba(22, 22, 21, 0.15) 75%, rgba(22, 22, 21, 0.1) 100%),
@@ -713,3 +716,13 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .sound-wave.zoom canvas { height: 170px; }
 .sound-wave.overview canvas { height: 64px; }
 
+/* ---------- icons (ui/components/icons.tsx) ---------- */
+.icon { flex: none; display: block; }
+.step-btn .icon { opacity: 0.8; }
+.step-btn.on .icon { opacity: 1; color: var(--live); }
+.step-btn.room { gap: 7px; }
+.layer-row .num .icon { color: inherit; }
+.menu button { display: flex; align-items: center; gap: 10px; }
+.menu button kbd { margin-left: auto; }
+.seg button .icon, .seg .seg-btn .icon { margin-right: 7px; }
+.row-actions .btn .icon { margin-right: -2px; }
