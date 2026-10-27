@@ -115,6 +115,11 @@ ui/
   `setProject`, playback, the preview renderer, the library. A step only reads what it needs.
 - **Every edit goes through `setProject`**, which records an undo step (`ui/app/history.ts`). Quick runs of edits
   (a slider drag, typing) merge into one step.
+- **Project files** (`ui/services/projectFile.ts`): "Save project file…" writes a `.pianoverse` file, a ZIP
+  container with a `mimetype` entry first, `project.json`, the card's thumbnail and the user's own textures and
+  shape drawings the project uses. Windows opens `.pianoverse` files with Pianoverse (file association; a second
+  launch hands its files to the open window). Autosave keeps plain JSON in the app's data folder, which is quicker
+  to write on every change; older `.pvproj.json` files still open.
 - The Style panels are **data**: `ui/style/lookSchema.ts` lists every control, bound to a `Look` setting, and
   `LookControls` draws them.
 
@@ -163,7 +168,10 @@ and a line in `App.tsx`'s router.
 
 ## Testing
 
-Tests drive the real app in Chromium with software WebGPU (`npx vite preview --port 4173` first).
+Browser tests drive the real app in Chromium with software WebGPU (`npx vite preview --port 4173` first).
+
+- **Unit tests** (`node test/unit/run.mjs`): code that needs no browser or GPU, bundled with esbuild and run in
+  Node, with in-memory fakes for storage (`test/unit/fakeTextures.ts`).
 
 - **Golden frames** (`node test/golden.mjs`): 26 frames covering every look, particle style, lighting, crop,
   camera, titles, textures and the transparent export, compared pixel by pixel with recorded copies
