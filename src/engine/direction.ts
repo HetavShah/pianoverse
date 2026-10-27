@@ -1,5 +1,5 @@
 // Which way notes fall on screen.
-import { Keyboard, ProjectFile, trackingMatrix } from './project';
+import { keyboardOf, ProjectFile, trackingMatrix } from './project';
 
 export type ProjectWithLook = ProjectFile & { look?: { noteAngle?: number | null } };
 
@@ -26,7 +26,7 @@ export const MAX_TILT = 60;
 export function autoNoteAngle(proj: ProjectFile): number {
   const f = proj.tracking.frames;
   if (!f.length) return 0;
-  const kb = new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b);
+  const kb = keyboardOf(proj);
   kb.H = trackingMatrix(proj, Math.floor(f.length / 2));
   const mid = proj.keyboard.whiteKeys / 2;
   const a = kb.P(mid - 2, 0.5), b = kb.P(mid + 2, 0.5);

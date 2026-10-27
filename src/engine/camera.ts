@@ -1,7 +1,7 @@
 // The virtual camera: a list of shots over the video, each a framing (Wide, Follow your hands, or a fixed Close-up),
 // joined by transitions (Cut, Glide, Punch, Dip to black, Dip to white). `cameraAt` gives the window of the video
 // to show at any moment; the renderer draws the frame through it.
-import { Keyboard, ProjectFile, RawNote, trackingMatrix } from './project';
+import { keyboardOf, ProjectFile, RawNote, trackingMatrix } from './project';
 import { BeatGrid, estimateBeats, nearestBeat } from './beats';
 
 export type Aspect = 'vertical' | 'landscape' | 'square';
@@ -63,7 +63,7 @@ const SIGMA: Record<AutoSettings['movement'], number> = { calm: 1.6, normal: 0.9
 export function followPath(proj: ProjectFile, movement: AutoSettings['movement'] = 'normal'): FollowPath {
   const fps = proj.video.fps || 30;
   const n = Math.max(1, proj.video.frames || Math.ceil((proj.video.duration ?? 1) * fps));
-  const kb = new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b);
+  const kb = keyboardOf(proj);
   const notes = [...proj.notes].sort((a, b) => a.s - b.s);
   const rx = new Float32Array(n), ry = new Float32Array(n), rs = new Float32Array(n), ru = new Float32Array(n);
   const mid = proj.keyboard.whiteKeys / 2;

@@ -22,7 +22,7 @@ export interface ProjectFile {
   id?: string;
   camera?: 'angled' | 'topdown';
   progress?: { calibrated?: boolean };
-  keyboard: { keys: number; lowestNote: number; whiteKeys: number; edge: { a: number; b: number } };
+  keyboard: { keys: number; lowestNote: number; whiteKeys: number; edge: { a: number; b: number }; fit?: KeyFit };
   tracking: { space: 'video-pixels'; frames: number[][] }; // 8 values per frame, h33 = 1
   notes: RawNote[];
   /** appearance settings saved with the project */
@@ -70,6 +70,8 @@ export type Mat3 = number[]; // row-major 3x3, length 9
 
 const WHITE_OFF: Record<number, number> = { 0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6 };
 const BLACK_OFF: Record<number, number> = { 1: 1, 3: 2, 6: 4, 8: 5, 10: 6 };
+/** where each black key's centre is, in white keys from the octave's C */
+const BLACK_CENTRE: Record<number, number> = { 1: 0.92, 3: 2.08, 6: 3.88, 8: 5.0, 10: 6.12 };
 
 // pitch palette: low azure -> teal -> mint
 const STOPS: [number, RGB][] = [
@@ -115,11 +117,21 @@ export function prepareNotes(raw: RawNote[], lowest: number, keys: number, look?
   return out;
 }
 
+/**
+ * A small correction of the key layout found by fitting it to the picture (see keyFit): plane x becomes
+ * x0 + (1 + k) * x + sh * y, so the keys can shift sideways, be a little wider or narrower, and slant from back
+ * to front the way the real keys run. Tracking places the keyboard; this lines up the keys inside it.
+ */
+export interface KeyFit { x0: number; k: number; sh: number }
+export const NO_FIT: KeyFit = { x0: 0, k: 0, sh: 0 };
+
 export class Keyboard {
   H: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
-  constructor(public lowest: number, public edgeA: number, public edgeB: number) {}
+  constructor(public lowest: number, public edgeA: number, public edgeB: number, public fit: KeyFit = NO_FIT) {}
 
-  P(x: number, y: number): [number, number] {
+  P(x0: number, y: number): [number, number] {
+    const f = this.fit;
+    const x = f.x0 + (1 + f.k) * x0 + f.sh * y;
     const h = this.H;
     const w = h[6] * x + h[7] * y + h[8];
     return [(h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w];
@@ -148,8 +160,9 @@ export class Keyboard {
       const w = ord(p) - base;
       return { quad: [[w + 0.08, 0.66], [w + 0.92, 0.66], [w + 0.92, 0.97], [w + 0.08, 0.97]], black: false };
     }
-    const c = ord(p) - base;
-    return { quad: [[c - 0.26, 0.06], [c + 0.26, 0.06], [c + 0.26, 0.58], [c - 0.26, 0.58]], black: true };
+    // black keys sit unevenly within the octave on a real keyboard (C♯ a little left of the C–D line, and so on)
+    const c = Math.floor(p / 12) * 7 + BLACK_CENTRE[r] - base;
+    return { quad: [[c - 0.29, 0.02], [c + 0.29, 0.02], [c + 0.29, 0.6], [c - 0.29, 0.6]], black: true };
   }
 
   keyCenterX(p: number): number {
@@ -165,6 +178,11 @@ export class Keyboard {
     const a = this.P(cx - 1, cy), b = this.P(cx + 1, cy);
     return { x: u, y: v, unit: this.unit(cx, cy), along: [b[0] - a[0], b[1] - a[1]] as [number, number], plane: cx };
   }
+}
+
+/** the keyboard model for a project (its lowest note, saber edge and key fit) */
+export function keyboardOf(proj: ProjectFile): Keyboard {
+  return new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b, proj.keyboard.fit ?? NO_FIT);
 }
 
 export function trackingMatrix(proj: ProjectFile, frame: number): Mat3 {

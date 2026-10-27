@@ -5,6 +5,7 @@ import {
 } from '../engine/calibration';
 import { cornersOf, Quad } from '../engine/geometry';
 import { startTracking, TrackJob, TrackProgress } from './trackRun';
+import type { KeyFit } from '../engine/project';
 
 export function defaultCorners(w: number, h: number): Quad {
   // a keyboard-shaped box in the lower middle of the frame, to be dragged into place
@@ -61,6 +62,11 @@ export function useCalibration(opts: {
   const [dragEdge, setDragEdge] = useState<{ a: number; b: number } | null>(null);
   const [track, setTrack] = useState<TrackState>({ kind: 'idle' });
   const job = useRef<TrackJob | null>(null);
+  // lining the keys up with the picture (see keyFit)
+  const [fitting, setFitting] = useState<number | null>(null);
+  const [fitResult, setFitResult] = useState<{ fit: KeyFit; before: number; after: number } | null>(null);
+  const latest = useRef(project);
+  latest.current = project;
 
   useEffect(() => () => job.current?.cancel(), []);
 
@@ -150,8 +156,28 @@ export function useCalibration(opts: {
 
   const cancelTracking = useCallback(() => { job.current?.cancel(); }, []);
 
+  const fitKeysNow = useCallback(async (v: HTMLVideoElement | null) => {
+    const p0 = latest.current;
+    if (!p0 || !v || !v.videoWidth || fitting !== null || job.current) return;
+    setFitting(0);
+    try {
+      const { fitKeys, grabShots } = await import('../engine/keyFit');
+      const dur = p0.video.frames / (p0.video.fps || 30);
+      const times = [0.15, 0.35, 0.55, 0.75, 0.9].map((k) => Math.min(dur - 0.1, k * dur));
+      const shots = await grabShots(v, p0, times);
+      const r = await fitKeys(p0, shots, (pct) => setFitting(pct));
+      const p1 = latest.current;
+      if (p1) setProject({ ...p1, keyboard: { ...p1.keyboard, fit: r.fit } });
+      setFitResult(r);
+    } catch (e) {
+      console.warn('[key fit]', e);
+    } finally {
+      setFitting(null);
+    }
+  }, [fitting, setProject]);
+
   return {
-    cal, tracked, corners, edge, fixHere, track,
-    onCorners, onEdge, setPreset, setCameraMoves, removeFix, clearTracking, runTracking, cancelTracking,
+    cal, tracked, corners, edge, fixHere, track, fitting, fitResult,
+    onCorners, onEdge, setPreset, setCameraMoves, removeFix, clearTracking, runTracking, cancelTracking, fitKeysNow,
   };
 }

@@ -14,7 +14,7 @@ import partsSrc from './shaders/particles_draw.wgsl?raw';
 import postSrc from './shaders/post.wgsl?raw';
 import { Brand, DEFAULT_BRAND, drawTitles, resolveTitles, Titles } from './titles';
 import {
-  Keyboard, Note, ProjectFile, RGB, gauss, lighten, mulberry32, prepareNotes, trackingMatrix,
+  Keyboard, keyboardOf, Note, ProjectFile, RGB, gauss, lighten, mulberry32, prepareNotes, trackingMatrix,
 } from './project';
 
 export interface Layers {
@@ -310,7 +310,7 @@ export class Renderer {
     this.srcW = proj.video.width;
     this.srcH = proj.video.height;
     this.whiteKeys = proj.keyboard.whiteKeys;
-    this.kb = new Keyboard(proj.keyboard.lowestNote, proj.keyboard.edge.a, proj.keyboard.edge.b);
+    this.kb = keyboardOf(proj);
     this.look = resolveLook(proj.look);
     this.titles = resolveTitles(proj.titles);
     this.scenes = (proj.particleScenes ?? []).filter((sc) => sc.end > sc.start).slice(0, SHAPE_SLOTS - 1);
@@ -492,7 +492,7 @@ export class Renderer {
 
   private buildEmitters() {
     if (!this.proj) return;
-    const kb = new Keyboard(this.kb.lowest, this.kb.edgeA, this.kb.edgeB);
+    const kb = new Keyboard(this.kb.lowest, this.kb.edgeA, this.kb.edgeB, this.kb.fit);
     const lk = this.look;
     const rows: { start: number; end: number; data: number[] }[] = [];
     // shapes in use: slot 0 is the look's own shape (Shape style for the whole video), then one per section

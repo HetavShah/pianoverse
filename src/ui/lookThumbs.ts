@@ -1,7 +1,7 @@
 // Gallery pictures: each look rendered on the user's own video, cropped to where the notes meet the keys.
 // They are drawn by a renderer of their own, so the main preview is never touched.
 import { applyPreset, Preset } from '../engine/look';
-import { Keyboard, trackingMatrix, type ProjectFile } from '../engine/project';
+import { keyboardOf, trackingMatrix, type ProjectFile } from '../engine/project';
 import { Renderer } from '../engine/renderer';
 import type { UserFiles } from '../engine/noteTextures';
 
@@ -23,7 +23,7 @@ function cropRect(p: ProjectFile, t: number) {
   const cw = Math.min(W, H / (THUMB_H / THUMB_W)), ch = cw * (THUMB_H / THUMB_W);
   let cx = W / 2, ey = H * 0.6;
   if (p.tracking?.frames?.length) {
-    const kb = new Keyboard(p.keyboard.lowestNote, p.keyboard.edge.a, p.keyboard.edge.b);
+    const kb = keyboardOf(p);
     kb.H = trackingMatrix(p, Math.round(t * (p.video.fps || 30)));
     const mid = p.keyboard.whiteKeys / 2;
     const e = kb.P(mid, kb.edgeY(mid));

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Dial from '../Dial';
 import { isBlack, noteName, PRESETS } from '../../engine/calibration';
 import { apply, planeToImage } from '../../engine/geometry';
@@ -26,6 +26,19 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
   const { project, calib: c } = ws;
   const [zoomCmd, setZoomCmd] = useState<{ n: number; k: number | 'fit' }>({ n: 0, k: 1 });
   const [z, setZ] = useState(1);
+  // line the keys up with the picture once the keyboard is tracked (and once for projects made before this)
+  const fitFor = useRef('');
+  const trackStamp = c.track.kind === 'done' ? `done-${c.track.frames}-${c.track.seconds}` : '';
+  useEffect(() => {
+    if (!project || !project.tracking.frames.length || c.track.kind === 'running' || c.fitting !== null) return;
+    const key = `${project.id ?? ''}|${trackStamp}`;
+    const want = trackStamp ? key !== fitFor.current : !project.keyboard.fit && fitFor.current !== key;
+    if (!want) return;
+    fitFor.current = key;
+    const v = ws.videoEl.current;
+    if (v && v.readyState >= 2) c.fitKeysNow(v);
+    else v?.addEventListener('loadeddata', () => c.fitKeysNow(v), { once: true });
+  }, [project?.id, trackStamp, c.track.kind]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!project) return null;
   const kb = project.keyboard;
   const W = kb.whiteKeys;
@@ -165,6 +178,18 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
             </ul>
           )}
           {c.tracked && <button type="button" className="link inline small-text" onClick={c.clearTracking}>Discard tracking</button>}
+        </Item>
+        <Item n={6} done={!!kb.fit && c.fitting === null} active={trackDone && !kb.fit} title="Line up the keys"
+          sub={c.fitting !== null ? 'Matching the keys to the picture…'
+            : kb.fit && (kb.fit.x0 || kb.fit.k || kb.fit.sh) ? 'The keys are lined up with the ones in the video, so lights and notes sit on the right keys'
+            : kb.fit ? 'The keys already matched the video'
+            : 'Matches every key to the ones in the video'}>
+          {c.fitting !== null
+            ? <div className="bar"><div style={{ width: `${Math.round(c.fitting)}%` }} /></div>
+            : <button type="button" className="btn small" disabled={running || !project.tracking.frames.length} onClick={() => c.fitKeysNow(ws.videoEl.current)}>{kb.fit ? 'Line up again' : 'Line up the keys'}</button>}
+          {c.fitResult && c.fitting === null && c.fitResult.after > c.fitResult.before && (
+            <small className="dim">Match with the picture: {Math.round(c.fitResult.before * 100)}% → {Math.round(c.fitResult.after * 100)}%</small>
+          )}
         </Item>
       </aside>
 
