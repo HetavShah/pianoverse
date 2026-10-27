@@ -21,6 +21,30 @@ fn vs(@location(0) p: vec2f, @location(1) uv: vec2f, @location(2) col: vec3f, @l
   return o;
 }
 
+// A lit black key: a soft pool of light on the glossy plastic, brightest at the back where the note lands and
+// fading towards the front and out to the sides, with no hard edges. The light only falls where the picture is dark
+// (the key and the side of it the camera sees), so it stops at the white keys and the hand; a little of it reaches
+// the white keys either side.
+// The quad: across, the key's centre ± (0.29 + 0.4) white keys; along, plane y -0.08 .. 0.62 (see renderer keyQuad).
+fn blackKey(i: VOut) -> vec4f {
+  let src = F.view.xy + i.pos.xy / F.scale;
+  let v = textureSampleLevel(kvideo, ksamp, src / F.srcSize, 0.0).rgb;
+  let luma = dot(v, vec3f(0.2126, 0.7152, 0.0722));
+  let dx = abs(i.uv.x - 0.5) * 2.0 * (0.29 + 0.4);         // white keys from the key's centre line
+  let y = -0.08 + i.uv.y * 0.7;                              // 0 = back of the keys, 0.6 = the black key's front
+  let dark = 1.0 - smoothstep(0.05, 0.14, luma);
+  let pool = exp(-sq(dx / 0.45)) * exp(-max(y - 0.02, 0.0) / 0.45)
+    * smoothstep(-0.07, 0.03, y) * smoothstep(0.66, 0.54, y) * smoothstep(0.69, 0.55, dx);
+  let k = dark * pool * 1.9;
+  let hot = sq(clamp(k, 0.0, 1.0));
+  let lit = (i.col * (1.0 - 0.15 * hot) + vec3f(0.15 * hot)) * k;
+  // light on the white keys beside it (bright pixels only, so gaps and hands stay as they are)
+  let white = smoothstep(0.45, 0.6, luma);
+  let side = exp(-sq(max(dx - 0.29, 0.0) / 0.12)) * smoothstep(0.2, 0.3, dx) * white * 0.25
+    * exp(-max(y, 0.0) / 0.35) * smoothstep(0.69, 0.55, dx);
+  return vec4f((lit + i.col * side) * 0.95, 0.0);
+}
+
 @fragment
 fn fs(i: VOut) -> @location(0) vec4f {
   if (i.black > 1.5) {
@@ -28,6 +52,7 @@ fn fs(i: VOut) -> @location(0) vec4f {
     return vec4f(i.col * e * 0.85, 0.0);
   }
   let isBlack = i.black > 0.5;
+  if (isBlack) { return blackKey(i); }
   let src = F.view.xy + i.pos.xy / F.scale;
   let v = textureSampleLevel(kvideo, ksamp, src / F.srcSize, 0.0).rgb;
   let luma = dot(v, vec3f(0.2126, 0.7152, 0.0722));

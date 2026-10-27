@@ -620,8 +620,8 @@ export class Renderer {
       // (the black keys inside that area are dark, so the key shader keeps the light off them)
       const fp = kb.footprint(p);
       const x0 = fp.quad[0][0], x1 = fp.quad[1][0], mid = (x0 + x1) / 2, half = (x1 - x0) / 2;
-      const wHalf = fp.black ? half : 0.5, spill = fp.black ? 0.2 : 0.3;
-      const y0 = fp.black ? fp.quad[0][1] : 0.0, y1 = fp.black ? fp.quad[2][1] : 0.98;
+      const wHalf = fp.black ? half : 0.5, spill = fp.black ? 0.4 : 0.3; // keys.wgsl assumes these shares
+      const y0 = fp.black ? -0.08 : 0.0, y1 = fp.black ? 0.62 : 0.98;
       const X0 = mid - wHalf - spill, X1 = mid + wHalf + spill;
       const qd = ([[X0, y0], [X1, y0], [X1, y1], [X0, y1]] as [number, number][]).map(([x, y]) => kb.P(x, y));
       const uv = [[0, 0], [1, 0], [1, 1], [0, 1]];
