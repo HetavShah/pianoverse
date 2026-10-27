@@ -1,6 +1,6 @@
 import { userTextureFiles } from './ui/textureStore';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DEFAULT_LAYERS, Layers, Renderer, View } from './engine/renderer';
+import { DEFAULT_LAYERS, Layers, Renderer, View } from './engine/render';
 import { CalibratedProject, testNotes } from './engine/calibration';
 import { UpdatePill, updateStatusText, useUpdater } from './updater';
 import { calibrationFromTracking, newProject, useCalibration } from './ui/useCalibration';

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Transport from '../Transport';
 import Dial from '../Dial';
 import { autoNoteAngle, MAX_TILT } from '../../engine/direction';
-import type { Layers } from '../../engine/renderer';
+import type { Layers } from '../../engine/render';
 import { applyPreset, LayerId, Look, LOOK_SCHEMA, matchesPreset, PALETTES, resolveLook, NOTE_TEXTURES, COLOR_BY, NOTE_2D, NOTE_3D, SABER_STYLES, PARTICLE_PRESETS, sameValue } from '../../engine/look';
 import LookControls from '../LookControls';
 import PresetBar from '../PresetBar';

@@ -2,7 +2,7 @@
 // They are drawn by a renderer of their own, so the main preview is never touched.
 import { applyPreset, Preset } from '../engine/look';
 import { keyboardOf, sourceRect, trackingMatrix, type ProjectFile } from '../engine/project';
-import { Renderer } from '../engine/renderer';
+import { Renderer } from '../engine/render';
 import type { UserFiles } from '../engine/noteTextures';
 
 export const THUMB_W = 240, THUMB_H = 180;

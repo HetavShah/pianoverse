@@ -1,6 +1,6 @@
 // Export: render every frame with the same engine as the preview and hand the pixels to an encoder.
 // In the desktop app the encoder is FFmpeg (NVENC / AMF / Quick Sync / x264, see src-tauri/src/export.rs).
-import type { Renderer } from '../engine/renderer';
+import type { Renderer } from '../engine/render';
 import { loadTitleFonts } from '../engine/titles';
 import type { CalibratedProject } from '../engine/calibration';
 import { aspectInfo, cameraAt, CameraFrame, followPath, FollowPath } from '../engine/camera';

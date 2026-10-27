@@ -1,7 +1,7 @@
 // What every step screen gets from the app shell.
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { CalibratedProject } from '../engine/calibration';
-import type { Layers, Renderer } from '../engine/renderer';
+import type { Layers, Renderer } from '../engine/render';
 import type { ConvertProgress, PickedVideo, PickKind } from './media';
 import type { useCalibration } from './useCalibration';
 import type { useNotes } from './useNotes';
@@ -58,8 +58,8 @@ export interface WS {
   brand: import('../engine/titles').Brand;
   setBrand: (b: import('../engine/titles').Brand) => void;
   /** zoomed in on the preview: the part of the video shown (null = all of it) */
-  inspect: import('../engine/renderer').View | null;
-  setInspect: (v: import('../engine/renderer').View | null) => void;
+  inspect: import('../engine/render').View | null;
+  setInspect: (v: import('../engine/render').View | null) => void;
   goHome: () => void;
   /** draw the preview again (after changing something on the renderer directly) */
   redraw: () => void;
