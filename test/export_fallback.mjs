@@ -1,6 +1,7 @@
 // A graphics-card encoder that gets stuck part way (as Intel Quick Sync did on a laptop): the export starts again
 // on the processor and finishes, says so, and that encoder isn't offered again. The encoder is pretended: the page
 // is told the computer has h264_qsv, and the sink stops taking frames from it after three.
+// A slow moment in the encoder shows what the frame is waiting for.
 // usage: node test/export_fallback.mjs
 import { chromium } from 'playwright';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'] });
@@ -10,7 +11,12 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++
 const starts = [];
 let framesIn = 0, finished = 0;
 await page.exposeFunction('pvStart', (o) => { starts.push(JSON.parse(o).encoder); framesIn = 0; });
-await page.exposeFunction('pvFrame', () => { framesIn++; const enc = starts[starts.length - 1]; if (enc === 'h264_qsv' && framesIn > 3) throw new Error('stalled'); });
+await page.exposeFunction('pvFrame', async () => {
+  framesIn++;
+  const enc = starts[starts.length - 1];
+  if (enc === 'h264_qsv' && framesIn > 3) throw new Error('stalled');
+  if (enc === 'libx264' && framesIn === 5) await new Promise((r) => setTimeout(r, 6000));   // a slow moment
+});
 await page.exposeFunction('pvFinish', () => { finished++; return 'C:\\\\out.mp4'; });
 await page.addInitScript(() => {
   window.__pvHeadless = true; localStorage.clear();
@@ -31,6 +37,8 @@ await page.evaluate(() => window.pianoverseSetLoop({ on: false, range: [10, 10.4
 await page.click('label:has-text("Only the selected part") input'); await page.waitForTimeout(300);
 ok(/Intel Quick Sync/.test(await page.locator('.ex-stats').innerText()), 'the pretend Quick Sync is picked');
 await page.click('button:has-text("Export video")');
+const waitText = await page.waitForSelector('.ex-wait', { timeout: 10 * 60 * 1000 }).then((e) => e.innerText()).catch(() => '');
+ok(/Waiting for the encoder/.test(waitText), 'a slow step says what it waits for  ' + JSON.stringify(waitText));
 await page.waitForSelector('.ex-done, .ex-error', { timeout: 15 * 60 * 1000 });
 const done = await page.locator('.ex-done, .ex-error').innerText();
 ok(starts[0] === 'h264_qsv' && starts[1] === 'libx264' && finished === 1, 'stuck on the graphics card: started again on the processor  ' + JSON.stringify(starts));

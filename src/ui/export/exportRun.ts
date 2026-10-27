@@ -143,7 +143,19 @@ const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>((res) => {
   setTimeout(done, 4000);
 });
 
-export interface ExportProgress { phase: 'sound' | 'video' | 'effects'; done: number; total: number; elapsed: number; eta: number; preview?: string; /** something that changed on the way (the encoder) */ note?: string }
+export interface ExportProgress {
+  phase: 'sound' | 'video' | 'effects'; done: number; total: number; elapsed: number; eta: number; preview?: string;
+  /** something that changed on the way (the encoder) */
+  note?: string;
+  /** what a frame has been waiting on for a few seconds (shown so a slow step is never a silent freeze) */
+  waiting?: string;
+}
+
+/** a step of a frame that takes too long fails with a message instead of waiting for ever */
+const within = <T,>(p: Promise<T>, secs: number, what: string): Promise<T> => Promise.race([
+  p,
+  new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${what} didn't answer for ${secs} seconds, so the export stopped. Keep Pianoverse open and try again; if it happens again, restart the app.`)), secs * 1000)),
+]);
 
 /** render and encode; resolves with the saved file's path */
 export async function runExport(args: {
@@ -210,20 +222,34 @@ export async function runExport(args: {
       const t0 = performance.now();
       let pending: Promise<void> | null = null;
       let lastSrc = -1;
+      // what the frame is doing now: shown when it takes more than a few seconds
+      let step = '', stepSince = performance.now(), done = 0;
+      const doing = (what: string) => { step = what; stepSince = performance.now(); };
+      const watch = setInterval(() => {
+        if (step && performance.now() - stepSince > 3000) {
+          const el = (performance.now() - t0) / 1000;
+          args.onProgress({ phase, done, total: frames, elapsed: el, eta: 0, note, waiting: step });
+        }
+      }, 1000);
+      try {
       for (let i = 0; i < frames; i++) {
         if (args.cancelled()) { await pending?.catch(() => {}); await sink.cancel(); throw new Error('cancelled'); }
         const t = from - lead + i / fps;
         // the video frame on screen at time t (frames repeat when exporting at a higher frame rate; during a
         // ring-out the last one holds while the effects play on)
         const si = Math.min(Math.floor(Math.max(from, Math.min(t, to - 0.5 / srcFps)) * srcFps + 1e-6), Math.max(0, Math.floor(args.duration * srcFps) - 1));
-        if (si !== lastSrc) { await seekTo(v, (si + 0.5) / srcFps); lastSrc = si; }
+        if (si !== lastSrc) { doing('the video'); await seekTo(v, (si + 0.5) / srcFps); lastSrc = si; }
         // the swell fades in from black and the ring-out fades to black (unless a title card is showing)
         const dark = fadeTail && t > to ? smoothFade((t - to) / tail) : fadeLead && t < from ? 1 - smoothFade((t - (from - lead)) / lead) : 0;
         if (cam) { const c = cameraFrameAt(p, Math.max(from, Math.min(t, to)), args.duration); r.setView(c.view, [Math.max(c.fade[0], dark), dark > c.fade[0] ? 0 : c.fade[1]]); }
         else if (tail > 0 || lead > 0) r.setView(null, [dark, 0]);
-        const img = await r.capture(videoFrame(v), t);
+        doing('the graphics card');
+        const img = await within(r.capture(videoFrame(v), t), 30, 'The graphics card');
+        doing('the encoder');
         if (pending) await pending;
         pending = sink.frame(img.data);
+        done = i + 1;
+        doing('');
         if (i % 6 === 0 || i === frames - 1) {
           const el = (performance.now() - t0) / 1000;
           let preview: string | undefined;
@@ -231,7 +257,10 @@ export async function runExport(args: {
           args.onProgress({ phase, done: i + 1, total: frames, elapsed: el, eta: (el / (i + 1)) * (frames - i - 1), preview, note });
         }
       }
+      doing('the encoder');
       if (pending) await pending;
+      doing('');
+      } finally { clearInterval(watch); }
       saved.push(await sink.finish());
       break;
       } catch (e) {

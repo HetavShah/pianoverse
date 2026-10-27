@@ -809,3 +809,4 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .sound-wave.updating canvas { opacity: 0.45; transition: opacity 0.2s; }
 .sound-wave-updating { position: absolute; top: 6px; right: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; background: var(--ground); border: 1px solid var(--rule-2); color: var(--paper); pointer-events: none; }
 .ex-note { color: var(--warn); font-size: 12px; line-height: 1.45; }
+.ex-wait { display: inline-flex; align-items: center; gap: 8px; color: var(--stone); font-size: 12px; }

@@ -95,11 +95,13 @@ export default function ExportStep({ ws }: { ws: WS }) {
     let note: string | undefined;
     try {
       r.setProject(project);
-      const files = await runExport({
+      // a held Web Lock keeps the page from being frozen while the window is in the background
+      const hold = <T,>(job: () => Promise<T>): Promise<T> => (navigator.locks ? navigator.locks.request('pianoverse-export', job) as Promise<T> : job());
+      const files = await hold(() => runExport({
         renderer: r, video: v, project, duration, settings: s, encoders: enc, sink, range: part,
         onProgress: (p) => { if (p.note) note = p.note; setRun({ kind: 'running', p }); if (p.preview) setThumb(p.preview); },
         cancelled: () => cancel.current,
-      });
+      }));
       setRun({ kind: 'done', files, secs: (performance.now() - t0) / 1000, note });
     } catch (e) {
       const m = String((e as Error)?.message ?? e);
@@ -243,9 +245,10 @@ export default function ExportStep({ ws }: { ws: WS }) {
           <div className="ex-progress">
             <div className="row">
               <span>{run.p ? (run.p.phase === 'sound' ? 'Preparing the sound…' : <>{run.p.phase === 'effects' ? 'Effects only ' : 'Rendering '}<span className="mono">{run.p.done.toLocaleString('en-US')} / {run.p.total.toLocaleString('en-US')}</span></>) : 'Starting…'}</span>
-              <span className="mono dim">{run.p && run.p.done > 10 ? `${fmtDur(run.p.eta)} left` : ''}</span>
+              <span className="mono dim">{run.p?.waiting ? '' : run.p && run.p.done > 10 ? `${fmtDur(run.p.eta)} left` : ''}</span>
             </div>
             <div className="bar"><i style={{ width: `${run.p ? (100 * run.p.done) / run.p.total : 0}%` }} /></div>
+            {run.p?.waiting && <small className="ex-wait"><span className="spinner" />Waiting for {run.p.waiting}…</small>}
             {run.p?.note && <small className="ex-note">{run.p.note}</small>}
             <div className="row"><span /><button type="button" className="btn small" onClick={() => { cancel.current = true; }}><Icon name="cancel" />Cancel</button></div>
           </div>
