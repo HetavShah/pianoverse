@@ -26,6 +26,7 @@ export class ParticleSystem implements LightLayer {
   private flowBuf: GPUBuffer;
   private partBuf: GPUBuffer;
   private simUni: GPUBuffer;
+  private lights: GPUBuffer | null = null;
   private drawUni: GPUBuffer;
   private simPipe: GPUComputePipeline;
   private drawPipe: GPURenderPipeline;
@@ -83,7 +84,10 @@ export class ParticleSystem implements LightLayer {
     // Sim header: time (written over the first word), emitters, slots per emitter, shapes ready
     this.gpu.write(this.simUni, new Uint32Array([0, this.alive, PER_EMIT, usesShapes && this.shapes.isLoaded ? 1 : 0]));
     this.gpu.write(this.simUni, new Float32Array([t]));
-    this.gpu.write(this.simUni, simParams(lk), 16);
+    this.gpu.write(this.simUni, simParams(lk, m.up), 16);
+    // the lights where notes land (floating dust shows only where they light it)
+    this.lights = f.lights;
+    this.gpu.write(this.simUni, new Float32Array([f.lightCount]), 30 * 4);
     this.gpu.write(this.drawUni, particleDrawParams(lk));
     return this.alive > 0;
   }
@@ -92,10 +96,10 @@ export class ParticleSystem implements LightLayer {
 
   /** compute every live particle's position */
   simulate(enc: GPUCommandEncoder) {
-    if (!this.alive) return;
+    if (!this.alive || !this.lights) return;
     const cp = enc.beginComputePass();
     cp.setPipeline(this.simPipe);
-    cp.setBindGroup(0, this.gpu.groups.get(this.simPipe, 0, [this.simUni, this.emitBuf, this.flowBuf, this.partBuf, this.shapes.buffer]));
+    cp.setBindGroup(0, this.gpu.groups.get(this.simPipe, 0, [this.simUni, this.emitBuf, this.flowBuf, this.partBuf, this.shapes.buffer, this.lights]));
     cp.dispatchWorkgroups(Math.ceil((this.alive * PER_EMIT) / 64));
     cp.end();
   }

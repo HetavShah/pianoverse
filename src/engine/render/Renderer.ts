@@ -177,7 +177,7 @@ export class Renderer {
     this.writeFrame(m, scene, offscreen);
 
     // every layer uploads its part, the particles are simulated, then the light layer is drawn in order
-    const f: FrameData = { frameBuf: this.frameBuf, scene, layers: this.layers, offscreen };
+    const f: FrameData = { frameBuf: this.frameBuf, scene, layers: this.layers, offscreen, lights: this.lightsBuf, lightCount: scene.lights.count };
     const shown = this.lightLayers.filter((l) => l.prepare(m, f));
     const enc = this.gpu.device.createCommandEncoder();
     this.particles.simulate(enc);

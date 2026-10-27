@@ -22,6 +22,9 @@ export interface FrameData {
   layers: Layers;
   /** the frame is being captured (export): videos are seeked, not played */
   offscreen: boolean;
+  /** this frame's lights where notes land (8 floats each: x, y, radius, strength, colour), and how many */
+  lights: GPUBuffer;
+  lightCount: number;
 }
 
 export interface LightLayer {

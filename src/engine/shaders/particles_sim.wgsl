@@ -15,7 +15,7 @@ struct Params {
   speed: f32, turbX: f32, turbY: f32, turbZ: f32,
   freq: f32, evo: f32, octaves: f32, octScale: f32,
   octMul: f32, spread: f32, rays: f32, rayLen: f32,
-  sparkFan: f32, smokeFountain: f32, pad3: f32, pad4: f32,   // layer styles (see layered)
+  sparkFan: f32, smokeFountain: f32, nLights: f32, pad4: f32,   // layer styles (see layered); lights where notes land
 };
 
 @group(0) @binding(0) var<uniform> PP: Params;
@@ -31,7 +31,8 @@ fn sky(v: vec2f) -> vec2f {
 @group(0) @binding(1) var<storage, read> emitters: array<Emitter>;
 @group(0) @binding(2) var<storage, read> flow: array<vec4f>;   // 0..9: kx, ky, amplitude, omega; 10..19: phase
 @group(0) @binding(3) var<storage, read_write> parts: array<Particle>;
-@group(0) @binding(4) var<storage, read> shape: array<vec4f>;   // outline points in drawing order: x, y, outline start, outline count (< 0: open)
+@group(0) @binding(4) var<storage, read> shape: array<vec4f>;
+@group(0) @binding(5) var<storage, read> lights: array<vec4f>;   // per light: (x, y, radius, strength), (colour, 0)   // outline points in drawing order: x, y, outline start, outline count (< 0: open)
 
 fn pcg(v: u32) -> u32 {
   let s = v * 747796405u + 2891336453u;
@@ -476,23 +477,31 @@ fn ambient(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let upv = vec2f(E.life, E.rate);
   let along = E.vel - E.pos;
   let s0 = rnd(st);
-  // in the air above the keys, not on the saber line: from about one key's length up (against a dark piano, dust
-  // sitting on the line looks like stray specks)
-  let h0 = (0.1 + 0.9 * pow(rnd(st), 1.3)) * H;
+  let h0 = pow(rnd(st), 1.6) * H;
   let ph = rnd(st) * 6.2831853;
   let rise = (0.25 + 0.5 * rnd(st)) * u * PP.rise;
   let side = (gaussR(st) * 0.3 + PP.wind) * u / max(length(along), 1.0);
-  let h = 0.1 * H + (h0 - 0.1 * H + rise * t) % (0.9 * H);   // drift up, wrapping back down
+  let h = (h0 + rise * t) % H;                     // drift up, wrapping back to the keys
   let s = fract(s0 + side * t);
   var p = E.pos + along * s + upv * h + vec2f(sin(t * 0.37 + ph), cos(t * 0.29 + ph * 1.7)) * u * 0.5;
   // fade towards the top of the band and the keyboard's ends, so neither the wrap nor the band's edge is seen
   let fy = h / H;
-  let edge = smoothstep(0.1, 0.3, fy) * (1.0 - smoothstep(0.5, 1.0, fy)) * smoothstep(0.0, 0.06, s) * smoothstep(1.0, 0.94, s);
+  let edge = smoothstep(0.0, 0.08, fy) * (1.0 - smoothstep(0.45, 1.0, fy)) * smoothstep(0.0, 0.06, s) * smoothstep(1.0, 0.94, s);
   let tw = 0.5 + 0.5 * sin(t * (0.8 + 2.5 * rnd(st)) + ph);
+  // dust is only seen where light catches it: near the keys being played (the lights where notes land), across the
+  // whole height of their lanes. Away from the notes it stays dark, so it never sits on the piano as stray glitter
+  let L = along / max(length(along), 1.0);
+  var lit = 0.0;
+  for (var i = 0u; i < u32(PP.nLights); i++) {
+    let Lt = lights[2u * i];
+    let d = dot(p - Lt.xy, L) / max(Lt.z * 1.4, 1.0);
+    lit += Lt.w * exp(-d * d);
+  }
+  let seen = clamp(lit * 1.8, 0.0, 1.0);
   var o: Particle;
   o.pos = p;
   o.vel = vec2f(0.0);
-  o.b = (0.25 + 0.5 * rnd(st)) * mix(1.0, tw * tw, PP.twinkle) * edge;
+  o.b = (0.25 + 0.5 * rnd(st)) * mix(1.0, tw * tw, PP.twinkle) * edge * seen;
   o.star = select(0.0, 1.0, rnd(st) < 0.004 * PP.stars);
   o.z = -1.05;                                  // finer than any other particle
   o.pad = 0.0;

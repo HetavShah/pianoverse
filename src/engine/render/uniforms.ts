@@ -111,10 +111,12 @@ export function lightingParams(m: DrawModel, off: boolean): Float32Array {
   ]);
 }
 
-/** Sim (particles_sim.wgsl), from byte 16: how particles move */
-export function simParams(lk: Look): Float32Array {
+/** Sim (particles_sim.wgsl), from byte 16: the way notes fall from (up), and how particles move. The light count
+ * (word 30) is written each frame by ParticleSystem. */
+export function simParams(lk: Look, up: [number, number]): Float32Array {
+  const ul = Math.hypot(up[0], up[1]) || 1;
   return new Float32Array([
-    0, -1, 0, 0, // glitter rises straight up the screen
+    up[0] / ul, up[1] / ul, 0, 0, // straight up the screen unless the notes come in at an angle (direction.ts)
     lk.partSwirl, lk.partWind, lk.partGravity, lk.partLife, lk.partRise, lk.partTwinkle, lk.partStars, lk.partColor,
     lk.partSpeed, lk.partTurbX, lk.partTurbY, lk.partTurbZ,
     lk.partTurbFreq, lk.partTurbEvo, Math.round(lk.partOctaves), lk.partOctScale,
