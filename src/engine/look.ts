@@ -213,6 +213,9 @@ export interface Look {
   partSparks: number; // extra layers on every hit: sparks that arc and fall,
   partGlitter: number; // fine glitter that hangs and twinkles,
   partGlow: number; // and soft glows that rise
+  partSparkStyle: 'trails' | 'fan'; // a few long curving trails, or a wide fan of short white sparks
+  partSmokeStyle: 'haze' | 'fountain'; // faint haze that rises, or smoke that arcs up and falls like a fountain
+  partAmbient: number; // fine dust floating above the keys all the time (0 = none)
   partRayLen: number;
   // background
   bgDarken: number;
@@ -262,7 +265,7 @@ export const DEFAULT_LOOK: Look = {
   keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
   partAmount: 1, partRise: 1, partSwirl: 1, partWind: 0, partGravity: 0, partLife: 1, partSize: 1, partTwinkle: 1, partHaze: 1, partStars: 1, partColor: 1, partVelocity: true,
   partSpeed: 1, partMode: 'plume', partShape: 'heart', partShapeSize: 1, partShapeHold: 1, partShapeDir: 'cw', partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
-  partSpread: 0, partOpacity: 1, partAlphaF: 0, partAdditive: 1, partBright: 1, partRays: false, partRayLen: 1, partSparks: 1, partGlitter: 1, partGlow: 1,
+  partSpread: 0, partOpacity: 1, partAlphaF: 0, partAdditive: 1, partBright: 1, partRays: false, partRayLen: 1, partSparks: 1, partGlitter: 1, partGlow: 1, partSparkStyle: 'trails', partSmokeStyle: 'haze', partAmbient: 0,
   bgDarken: 1, bgContrast: 1, bgSaturation: 1, bgVignette: 1,
   footOpacity: 1, footScale: 1, footX: 0, footY: 0, footRot: 0, footCropT: 0, footCropB: 0, footCropL: 0, footCropR: 0, footBright: 0, footHue: 0,
   bgColorOn: false, bgColor: '#000000', bgImageOn: false, bgImage: '',
@@ -588,7 +591,10 @@ export const LOOK_SCHEMA: Record<LayerId, Section[]> = {
     { title: 'Layers on every hit', controls: [
       { key: 'partSparks', kind: 'slider', label: 'Sparks', min: 0, max: 3, step: 0.01, fmt: pct, hint: 'Bright sparks that fly out and fall' },
       { key: 'partGlitter', kind: 'slider', label: 'Glitter', min: 0, max: 3, step: 0.01, fmt: pct, hint: 'Fine dust that hangs in the air and twinkles' },
-      { key: 'partGlow', kind: 'slider', label: 'Glow', min: 0, max: 3, step: 0.01, fmt: pct, hint: 'Soft light that rises from each key' },
+      { key: 'partGlow', kind: 'slider', label: 'Glow and smoke', min: 0, max: 3, step: 0.01, fmt: pct, hint: 'Soft light and smoke from each key' },
+      { key: 'partSparkStyle', kind: 'select', label: 'Sparks', segmented: true, options: [{ value: 'trails', label: 'Long trails' }, { value: 'fan', label: 'Fan' }] },
+      { key: 'partSmokeStyle', kind: 'select', label: 'Smoke', segmented: true, options: [{ value: 'haze', label: 'Rising haze' }, { value: 'fountain', label: 'Fountain' }] },
+      { key: 'partAmbient', kind: 'slider', label: 'Floating dust', min: 0, max: 2, step: 0.01, fmt: pct, hint: 'Fine dust hanging above the keys the whole time' },
     ] },
     { title: 'Particle turbulence', fold: true, controls: [
       { key: 'partSwirl', kind: 'slider', label: 'Turbulence', min: 0, max: 3, step: 0.01, fmt: pct },
@@ -689,23 +695,38 @@ export interface Preset { id: string; name: string; builtIn?: boolean; look: Par
 
 const parts = (id: string) => PARTICLE_PRESETS.find((p) => p.id === id)!.set;
 /** the looks in the gallery: each a complete style (colours, notes, saber, particles, finish) */
+// Two ways of drawing particles, after the two best-known piano visualisers:
+// fountain (Patrik Pietschmann): smoke thrown up from each key that arcs over and sinks, a fan of short white sparks,
+//   fine dust hanging in the air the whole time;
+// concert (Rousseau): compact clouds of coloured dust with white-hot centres, a few long curving trails, a faint
+//   rising haze, a star of light on each key and a saber lit only where you play.
+const fountainStyle: Partial<Look> = {
+  ...parts('fountain'), partAmount: 0.3, partSize: 0.8, partRays: false,
+  partSparkStyle: 'fan', partSparks: 1.2, partSmokeStyle: 'fountain', partGlow: 1.5, partGlitter: 0.3, partAmbient: 1.1,
+  flashStar: 0.6, saberIdle: 0.25,
+};
+const concertStyle: Partial<Look> = {
+  ...parts('default'), partRays: false, partColor: 1.2,
+  partSparkStyle: 'trails', partSparks: 1.2, partSmokeStyle: 'haze', partGlow: 1, partGlitter: 1.1, partAmbient: 0.35,
+  flashStar: 1.1, saberIdle: 0.08,
+};
+/** the looks in the gallery: each a complete style (colours, notes, saber, particles, finish) */
 export const BUILT_IN_PRESETS: Preset[] = ([
-  { id: 'interstellar-teal', name: 'Interstellar Teal', look: {} },
-  { id: 'ember', name: 'Ember', look: { palette: 'ember', saberStyle: 'flame', ...parts('explode'), noteGlow: 1.2, bloom: 1.15, relight: 1.3, partSparks: 2 } },
-  { id: 'neon-night', name: 'Neon Night', look: { palette: 'neon', noteDim: '2d', note2d: 'hollow', saberStyle: 'electric', ...parts('streaks'), bloom: 1.35, fringe: 1.8, bgDarken: 1.5, bgSaturation: 0.55 } },
-  { id: 'aurora', name: 'Aurora', look: { palette: 'aurora', gradMap: 'time', colorCycle: 16, noteDim: '2d', note2d: 'soft', saberStyle: 'soft', ...parts('twirl'), bloomWide: 1.4 } },
-  { id: 'swan', name: 'Swan', look: { palette: 'swan', saberStyle: 'soft', ...parts('default'), partColor: 0.2, partAmount: 0.75, partStars: 1.6, bgSaturation: 0.45, relight: 0.6, saberIdle: 0.15 } },
-  { id: 'gold-leaf', name: 'Gold Leaf', look: { palette: 'gold', texOn: true, noteTexture: 'foil', texMode: 'natural', saberStyle: 'straight', saberCustom: true, saberColor: '#ffd27a', ...parts('streaks'), partColor: 0.8, bgSaturation: 0.7, saberIdle: 0.2, partSparks: 1.6 } },
-  { id: 'ink', name: 'Ink', look: { colorBy: 'single', colorA: '#f2efe8', noteDim: '2d', note2d: 'filled', saberStyle: 'straight', saberCustom: true, saberColor: '#ffffff', ...parts('fast'), partColor: 0, bgSaturation: 0, bgContrast: 1.35, grain: 2, bloom: 0.6, relight: 0.4, saberIdle: 0.1 } },
-  { id: 'synthwave', name: 'Synthwave', look: { palette: 'synthwave', note3d: 'angled', saberStyle: 'electric', ...parts('straight'), fringe: 2.2, bgVignette: 1.5, bgSaturation: 0.7 } },
-  { id: 'ocean-gem', name: 'Ocean Gem', look: { palette: 'ocean', note3d: 'gem', ...parts('fountain') } },
+  { id: 'interstellar-teal', name: 'Interstellar Teal', look: { ...fountainStyle, noteRound: 1.4 } },
   { id: 'concert', name: 'Concert', look: {
-    palette: 'gold', noteDim: '2d', note2d: 'filled', noteRound: 1.92, noteGlow: 0.6, noteOpacity: 0.95, noteRim: 0.6,
+    ...concertStyle, palette: 'gold', noteDim: '2d', note2d: 'filled', noteRound: 1.92, noteGlow: 0.6, noteOpacity: 0.95, noteRim: 0.6,
     saberStyle: 'straight', saberIdle: 0.06, saberCustom: true, saberColor: '#d9d4ff', saberThick: 0.8, saberTint: 1,
-    flashStar: 1.3, flashSize: 1.3, streakLen: 0.6, keyBright: 1.3, relight: 1.5,
-    ...parts('default'), partColor: 1.25, partSparks: 1.3, partGlitter: 1.2, partGlow: 1.2,
+    flashStar: 1.3, flashSize: 1.3, streakLen: 0.6, keyBright: 1.3, relight: 1.5, partColor: 1.25, partSparks: 1.3, partGlitter: 1.2, partGlow: 1.2,
     bgDarken: 1.6, bgSaturation: 0.4, bloom: 1.1 } },
-  { id: 'crystal', name: 'Crystal', look: { palette: 'swan', texOn: true, noteTexture: 'crystal', texMode: 'glow', saberStyle: 'soft', ...parts('turb'), partColor: 0.5, saberIdle: 0.12, partGlitter: 1.8 } },
+  { id: 'ember', name: 'Ember', look: { ...concertStyle, palette: 'ember', saberStyle: 'flame', saberIdle: 0.15, noteGlow: 1.2, bloom: 1.15, relight: 1.4, partSparks: 1.6, partGlitter: 1.3, bgSaturation: 0.5 } },
+  { id: 'neon-night', name: 'Neon Night', look: { ...fountainStyle, palette: 'neon', noteDim: '2d', note2d: 'hollow', noteRound: 1.2, saberStyle: 'electric', partGlow: 1.3, partAmbient: 1.2, bloom: 1.35, fringe: 1.8, bgDarken: 1.5, bgSaturation: 0.55 } },
+  { id: 'aurora', name: 'Aurora', look: { ...fountainStyle, palette: 'aurora', gradMap: 'time', colorCycle: 16, noteDim: '2d', note2d: 'soft', saberStyle: 'soft', partSmokeStyle: 'fountain', partGlow: 1.4, partSparks: 0.6, partAmbient: 1.5, bloomWide: 1.4 } },
+  { id: 'swan', name: 'Swan', look: { ...concertStyle, palette: 'swan', saberStyle: 'soft', saberIdle: 0.15, partColor: 0.25, partAmount: 0.75, partStars: 1.6, partGlitter: 1.4, partSparks: 0.8, partAmbient: 0.6, bgSaturation: 0.45, relight: 0.6 } },
+  { id: 'gold-leaf', name: 'Gold Leaf', look: { ...concertStyle, palette: 'gold', texOn: true, noteTexture: 'foil', texMode: 'natural', saberStyle: 'straight', saberCustom: true, saberColor: '#ffd27a', saberIdle: 0.2, partColor: 0.9, partSparks: 1.6, flashStar: 1, partAmbient: 0.5, bgSaturation: 0.7 } },
+  { id: 'ink', name: 'Ink', look: { ...fountainStyle, colorBy: 'single', colorA: '#f2efe8', noteDim: '2d', note2d: 'filled', noteRound: 1.2, saberStyle: 'straight', saberCustom: true, saberColor: '#ffffff', saberIdle: 0.1, partColor: 0, partGlow: 0.5, partAmbient: 0.8, bgSaturation: 0, bgContrast: 1.35, grain: 2, bloom: 0.6, relight: 0.4 } },
+  { id: 'synthwave', name: 'Synthwave', look: { ...fountainStyle, palette: 'synthwave', note3d: 'angled', saberStyle: 'electric', fringe: 2.2, bgVignette: 1.5, bgSaturation: 0.7 } },
+  { id: 'ocean-gem', name: 'Ocean Gem', look: { ...fountainStyle, palette: 'ocean', note3d: 'gem', partGlow: 1.4, partAmbient: 1.2 } },
+  { id: 'crystal', name: 'Crystal', look: { ...concertStyle, palette: 'swan', texOn: true, noteTexture: 'crystal', texMode: 'glow', saberStyle: 'soft', saberIdle: 0.12, ...parts('turb'), partColor: 0.5, partGlitter: 1.8, partSparks: 0.8, partAmbient: 1 } },
 ] as Preset[]).map((p) => ({ ...p, builtIn: true }));
 
 /** settings that belong to a video rather than a look (kept when a preset is applied) */

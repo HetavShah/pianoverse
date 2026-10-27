@@ -15,6 +15,7 @@ struct Params {
   speed: f32, turbX: f32, turbY: f32, turbZ: f32,
   freq: f32, evo: f32, octaves: f32, octScale: f32,
   octMul: f32, spread: f32, rays: f32, rayLen: f32,
+  sparkFan: f32, smokeFountain: f32, pad3: f32, pad4: f32,   // layer styles (see layered)
 };
 
 @group(0) @binding(0) var<uniform> PP: Params;
@@ -303,8 +304,8 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   o.vel = vel;
   o.b = (0.85 + 0.6 * rnd(st)) * (0.75 + 0.45 * E.vn) * b * tw;
   o.star = select(0.0, 1.0, !isDust && rnd(st) < 0.03 * PP.stars);
-  o.z = 0.0;
-  o.pad = 0.0;
+  o.z = select(0.0, -0.7, isDust);
+  o.pad = 3.0;                                  // dots only: a shape traced in streaks reads as scratches
   o.col = vec4f(mix(vec3f(1.0), vec3f(0.22) + E.col * 0.78, PP.colorMix), tw);
   return o;
 }
@@ -325,6 +326,24 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let base = atan2(up.y, up.x);
   let tint = mix(vec3f(1.0), vec3f(0.2) + E.col * 0.8, PP.colorMix);
   var o: Particle;
+  if (kf < nS && PP.sparkFan > 0.5) {
+    // fan: a wide spray of short white sparks that shoot out of the key, slow quickly and burn out
+    let ts = E.start + rnd(st) * 0.03;
+    let plife = (0.22 + 0.45 * rnd(st)) * PP.lifeMul;
+    let age = t - ts;
+    if (age < 0.0 || age > plife) { return off; }
+    let a = base + gaussR(st) * 0.7;
+    let v0 = vec2f(cos(a), sin(a)) * u * (9.0 + 14.0 * rnd(st)) * (0.75 + 0.5 * E.vn) * PP.speed;
+    let kd = 3.4;
+    let ex = 1.0 - exp(-kd * age);
+    let g = vec2f(PP.wind * u * 2.0, u * 7.0 * (1.0 + PP.gravity));
+    let pos = E.pos + v0 * ex / kd + 0.5 * g * age * age;
+    let vel = v0 * (1.0 - ex) + g * age;
+    let bright = (2.2 + 1.6 * rnd(st)) * (0.8 + 0.5 * E.vn);
+    o = finishP(pos, vel, age, plife, bright, 0.0, mix(E.col, vec3f(1.0), 0.8), st);
+    o.pad = 1.3;                                  // a short, thin streak
+    return o;
+  }
   if (kf < nS) {
     // trail: a bright head that shoots up from the key, slowing and bending a little, a fading tail behind it
     let ts = E.start + rnd(st) * 0.06;
@@ -381,6 +400,30 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     o.col = vec4f(mix(E.col, vec3f(1.0), 0.75), 1.0);
     return o;
   }
+  if (kf < nS + nD + nG && PP.smokeFountain > 0.5) {
+    // fountain smoke: soft plumes thrown up from the key that arc over and sink, like a palm or a fountain
+    let plife = (1.7 + 1.1 * rnd(st)) * PP.lifeMul;
+    let ts = E.start + rnd(st) * 0.08;
+    let age = t - ts;
+    if (age < 0.0 || age > plife) { return off; }
+    // each puff leaves the key on its own path: up a column, then curling out to one side and sinking
+    let a = base + gaussR(st) * 0.5;
+    let v0 = vec2f(cos(a), sin(a)) * u * (7.0 + 6.0 * rnd(st)) * PP.rise * (0.8 + 0.4 * E.vn);
+    let kd = 0.75;
+    let ex = 1.0 - exp(-kd * age);
+    let g = vec2f(PP.wind * u * 1.5, u * 2.4 * (1.0 + PP.gravity));
+    var pos = E.pos + v0 * ex / kd + 0.5 * g * age * age;
+    pos += turbVel(pos, t) * age * 0.15 * PP.swirl;
+    let env = smoothstep(0.0, 0.35, age) * pow(clamp(1.0 - age / plife, 0.0, 1.0), 1.2);
+    o.pos = pos;
+    o.vel = vec2f(0.0);
+    o.b = env * (0.1 + 0.08 * E.vn);               // faint: the plumes build up where they overlap
+    o.star = 0.0;
+    o.z = u * (0.35 + 0.25 * rnd(st)) * (1.0 + 1.8 * age);   // radius in video px, swelling as it spreads
+    o.pad = 2.0;
+    o.col = vec4f(E.col * 0.85, 1.0);
+    return o;
+  }
   if (kf < nS + nD + nG) {
     // glow: a soft light that rises from the hit and fades, lighting the air above the key
     // smoke: a faint tinted haze that swells as it rises and lingers behind the dots
@@ -401,6 +444,36 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     return o;
   }
   return off;
+}
+
+// FLOATING DUST: fine specks spread over the space above the keys (pos..vel is that box), drifting slowly up and
+// sideways and twinkling, there all the time. count = how many; pad0 = pixels per key.
+fn ambient(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
+  var off: Particle;
+  off.pos = vec2f(-10000.0);
+  off.b = 0.0;
+  if (f32(k) >= E.count) { return off; }
+  let lo = E.pos;
+  let sz = max(E.vel - E.pos, vec2f(1.0));
+  let u = E.pad0;
+  let p0 = lo + vec2f(rnd(st), rnd(st)) * sz;
+  let drift = vec2f(gaussR(st) * 0.35 + PP.wind, -(0.25 + 0.5 * rnd(st)) * PP.rise) * u;
+  let ph = rnd(st) * 6.2831853;
+  var p = p0 + drift * t + vec2f(sin(t * 0.37 + ph), cos(t * 0.29 + ph * 1.7)) * u * 0.6;
+  p = lo + ((p - lo) % sz + sz) % sz;              // wrap round the box
+  // dimmer near the box's top and bottom, so the wrap is never seen
+  let fy = (p.y - lo.y) / sz.y;
+  let edge = smoothstep(0.0, 0.12, fy) * smoothstep(1.0, 0.8, fy);
+  let tw = 0.5 + 0.5 * sin(t * (0.8 + 2.5 * rnd(st)) + ph);
+  var o: Particle;
+  o.pos = p;
+  o.vel = vec2f(0.0);
+  o.b = (0.25 + 0.5 * rnd(st)) * mix(1.0, tw * tw, PP.twinkle) * edge;
+  o.star = select(0.0, 1.0, rnd(st) < 0.004 * PP.stars);
+  o.z = -1.05;                                  // finer than any other particle
+  o.pad = 0.0;
+  o.col = vec4f(mix(vec3f(1.0), E.col, 0.35 * PP.colorMix), 1.0);
+  return o;
 }
 
 @compute @workgroup_size(64)
@@ -435,7 +508,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     else if (E.kind < 3.5) { p = spray(E, k, t, &st); }
     else if (E.kind < 4.5) { p = vortex(E, k, t, &st); }
     else if (E.kind < 5.5) { p = shapeP(E, k, t, &st); }
-    else { p = layered(E, k, t, &st); }
+    else if (E.kind < 6.5) { p = layered(E, k, t, &st); }
+    else { p = ambient(E, k, t, &st); }
     parts[id] = p;
     return;
   }

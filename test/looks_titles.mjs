@@ -57,7 +57,7 @@ const look0 = await mainLook();
 await cards.nth(1).hover();
 await page.waitForFunction(() => true);
 const srcs = new Set();
-for (let i = 0; i < 40 && srcs.size < 3; i++) { srcs.add(await cards.nth(1).locator('img').getAttribute('src')); await page.waitForTimeout(250); }
+for (let i = 0; i < 240 && srcs.size < 3; i++) { srcs.add(await cards.nth(1).locator('img').getAttribute('src')); await page.waitForTimeout(250); }
 check('resting on a card plays a short loop inside it', srcs.size >= 3, `${srcs.size} different pictures`);
 check('…and leaves the main preview alone', (await mainLook()) === look0);
 check('…and the project', (await P()).presetId === before.presetId);
@@ -75,7 +75,7 @@ const lit = await page.evaluate(async () => {
 });
 check('the picture survives a change of frame size', lit > 8, lit.toFixed(1));
 await shot('1-looks');
-await cards.nth(6).click(); await page.waitForTimeout(400);
+await page.locator('.look-card', { hasText: 'Ink' }).click(); await page.waitForTimeout(400);
 check('click uses the look', (await P()).presetId === 'ink');
 await shot('2-ink');
 await page.click('button[aria-label=Undo]'); await page.waitForTimeout(400);

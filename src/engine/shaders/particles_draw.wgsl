@@ -18,7 +18,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
   let P = parts[ii];
   if (P.b < 0.01) { o.pos = OFFSCREEN; return o; }
   let c0 = corner(vi) * 2.0 - vec2f(1.0);
-  if (P.pad > 1.5) {
+  if (P.pad > 1.5 && P.pad < 2.5) {
     // a soft glow (radius in z)
     let gh = P.z * 2.6;
     o.pos = toClip(P.pos + c0 * gh);
@@ -33,7 +33,8 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
   if (isStar) { half = 24.0 * F.partSize; }
   var zs = max(0.2, 1.0 + 0.5 * P.z);
   // mixed sizes: most dots small and crisp, one in sixteen a larger, brighter ball
-  let spark = P.pad > 0.5;
+  let spark = P.pad > 0.5 && P.pad < 1.5;         // 1 = long trail, 1.3 = short fan spark
+  let dotOnly = P.pad > 2.5;                       // shape particles
   var bmul = 1.0;
   if (!spark && !isStar) {
     let hv = fract(sin(f32(ii) * 91.345 + 3.1) * 47453.5453);
@@ -45,10 +46,10 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
   o.local = c * half;
   o.ray = vec4f(0.0, 0.0, 0.0, zs);
   let sp = length(P.vel);
-  if ((DP.rays > 0.5 || spark) && sp > 1.0 && !isStar) {
+  if ((DP.rays > 0.5 || spark) && !dotOnly && sp > 1.0 && !isStar) {
     // a streak along the particle's motion; trails put the particle at the head with a tail behind
     let dir = P.vel / sp;
-    let len = max(half, sp * select(0.045 * DP.rayLen, 0.28, spark) * F.partSize);
+    let len = max(half, sp * select(0.045 * DP.rayLen, select(0.28, 0.06, P.pad > 1.15), spark) * F.partSize);
     let nrm = vec2f(-dir.y, dir.x);
     let back = select(0.0, len, spark);
     p = P.pos - dir * back + dir * (c.x * (len + half)) + nrm * (c.y * half);
