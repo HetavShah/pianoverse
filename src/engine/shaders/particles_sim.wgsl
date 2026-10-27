@@ -367,8 +367,8 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     return o;
   }
   if (kf < nS + nD) {
-    // glitter: a loose cloud around the hit that drifts up with the air and twinkles
-    let ts = E.start + rnd(st) * 0.3;
+    // glitter: a loose cloud around the hit that drifts up with the air and twinkles (born while the key is down)
+    let ts = E.start + rnd(st) * min(0.3, max(E.pad1, 0.02));
     let plife = (1.3 + 1.9 * rnd(st)) * PP.lifeMul;
     let age = t - ts;
     if (age < 0.0 || age > plife) { return off; }

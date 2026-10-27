@@ -497,6 +497,8 @@ export class Renderer {
     this.shapeKeys = [lk.partShape || 'heart', ...this.scenes.map((sc) => sc.shape || 'heart')];
     for (const n of this.notes) {
       const scene = this.scenes.findIndex((sc) => n.s >= sc.start && n.s < sc.end);
+      // particles are only born while the key is down (those already in the air finish their flight)
+      const dur = Math.max(0.05, n.e - n.s);
       const sc = scene >= 0 ? this.scenes[scene] : null;
       kb.H = trackingMatrix(this.proj, Math.round(n.s * this.proj.video.fps));
       const tg = kb.target(n.p);
@@ -511,7 +513,7 @@ export class Renderer {
         const nG = lk.partGlow > 0 ? 1 + Math.round((lk.partSmokeStyle === 'fountain' ? 14 + 10 * vv : 1 + vv) * lk.partGlow) : 0;
         if (nS + nD + nG > 0) {
           const k = Math.min(1, (PER_EMIT - 8) / (nS + nD + nG));
-          rows.push({ start: n.s, end: n.s + 0.4 + 3.4 * lk.partLife, data: [n.s, Math.round(nG * k), Math.round(nS * k), Math.round(nD * k), tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 13, 6, tg.unit, 0] });
+          rows.push({ start: n.s, end: n.s + 0.4 + 3.4 * lk.partLife, data: [n.s, Math.round(nG * k), Math.round(nS * k), Math.round(nD * k), tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 13, 6, tg.unit, dur] });
         }
       }
       const jobs: { mode: string; slot: number; dir: number; size: number }[] = [];
@@ -522,12 +524,12 @@ export class Renderer {
       const shapeDir = job.dir, shapeSize = job.size;
       const rnd = mulberry32(n.idx * 7919 + 101 + slot * 31);
       if (mode !== 'plume') {
-        const held = Math.min(4, Math.max(0.2, n.e - n.s));
+        const held = Math.min(4, dur);
         const slope = Math.abs(tg.along[0]) > 1e-3 ? tg.along[1] / tg.along[0] : 0;
         if (mode === 'fountain') {
           const sp = tg.unit * 13 * lk.partSpeed * (0.85 + 0.3 * vv);
           const G = (sp * sp) / (2 * tg.unit * 7 * Math.max(0.2, lk.partRise));
-          const life = Math.min(Math.max(held, 0.35), 2.5);
+          const life = Math.min(held, 2.5);
           const rate = Math.min(1000 / life, 420 * (0.6 + 0.8 * vv) * lk.partAmount);
           if (rate > 0) rows.push({ start: n.s, end: n.s + life + 2.5 * lk.partLife, data: [n.s, life, rate, 0, tg.x, tg.y, 0, -sp, ...n.col, vv, n.idx * 16, 2, slope, G] });
         } else if (mode === 'spray') {
@@ -553,7 +555,7 @@ export class Renderer {
           const ends = [kb.P(0, kb.edgeY(0)), kb.P(this.whiteKeys, kb.edgeY(this.whiteKeys))];
           const half = Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) / 2;
           const rate = 320 * (0.6 + 0.8 * vv) * lk.partAmount;
-          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.6 + 4.9 * lk.partLife, data: [n.s, 0.6, rate, 0, tg.x, tg.y, C[0], C[1], ...n.col, vv, n.idx * 16, 4, ang, half * (1 + lk.partSpread)] });
+          if (rate > 0) rows.push({ start: n.s, end: n.s + 0.6 + 4.9 * lk.partLife, data: [n.s, Math.min(0.6, dur), rate, 0, tg.x, tg.y, C[0], C[1], ...n.col, vv, n.idx * 16, 4, ang, half * (1 + lk.partSpread)] });
         }
         continue;
       }
@@ -561,7 +563,7 @@ export class Renderer {
       for (let j = 0; j < streams; j++) {
         const a = gauss(rnd, -Math.PI / 2, 0.32);
         const sp = (170 + 100 * rnd()) * (0.8 + 0.5 * vv) * lk.partRise * lk.partSpeed;
-        const life = (0.9 + 0.7 * rnd()) * (0.8 + 0.5 * vv) * lk.partLife;
+        const life = Math.min(dur, (0.9 + 0.7 * rnd()) * (0.8 + 0.5 * vv) * lk.partLife);
         const rate = (200 + 120 * rnd()) * (0.6 + 0.8 * vv) * lk.partAmount; // sparse, so each dot reads on its own
         if (rate <= 0) continue;
         let ex = tg.x, ey = tg.y;
