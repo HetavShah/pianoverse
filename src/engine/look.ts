@@ -262,7 +262,7 @@ export const DEFAULT_LOOK: Look = {
   saberBright: 1, saberThick: 1, saberFlicker: 1, saberReact: 1, saberIdle: 1, saberTint: 1,
   saberStyle: 'plasma', saberOpacity: 1, saberOffset: 0, saberCustom: false, saberColor: '#8cf5e1',
   flashSize: 1, flashBright: 1, streakLen: 1, streakBright: 1, impactTime: 1.3, flashStar: 0,
-  keyBright: 1, keyAnticipate: 0.5, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
+  keyBright: 1, keyAnticipate: 0, keyHeld: 1, relight: 1, relightRadius: 1, bassPulse: 1,
   partAmount: 1, partRise: 1, partSwirl: 1, partWind: 0, partGravity: 0, partLife: 1, partSize: 1, partTwinkle: 1, partHaze: 1, partStars: 1, partColor: 1, partVelocity: true,
   partSpeed: 1, partMode: 'plume', partShape: 'heart', partShapeSize: 1, partShapeHold: 1, partShapeDir: 'cw', partTurbX: 1, partTurbY: 1, partTurbZ: 0, partTurbFreq: 1, partTurbEvo: 1, partOctaves: 1, partOctScale: 2, partOctMul: 0.5,
   partSpread: 0, partOpacity: 1, partAlphaF: 0, partAdditive: 1, partBright: 1, partRays: false, partRayLen: 1, partSparks: 1, partGlitter: 1, partGlow: 1, partSparkStyle: 'trails', partSmokeStyle: 'haze', partAmbient: 0,

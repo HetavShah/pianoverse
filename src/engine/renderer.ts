@@ -214,7 +214,7 @@ export class Renderer {
     this.blankTex = d.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
     d.queue.writeTexture({ texture: this.blankTex }, new Uint8Array([0, 0, 0, 0]), { bytesPerRow: 4 }, [1, 1]);
     this.glassBuf = buf(MAX_GLASS * 64, U.VERTEX | U.COPY_DST);
-    this.keysBuf = buf(MAX_KEYS * 6 * 28, U.VERTEX | U.COPY_DST);
+    this.keysBuf = buf(MAX_KEYS * 6 * 32, U.VERTEX | U.COPY_DST);
     this.spriteBuf = buf(MAX_SPRITES * 48, U.VERTEX | U.COPY_DST);
     this.labelBuf = buf(MAX_GLASS * 48, U.VERTEX | U.COPY_DST);
     this.atlas = makeAtlas(d);
@@ -255,10 +255,11 @@ export class Renderer {
       layout: 'auto',
       vertex: {
         module: keysM, entryPoint: 'vs',
-        buffers: [{ arrayStride: 28, attributes: [
+        buffers: [{ arrayStride: 32, attributes: [
           { shaderLocation: 0, offset: 0, format: 'float32x2' },
           { shaderLocation: 1, offset: 8, format: 'float32x2' },
           { shaderLocation: 2, offset: 16, format: 'float32x3' },
+          { shaderLocation: 3, offset: 28, format: 'float32' },   // 1 = black key
         ] }],
       },
       fragment: { module: keysM, entryPoint: 'fs', targets: lightTarget },
@@ -614,10 +615,11 @@ export class Renderer {
     const FALL = lk.noteSpeed;
 
     const keyQuad = (p: number, c: RGB) => {
-      if (keys.length / 42 >= MAX_KEYS) return;
-      const qd = kb.footprint(p).quad.map(([x, y]) => kb.P(x, y));
+      if (keys.length / 48 >= MAX_KEYS) return;
+      const fp = kb.footprint(p);
+      const qd = fp.quad.map(([x, y]) => kb.P(x, y));
       const uv = [[0, 0], [1, 0], [1, 1], [0, 1]];
-      for (const i of [0, 1, 2, 0, 2, 3]) keys.push(qd[i][0], qd[i][1], uv[i][0], uv[i][1], c[0], c[1], c[2]);
+      for (const i of [0, 1, 2, 0, 2, 3]) keys.push(qd[i][0], qd[i][1], uv[i][0], uv[i][1], c[0], c[1], c[2], fp.black ? 1 : 0);
     };
     const dot = (x: number, y: number, r: number, c: RGB) => {
       if (sprites.length / 12 < MAX_SPRITES) sprites.push(x, y, r, 0, 0, 0, 0, 0, c[0], c[1], c[2], 0);
@@ -733,10 +735,10 @@ export class Renderer {
       for (const b of this.bars) {
         const s0 = (b - t) * FALL;
         if (s0 < 0 || s0 > sMaxBar) continue;
-        if (keys.length / 42 >= MAX_KEYS) break;
+        if (keys.length / 48 >= MAX_KEYS) break;
         const q = [[A[0] + U[0] * s0, A[1] + U[1] * s0], [B[0] + U[0] * s0, B[1] + U[1] * s0], [B[0] + U[0] * (s0 + th), B[1] + U[1] * (s0 + th)], [A[0] + U[0] * (s0 + th), A[1] + U[1] * (s0 + th)]];
         const uv = [[0, 0], [1, 0], [1, 1], [0, 1]];
-        for (const i of [0, 1, 2, 0, 2, 3]) keys.push(q[i][0], q[i][1], uv[i][0] * 0.4 + 0.3, uv[i][1], c, c, c);
+        for (const i of [0, 1, 2, 0, 2, 3]) keys.push(q[i][0], q[i][1], uv[i][0] * 0.4 + 0.3, uv[i][1], c, c, c, 2); // 2 = not on a key: never masked
       }
     }
 
@@ -833,11 +835,16 @@ export class Renderer {
     const frameGroup = (name: string, pipe: GPURenderPipeline) => this.group('f-' + name, () => d.createBindGroup({
       layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: this.frameBuf } }],
     }));
-    if (keys.length) {
+    if (keys.length && this.videoTex) {
       lp.setPipeline(this.keysPipe);
       lp.setBindGroup(0, frameGroup('keys', this.keysPipe));
+      // the video, so a key lights only on its own surface and fingers over it stay in front
+      lp.setBindGroup(1, this.group('comp1-keys', () => d.createBindGroup({
+        layout: this.keysPipe.getBindGroupLayout(1),
+        entries: [{ binding: 0, resource: this.sampler }, { binding: 1, resource: this.videoTex!.createView() }],
+      })));
       lp.setVertexBuffer(0, this.keysBuf);
-      lp.draw(keys.length / 7);
+      lp.draw(keys.length / 8);
     }
     if (glass.length) {
       lp.setPipeline(this.glassPipe);
