@@ -1,5 +1,5 @@
 // The look: every visual setting of the effects, with defaults that reproduce the original approved
-// "Interstellar Teal" look exactly. The style panels are generated from LOOK_SCHEMA, the renderer reads Look.
+// original look exactly (Lagoon's colours). The style panels are generated from LOOK_SCHEMA, the renderer reads Look.
 
 import type { RGB } from './project';
 
@@ -320,7 +320,7 @@ function hsvc(h: number, s: number, v: number): RGB {
 
 export const PALETTES: { id: PaletteId; label: string; stops?: [number, RGB][] }[] = [
   { id: 'custom', label: 'Custom' },
-  { id: 'teal', label: 'Interstellar teal', stops: [[0, rgb(60, 110, 255)], [0.45, rgb(20, 215, 190)], [1, rgb(120, 255, 170)]] },
+  { id: 'teal', label: 'Lagoon', stops: [[0, rgb(60, 110, 255)], [0.45, rgb(20, 215, 190)], [1, rgb(120, 255, 170)]] },
   { id: 'swan', label: 'Swan white', stops: [[0, rgb(120, 150, 255)], [0.5, rgb(200, 215, 255)], [1, rgb(255, 255, 255)]] },
   { id: 'ember', label: 'Ember', stops: [[0, rgb(255, 60, 40)], [0.5, rgb(255, 140, 30)], [1, rgb(255, 225, 120)]] },
   { id: 'neon', label: 'Neon', stops: [[0, rgb(140, 60, 255)], [0.5, rgb(255, 60, 200)], [1, rgb(60, 220, 255)]] },
@@ -712,7 +712,7 @@ const concertStyle: Partial<Look> = {
 };
 /** the looks in the gallery: each a complete style (colours, notes, saber, particles, finish) */
 export const BUILT_IN_PRESETS: Preset[] = ([
-  { id: 'interstellar-teal', name: 'Interstellar Teal', look: { ...fountainStyle, noteRound: 1.4 } },
+  { id: 'interstellar-teal', name: 'Lagoon', look: { ...fountainStyle, noteRound: 1.4 } },
   { id: 'concert', name: 'Concert', look: {
     ...concertStyle, palette: 'gold', noteDim: '2d', note2d: 'filled', noteRound: 1.92, noteGlow: 0.6, noteOpacity: 0.95, noteRim: 0.6,
     saberStyle: 'straight', saberIdle: 0.06, saberCustom: true, saberColor: '#d9d4ff', saberThick: 0.8, saberTint: 1,
