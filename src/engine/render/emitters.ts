@@ -47,12 +47,13 @@ const PARTICLE_MODES: Record<Look['partMode'], ModeStrategy> = {
   // smoke thrown up from the key that arcs over and sinks, for as long as the key is held
   fountain: ({ n, tg, vv, dur }, lk) => {
     const held = Math.min(4, dur);
-    const slope = Math.abs(tg.along[0]) > 1e-3 ? tg.along[1] / tg.along[0] : 0;
+    // the keyboard line's direction on screen (an angle: a slope can't describe a keyboard running up the picture)
+    const lineAngle = Math.atan2(tg.along[1], tg.along[0]);
     const sp = tg.unit * 13 * lk.partSpeed * (0.85 + 0.3 * vv);
     const G = (sp * sp) / (2 * tg.unit * 7 * Math.max(0.2, lk.partRise));
     const life = Math.min(held, 2.5);
     const rate = Math.min(1000 / life, 420 * (0.6 + 0.8 * vv) * lk.partAmount);
-    return rate > 0 ? [{ start: n.s, end: n.s + life + 2.5 * lk.partLife, data: [n.s, life, rate, 0, tg.x, tg.y, 0, -sp, ...n.col, vv, n.idx * 16, Kind.Fountain, slope, G] }] : [];
+    return rate > 0 ? [{ start: n.s, end: n.s + life + 2.5 * lk.partLife, data: [n.s, life, rate, 0, tg.x, tg.y, 0, -sp, ...n.col, vv, n.idx * 16, Kind.Fountain, lineAngle, G] }] : [];
   },
   // a burst on the hit, then a spray while the key is held
   spray: ({ n, tg, vv, dur }, lk) => {

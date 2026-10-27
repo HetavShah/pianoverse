@@ -80,23 +80,33 @@ export function backgroundParams(lk: Look, imageReady: boolean, imageAspect: num
   ]);
 }
 
-/** LT (post.wgsl): the video's own lighting, with the keyboard's plane (inverse of this frame's tracking) */
+/**
+ * LT (post.wgsl): the video's own lighting. The room is lit round the keyboard as it appears in this frame: the
+ * keyboard's outline (four corners in video pixels, from this frame's tracking and the key fit) and the size of a
+ * white key on screen. Measured on screen, so it works from any camera angle (on the keyboard's own plane, points far
+ * off to the side of a side-on shot fall beyond its horizon and can't be measured).
+ */
 export function lightingParams(m: DrawModel, off: boolean): Float32Array {
   const L = m.lighting;
   const on = !off && lightingActive(L);
   const H = m.kb.H;
-  const a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7], i = H[8];
-  const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
-  const det = a * A + b * B + c * C;
-  const tracked = !!m.proj.tracking.frames.length && Math.abs(det) > 1e-12;
-  const k = tracked ? 1 / det : 0;
-  const inv = [A * k, -(b * i - c * h) * k, (b * f - c * e) * k, B * k, (a * i - c * g) * k, -(a * f - c * d) * k, C * k, -(a * h - b * g) * k, (a * e - b * d) * k];
   const fit = m.kb.fit;
+  const W = m.whiteKeys;
+  const proj = (xs: number, Y: number): [number, number] => {
+    const X = fit.x0 + (1 + fit.k) * xs + fit.sh * Y;
+    const w = H[6] * X + H[7] * Y + H[8];
+    return [(H[0] * X + H[1] * Y + H[2]) / w, (H[3] * X + H[4] * Y + H[5]) / w];
+  };
+  // the keys with a little margin: half a white key at each end, a little behind and in front
+  const q = [proj(-0.5, -0.3), proj(W + 0.5, -0.3), proj(W + 0.5, 1.5), proj(-0.5, 1.5)];
+  const len = (p: [number, number], r: [number, number]) => Math.hypot(p[0] - r[0], p[1] - r[1]);
+  const unit = (len(q[0], q[1]) + len(q[3], q[2])) / 2 / (W + 1);
+  const tracked = !!m.proj.tracking.frames.length && q.every((p) => Number.isFinite(p[0]) && Number.isFinite(p[1])) && unit > 1e-3;
   return new Float32Array([
     on ? 1 : 0, L.exposure, L.contrast, L.highlights,
     L.shadows, L.warmth, L.saturation, L.room,
-    L.reach, L.softness, L.vignette, m.whiteKeys,
-    ...inv, fit.x0, fit.k, fit.sh,
+    L.reach, L.softness, L.vignette, W,
+    ...q.flat(), unit, 0, 0, 0,
     tracked ? 1 : 0, 0, 0, 0, 0, 0, 0, 0,
   ]);
 }

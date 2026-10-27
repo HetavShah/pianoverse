@@ -1,5 +1,6 @@
-// Import step trim and crop, and the Light step.
+// Video step trim and crop, and the Light step.
 import { chromium } from 'playwright';
+import { writeFileSync } from 'node:fs';
 const S = process.env.SHOTS ?? '/tmp';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'] });
 const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
@@ -14,9 +15,9 @@ await page.setInputFiles('.file-card .actions input[type=file]', 'samples/inters
 let fails = 0;
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 
-// ---- Import: crop ----
-await page.click('.stepper >> text=Import'); await page.waitForTimeout(600);
-ok(await page.locator('.video-edit').count() === 1, 'trim and crop panel on Import');
+// ---- Video: crop ----
+await page.click('.stepper >> text=Video'); await page.waitForTimeout(600);
+ok(await page.locator('.video-edit').count() === 1, 'trim and crop panel on Video');
 await page.click('.ve-side .seg >> text=1:1'); await page.waitForTimeout(400);
 const size = await page.locator('.ve-side .mono').innerText();
 ok(/^1080×1080 of 1080×1920$/.test(size), 'square crop  ' + size);
@@ -26,7 +27,7 @@ await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page
 await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.7, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(300);
 await page.screenshot({ path: `${S}/import_crop.png` });
 
-// ---- Import: trim ----
+// ---- Video: trim ----
 const dur = await page.evaluate(() => document.querySelector('video').duration);
 await page.locator('.ve-trim').scrollIntoViewIfNeeded();
 const bar = await page.locator('.ve-bar').boundingBox();
@@ -52,14 +53,20 @@ const frame = async () => page.evaluate(async () => {
   v.currentTime = 24.2; await new Promise((res) => v.addEventListener('seeked', res, { once: true }));
   const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
   r.setScale(0.5);
+  // the video alone: the effects are drawn on top of the lighting and aren't darkened by it
+  const keep = r.layers;
+  r.layers = { ...keep, notes: false, impact: false, saber: false, particles: false, bloom: false };
   const img = await r.capture(c, 24.2);
+  r.layers = keep;
   // mean brightness of the top-left corner (the room) and of the frame
   const at = (x0, y0, x1, y1) => { let s = 0, n = 0; for (let y = Math.floor(y0 * img.height); y < y1 * img.height; y += 2) for (let x = Math.floor(x0 * img.width); x < x1 * img.width; x += 2) { const i = (y * img.width + x) * 4; s += img.data[i] + img.data[i + 1] + img.data[i + 2]; n++; } return s / n / 765; };
-  return { room: at(0, 0, 0.35, 0.3), all: at(0, 0, 1, 1), w: img.width, h: img.height };
+  const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; cv.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
+  return { room: at(0, 0, 0.35, 0.3), all: at(0, 0, 1, 1), w: img.width, h: img.height, png: cv.toDataURL() };
 });
 const before = await frame();
 await page.click('.light-presets >> text=Night'); await page.waitForTimeout(600);
 const after = await frame();
+if (process.env.SHOTS) for (const [n, f] of [['before', before], ['after', after]]) writeFileSync(`${S}/night_${n}.png`, Buffer.from(f.png.split(',')[1], 'base64'));
 ok(after.room < before.room * 0.6, `Night darkens the room  ${before.room.toFixed(3)} → ${after.room.toFixed(3)}`);
 await page.screenshot({ path: `${S}/light_step.png` });
 const kind = await page.locator('.light-page .insp-kind').innerText();

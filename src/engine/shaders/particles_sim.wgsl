@@ -19,6 +19,15 @@ struct Params {
 };
 
 @group(0) @binding(0) var<uniform> PP: Params;
+
+// Gravity and wind in the scene's own directions: "down" is the way the notes fall, wind blows across it. Most videos
+// have the notes falling straight down the screen and this changes nothing; filmed from the side, the notes come in at
+// an angle (direction.ts), and sparks falling straight down the screen would slide along the keyboard instead of
+// falling onto it. v: x = across (wind), y = down (gravity), in pixels.
+fn sky(v: vec2f) -> vec2f {
+  let d = -normalize(PP.up + vec2f(0.0, -1e-4));
+  return vec2f(d.y, -d.x) * v.x + d * v.y;
+}
 @group(0) @binding(1) var<storage, read> emitters: array<Emitter>;
 @group(0) @binding(2) var<storage, read> flow: array<vec4f>;   // 0..9: kx, ky, amplitude, omega; 10..19: phase
 @group(0) @binding(3) var<storage, read_write> parts: array<Particle>;
@@ -93,16 +102,20 @@ fn fountain(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   if (age > plife) { return off; }
   let ang = gaussR(st) * 0.17;
   let sp = 0.82 + 0.3 * rnd(st);
-  var v = vec2f(E.vel.x * cos(ang) - E.vel.y * sin(ang), E.vel.x * sin(ang) + E.vel.y * cos(ang)) * sp;
-  let g = vec2f(PP.wind * 140.0, E.pad1 * (1.0 + PP.gravity));
-  let sl = E.pad0;                                   // the keyboard line's slope on screen
-  let N = normalize(vec2f(-sl, 1.0));
+  let v0 = sky(E.vel);                               // thrown up the way the notes come from
+  var v = vec2f(v0.x * cos(ang) - v0.y * sin(ang), v0.x * sin(ang) + v0.y * cos(ang)) * sp;
+  let g = sky(vec2f(PP.wind * 140.0, E.pad1 * (1.0 + PP.gravity)));
+  // the keyboard line through the key (pad0: its angle on screen), and its normal on the side the drops are thrown to
+  let L = vec2f(cos(E.pad0), sin(E.pad0));
+  var N = vec2f(-L.y, L.x);
+  if (dot(N, PP.up) < 0.0) { N = -N; }
   var q = vec2f(0.0);
   var rem = age;
   var fade = 1.0;
   for (var b = 0; b < 4; b++) {
-    let den = g.y - sl * g.x;
-    let tHit = -2.0 * (v.y - sl * v.x) / max(den, 1e-3);
+    // a drop lands back on the line only if gravity pulls it there (not when it runs along the line)
+    let den = dot(g, N);
+    let tHit = select(-1.0, -2.0 * dot(v, N) / den, den < -1e-3);
     if (tHit <= 0.002 || tHit >= rem) {
       q += v * rem + 0.5 * g * rem * rem;
       v += g * rem;
@@ -153,9 +166,9 @@ fn spray(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   if (age > plife) { return off; }
   let kd = 2.4;
   let ex = 1.0 - exp(-kd * age);
-  var pos = E.pos + v0 * ex / kd + vec2f(PP.wind * 60.0, -38.0 * PP.rise + PP.gravity * 120.0) * age;
+  var pos = E.pos + v0 * ex / kd + sky(vec2f(PP.wind * 60.0, -38.0 * PP.rise + PP.gravity * 120.0)) * age;
   pos += turbVel(pos, t) * min(age, 1.5) * 0.3 * PP.swirl;
-  let vel = v0 * (1.0 - ex) + vec2f(0.0, -38.0);
+  let vel = v0 * (1.0 - ex) + sky(vec2f(0.0, -38.0));
   var star = 0.0;
   if (rnd(st) < 0.012 * PP.stars) { star = 1.0; }
   let col = mix(vec3f(1.0), vec3f(0.22) + E.col * 0.78, PP.colorMix);
@@ -264,7 +277,7 @@ fn shapeP(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     if (a2 > dlife) { return off; }
     let f = (rel + surge * sin(rel * 12.566 + ph)) * select(n * dir, n - 1.0, cnt < 0.0);
     let p0 = E.vel + alongShape(start, cnt, f) * size;
-    pos = p0 + drift * a2 + vec2f(PP.wind * 40.0, 22.0 * (1.0 + PP.gravity)) * a2 * a2 + turbVel(p0, t) * a2 * 0.12 * PP.swirl;
+    pos = p0 + drift * a2 + sky(vec2f(PP.wind * 40.0, 22.0 * (1.0 + PP.gravity))) * a2 * a2 + turbVel(p0, t) * a2 * 0.12 * PP.swirl;
     vel = drift;
     b = 0.55 * (1.0 - a2 / dlife) * (1.0 - a2 / dlife);
   } else if (age < tRise) {
@@ -338,7 +351,7 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let v0 = vec2f(cos(a), sin(a)) * u * (9.0 + 14.0 * rnd(st)) * (0.75 + 0.5 * E.vn) * PP.speed;
     let kd = 3.4;
     let ex = 1.0 - exp(-kd * age);
-    let g = vec2f(PP.wind * u * 2.0, u * 7.0 * (1.0 + PP.gravity));
+    let g = sky(vec2f(PP.wind * u * 2.0, u * 7.0 * (1.0 + PP.gravity)));
     let pos = E.pos + v0 * ex / kd + 0.5 * g * age * age;
     let vel = v0 * (1.0 - ex) + g * age;
     let bright = (2.2 + 1.6 * rnd(st)) * (0.8 + 0.5 * E.vn);
@@ -356,7 +369,7 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let v0 = vec2f(cos(a), sin(a)) * u * (9.0 + 9.0 * rnd(st)) * (0.75 + 0.5 * E.vn) * PP.speed;
     let kd = 2.2;
     let ex = 1.0 - exp(-kd * age);
-    let g = vec2f(PP.wind * u * 2.0, u * 3.0 * (1.0 + PP.gravity));
+    let g = sky(vec2f(PP.wind * u * 2.0, u * 3.0 * (1.0 + PP.gravity)));
     // a gentle sideways bend as the air takes it, so trails curve instead of flying dead straight
     let side = vec2f(-up.y, up.x) * gaussR(st) * u * 2.6;
     let pos = E.pos + v0 * ex / kd + 0.5 * g * age * age + side * age * age;
@@ -379,7 +392,7 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let v0 = up * u * (0.5 + 1.3 * rnd(st)) * PP.rise + side * gaussR(st) * u * 0.35;
     let kd = 1.1;
     let ex = 1.0 - exp(-kd * age);
-    var pos = p0 + v0 * ex / kd + up * u * 0.25 * PP.rise * age + vec2f(PP.wind * u * 1.2, PP.gravity * u * 2.5) * age;
+    var pos = p0 + v0 * ex / kd + up * u * 0.25 * PP.rise * age + sky(vec2f(PP.wind * u * 1.2, PP.gravity * u * 2.5)) * age;
     pos += turbVel(pos, t) * min(age, 2.0) * 0.22 * PP.swirl;
     let bright = (0.2 + 0.45 * rnd(st)) * (0.75 + 0.45 * E.vn);   // faint: dust around the brighter dots
     var star = 0.0;
@@ -415,7 +428,7 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let v0 = vec2f(cos(a), sin(a)) * u * (7.0 + 6.0 * rnd(st)) * PP.rise * (0.8 + 0.4 * E.vn);
     let kd = 0.75;
     let ex = 1.0 - exp(-kd * age);
-    let g = vec2f(PP.wind * u * 1.5, u * 2.4 * (1.0 + PP.gravity));
+    let g = sky(vec2f(PP.wind * u * 1.5, u * 2.4 * (1.0 + PP.gravity)));
     var pos = E.pos + v0 * ex / kd + 0.5 * g * age * age;
     pos += turbVel(pos, t) * age * 0.15 * PP.swirl;
     let env = smoothstep(0.0, 0.35, age) * pow(clamp(1.0 - age / plife, 0.0, 1.0), 1.2);
@@ -463,16 +476,18 @@ fn ambient(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
   let upv = vec2f(E.life, E.rate);
   let along = E.vel - E.pos;
   let s0 = rnd(st);
-  let h0 = pow(rnd(st), 1.6) * H;
+  // in the air above the keys, not on the saber line: from about one key's length up (against a dark piano, dust
+  // sitting on the line looks like stray specks)
+  let h0 = (0.1 + 0.9 * pow(rnd(st), 1.3)) * H;
   let ph = rnd(st) * 6.2831853;
   let rise = (0.25 + 0.5 * rnd(st)) * u * PP.rise;
   let side = (gaussR(st) * 0.3 + PP.wind) * u / max(length(along), 1.0);
-  let h = (h0 + rise * t) % H;                     // drift up, wrapping back to the keys
+  let h = 0.1 * H + (h0 - 0.1 * H + rise * t) % (0.9 * H);   // drift up, wrapping back down
   let s = fract(s0 + side * t);
   var p = E.pos + along * s + upv * h + vec2f(sin(t * 0.37 + ph), cos(t * 0.29 + ph * 1.7)) * u * 0.5;
   // fade towards the top of the band and the keyboard's ends, so neither the wrap nor the band's edge is seen
   let fy = h / H;
-  let edge = smoothstep(0.0, 0.08, fy) * (1.0 - smoothstep(0.45, 1.0, fy)) * smoothstep(0.0, 0.06, s) * smoothstep(1.0, 0.94, s);
+  let edge = smoothstep(0.1, 0.3, fy) * (1.0 - smoothstep(0.5, 1.0, fy)) * smoothstep(0.0, 0.06, s) * smoothstep(1.0, 0.94, s);
   let tw = 0.5 + 0.5 * sin(t * (0.8 + 2.5 * rnd(st)) + ph);
   var o: Particle;
   o.pos = p;
@@ -537,8 +552,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     while (et < ts) {
       let dt = min(1.0 / 60.0, ts - et);
       let f = turbVel(ep, et);
-      ev.x += (f.x * 0.9 * PP.swirl + PP.wind * 70.0 - ev.x) * 1.4 * dt;
-      ev.y += (f.y * 1.6 * PP.swirl - 72.0 * PP.rise + PP.gravity * 150.0 - ev.y) * 0.9 * dt;   // compact clouds, not tall columns
+      let air = sky(vec2f(PP.wind * 70.0, -72.0 * PP.rise + PP.gravity * 150.0));
+      ev.x += (f.x * 0.9 * PP.swirl + air.x - ev.x) * 1.4 * dt;
+      ev.y += (f.y * 1.6 * PP.swirl + air.y - ev.y) * 0.9 * dt;   // compact clouds, not tall columns
       ep += ev * dt;
       et += dt;
     }
@@ -570,7 +586,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let dt = min(1.0 / 40.0, t - pt);
     let f = turbVel(pos, pt);
     // drift with the air current and rise back along the notes' lane
-    let goal = vec2f(f.x * 0.55, f.y * 0.8) * PP.swirl + PP.up * 30.0 * PP.rise + vec2f(PP.wind * 50.0, PP.gravity * 110.0);
+    let goal = vec2f(f.x * 0.55, f.y * 0.8) * PP.swirl + PP.up * 30.0 * PP.rise + sky(vec2f(PP.wind * 50.0, PP.gravity * 110.0));
     vel += (goal - vel) * 2.2 * dt;
     pos += vel * dt;
     pt += dt;

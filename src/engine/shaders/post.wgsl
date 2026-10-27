@@ -76,11 +76,28 @@ struct LT {
   on: f32, exposure: f32, contrast: f32, highlights: f32,
   shadows: f32, warmth: f32, saturation: f32, room: f32,
   reach: f32, softness: f32, vignette: f32, whiteKeys: f32,
-  h0: f32, h1: f32, h2: f32, h3: f32, h4: f32, h5: f32, h6: f32, h7: f32, h8: f32,   // video pixels -> keyboard plane
-  fx0: f32, fk: f32, fsh: f32,                                                         // the key fit (project.ts KeyFit)
+  k0x: f32, k0y: f32, k1x: f32, k1y: f32, k2x: f32, k2y: f32, k3x: f32, k3y: f32,   // the keyboard's outline, video pixels
+  unit: f32, p0: f32, p1: f32, p2: f32,                                                // a white key's width on screen
   tracked: f32, q1: f32, q2: f32, q3: f32, q4: f32, q5: f32, q6: f32, q7: f32,
 };
 @group(1) @binding(10) var<uniform> LTU: LT;
+
+fn segDistance(p: vec2f, a: vec2f, b: vec2f) -> f32 {
+  let ab = b - a;
+  let t = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+  return length(p - a - ab * t);
+}
+fn cross2(a: vec2f, b: vec2f) -> f32 { return a.x * b.y - a.y * b.x; }
+/** how far p is outside the quad a-b-c-d (0 inside), in pixels */
+fn quadDistance(p: vec2f, a: vec2f, b: vec2f, c: vec2f, d: vec2f) -> f32 {
+  let s0 = cross2(b - a, p - a);
+  let s1 = cross2(c - b, p - b);
+  let s2 = cross2(d - c, p - c);
+  let s3 = cross2(a - d, p - d);
+  let inside = (s0 >= 0.0 && s1 >= 0.0 && s2 >= 0.0 && s3 >= 0.0) || (s0 <= 0.0 && s1 <= 0.0 && s2 <= 0.0 && s3 <= 0.0);
+  if (inside) { return 0.0; }
+  return min(min(segDistance(p, a, b), segDistance(p, b, c)), min(segDistance(p, c, d), segDistance(p, d, a)));
+}
 
 fn lightVideo(c0: vec3f, srcPx: vec2f, fuv: vec2f) -> vec3f {
   let W3 = vec3f(0.2126, 0.7152, 0.0722);
@@ -94,18 +111,10 @@ fn lightVideo(c0: vec3f, srcPx: vec2f, fuv: vec2f) -> vec3f {
   x = x * vec3f(1.0 + 0.12 * LTU.warmth, 1.0, 1.0 - 0.12 * LTU.warmth);
   let l = dot(x, W3);
   x = max(vec3f(l) + (x - vec3f(l)) * LTU.saturation, vec3f(0.0));
-  // the room: darker away from the keyboard (measured on the keyboard's plane, in white keys)
+  // the room: darker away from the keyboard (measured on screen from its outline, in white keys)
   if (LTU.room < 0.999 && LTU.tracked > 0.5) {
-    let q = vec3f(LTU.h0 * srcPx.x + LTU.h1 * srcPx.y + LTU.h2, LTU.h3 * srcPx.x + LTU.h4 * srcPx.y + LTU.h5, LTU.h6 * srcPx.x + LTU.h7 * srcPx.y + LTU.h8);
-    var m = 0.0;
-    if (q.z > 1e-9) {
-      let X = q.x / q.z;
-      let Y = q.y / q.z;
-      let xs = (X - LTU.fx0 - LTU.fsh * Y) / (1.0 + LTU.fk);
-      let half = vec2f(LTU.whiteKeys * 0.5 + 0.5, 0.9);
-      let dd = length(max(abs(vec2f(xs - LTU.whiteKeys * 0.5, Y - 0.6)) - half, vec2f(0.0)));
-      m = 1.0 - smoothstep(0.5 * LTU.reach, (0.5 + 4.0 * LTU.softness) * LTU.reach + 0.5, dd);
-    }
+    let dd = quadDistance(srcPx, vec2f(LTU.k0x, LTU.k0y), vec2f(LTU.k1x, LTU.k1y), vec2f(LTU.k2x, LTU.k2y), vec2f(LTU.k3x, LTU.k3y)) / LTU.unit;
+    let m = 1.0 - smoothstep(0.5 * LTU.reach, (0.5 + 4.0 * LTU.softness) * LTU.reach + 0.5, dd);
     x = x * (LTU.room + (1.0 - LTU.room) * m);
   }
   if (LTU.vignette > 0.0) {
