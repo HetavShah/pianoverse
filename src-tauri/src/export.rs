@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, State};
 
@@ -37,6 +38,21 @@ pub struct ExportOpts {
     pub duration: f64,
 }
 
+/// The encoder and its quality settings, the same for an export and for the test at start-up.
+pub fn encoder_args(encoder: &str, quality: &str) -> Vec<String> {
+    let s = |v: &str| v.to_string();
+    let qi = match quality { "medium" => 1, "small" => 2, _ => 0 };
+    let pick = |v: [i32; 3]| v[qi].to_string();
+    match encoder {
+        "h264_nvenc" | "hevc_nvenc" => vec![s("-c:v"), s(encoder), s("-preset"), s("p5"), s("-tune"), s("hq"), s("-rc"), s("vbr"), s("-cq"), pick([19, 23, 28]), s("-b:v"), s("0")],
+        "h264_amf" | "hevc_amf" => vec![s("-c:v"), s(encoder), s("-quality"), s("quality"), s("-rc"), s("cqp"), s("-qp_i"), pick([18, 22, 27]), s("-qp_p"), pick([20, 24, 29])],
+        "h264_qsv" | "hevc_qsv" => vec![s("-c:v"), s(encoder), s("-preset"), s("slower"), s("-global_quality"), pick([20, 24, 29])],
+        "libx265" => vec![s("-c:v"), s("libx265"), s("-preset"), s("medium"), s("-crf"), pick([20, 24, 29])],
+        "prores_ks" => vec![s("-c:v"), s("prores_ks"), s("-profile:v"), s("4444"), s("-vendor"), s("apl0")],
+        _ => vec![s("-c:v"), s("libx264"), s("-preset"), s("medium"), s("-crf"), pick([18, 22, 27])],
+    }
+}
+
 /// The FFmpeg arguments for an export (input frames on stdin).
 pub fn build_args(o: &ExportOpts, audio_codec: Option<&str>, part: &str) -> Vec<String> {
     let mut a: Vec<String> = Vec::new();
@@ -64,28 +80,7 @@ pub fn build_args(o: &ExportOpts, audio_codec: Option<&str>, part: &str) -> Vec<
     if with_audio {
         a.extend([s("-map"), s("1:a:0?")]);
     }
-    let qi = match o.quality.as_str() { "medium" => 1, "small" => 2, _ => 0 };
-    let pick = |v: [i32; 3]| v[qi].to_string();
-    match o.encoder.as_str() {
-        "h264_nvenc" | "hevc_nvenc" => {
-            a.extend([s("-c:v"), o.encoder.clone(), s("-preset"), s("p5"), s("-tune"), s("hq"), s("-rc"), s("vbr"), s("-cq"), pick([19, 23, 28]), s("-b:v"), s("0")]);
-        }
-        "h264_amf" | "hevc_amf" => {
-            a.extend([s("-c:v"), o.encoder.clone(), s("-quality"), s("quality"), s("-rc"), s("cqp"), s("-qp_i"), pick([18, 22, 27]), s("-qp_p"), pick([20, 24, 29])]);
-        }
-        "h264_qsv" | "hevc_qsv" => {
-            a.extend([s("-c:v"), o.encoder.clone(), s("-preset"), s("slower"), s("-global_quality"), pick([20, 24, 29])]);
-        }
-        "libx265" => {
-            a.extend([s("-c:v"), s("libx265"), s("-preset"), s("medium"), s("-crf"), pick([20, 24, 29])]);
-        }
-        "prores_ks" => {
-            a.extend([s("-c:v"), s("prores_ks"), s("-profile:v"), s("4444"), s("-vendor"), s("apl0")]);
-        }
-        _ => {
-            a.extend([s("-c:v"), s("libx264"), s("-preset"), s("medium"), s("-crf"), pick([18, 22, 27])]);
-        }
-    }
+    a.extend(encoder_args(&o.encoder, &o.quality));
     if o.codec == "hevc" {
         a.extend([s("-tag:v"), s("hvc1")]);
     }
@@ -105,7 +100,11 @@ pub fn build_args(o: &ExportOpts, audio_codec: Option<&str>, part: &str) -> Vec<
 
 struct Job {
     child: Child,
-    stdin: Option<ChildStdin>,
+    /// frames for the writer thread, which feeds FFmpeg (None once all are sent)
+    frames_tx: Option<SyncSender<Vec<u8>>>,
+    /// set by the writer thread when FFmpeg stops taking frames
+    write_error: Arc<Mutex<Option<String>>>,
+    writer: Option<std::thread::JoinHandle<()>>,
     part: PathBuf,
     out: PathBuf,
     log: Arc<Mutex<Vec<String>>>,
@@ -169,27 +168,38 @@ pub struct Encoders {
     pub prores: bool,
 }
 
-/// Try each hardware encoder with a tiny test encode (they are listed even when the graphics card lacks them).
+/// Try each encoder the way an export uses it: a portrait 1080x1920 picture, the export's quality settings, a
+/// second of frames, one encoder at a time, and given up on after a few seconds (a graphics-card encoder can be
+/// listed and even start, yet hang). Graphics cards are listed even when they lack an encoder, hence the test.
 #[tauri::command]
 pub async fn export_encoders(app: AppHandle) -> Result<Encoders, String> {
     let exe = ensure_ffmpeg(&app).await?;
     tauri::async_runtime::spawn_blocking(move || {
         let works = |enc: &str| -> bool {
             let mut cmd = Command::new(&exe);
-            cmd.args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=0.2", "-frames:v", "3", "-c:v", enc, "-f", "null", "-"]);
-            cmd.stdout(Stdio::null()).stderr(Stdio::null());
+            cmd.args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=1080x1920:r=30:d=1", "-frames:v", "30", "-pix_fmt", "yuv420p"])
+                .args(encoder_args(enc, "high"))
+                .args(["-f", "null", "-"]);
+            cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
             hide_window(&mut cmd);
-            cmd.status().map(|s| s.success()).unwrap_or(false)
+            let Ok(mut child) = cmd.spawn() else { return false };
+            let start = std::time::Instant::now();
+            loop {
+                match child.try_wait() {
+                    Ok(Some(st)) => return st.success(),
+                    Ok(None) if start.elapsed() > std::time::Duration::from_secs(12) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return false;
+                    }
+                    Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
+                    Err(_) => return false,
+                }
+            }
         };
-        let works = &works;
-        let try_all = |list: &[&str]| -> Vec<String> {
-            std::thread::scope(|sc| {
-                let hs: Vec<_> = list.iter().map(|e| sc.spawn(move || works(e))).collect();
-                list.iter().zip(hs).filter_map(|(e, h)| if h.join().unwrap_or(false) { Some(e.to_string()) } else { None }).collect()
-            })
-        };
-        let h264 = try_all(&["h264_nvenc", "h264_amf", "h264_qsv", "libx264"]);
-        let hevc = try_all(&["hevc_nvenc", "hevc_amf", "hevc_qsv", "libx265"]);
+        let pick = |list: &[&str]| -> Vec<String> { list.iter().filter(|e| works(e)).map(|e| e.to_string()).collect() };
+        let h264 = pick(&["h264_nvenc", "h264_amf", "h264_qsv", "libx264"]);
+        let hevc = pick(&["hevc_nvenc", "hevc_amf", "hevc_qsv", "libx265"]);
         let prores = works("prores_ks");
         Encoders { h264, hevc, prores }
     })
@@ -231,24 +241,66 @@ pub async fn export_start(app: AppHandle, state: State<'_, ExportState>, opts: E
             }
         }
     });
-    let stdin = child.stdin.take();
-    *state.0.lock().map_err(|e| e.to_string())? = Some(Job { child, stdin, part, out, log, frames: 0, temp_audio });
+    // a thread of its own writes the frames into FFmpeg, so a slow (or stuck) encoder never holds up the window
+    let mut stdin: ChildStdin = child.stdin.take().ok_or("The encoder has no input")?;
+    let (tx, rx) = sync_channel::<Vec<u8>>(2);
+    let write_error = Arc::new(Mutex::new(None::<String>));
+    let werr = write_error.clone();
+    let writer = std::thread::spawn(move || {
+        for frame in rx {
+            if let Err(e) = stdin.write_all(&frame) {
+                if let Ok(mut w) = werr.lock() { *w = Some(e.to_string()); }
+                return;
+            }
+        }
+        // all frames sent: closing FFmpeg's input lets it finish
+    });
+    *state.0.lock().map_err(|e| e.to_string())? = Some(Job { child, frames_tx: Some(tx), write_error, writer: Some(writer), part, out, log, frames: 0, temp_audio });
     Ok(())
 }
 
-/// One frame of raw RGBA pixels (the request body).
+/// How long the encoder may go without taking a frame before the export counts it as stuck.
+const STALL: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// One frame of raw RGBA pixels (the request body). Handed to the writer thread; fails with "stalled" when the
+/// encoder hasn't taken a frame for STALL (a graphics-card encoder that hangs), or with FFmpeg's message if it stopped.
 #[tauri::command]
-pub fn export_frame(state: State<'_, ExportState>, request: tauri::ipc::Request<'_>) -> Result<u64, String> {
+pub async fn export_frame(state: State<'_, ExportState>, request: tauri::ipc::Request<'_>) -> Result<u64, String> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err("expected raw frame bytes".into());
     };
+    let frame = bytes.to_vec();
+    let (tx, werr, log) = {
+        let guard = state.0.lock().map_err(|e| e.to_string())?;
+        let job = guard.as_ref().ok_or("No export is running")?;
+        (job.frames_tx.clone().ok_or("The export has finished")?, job.write_error.clone(), job.log.clone())
+    };
+    let sent = tauri::async_runtime::spawn_blocking(move || {
+        let stopped = |werr: &Arc<Mutex<Option<String>>>| -> Option<String> {
+            let e = werr.lock().ok()?.clone()?;
+            let msg = tail(&log);
+            Some(if msg.is_empty() { format!("The encoder stopped: {e}") } else { format!("The encoder stopped:\n{msg}") })
+        };
+        let start = std::time::Instant::now();
+        let mut f = frame;
+        loop {
+            match tx.try_send(f) {
+                Ok(()) => return Ok(()),
+                Err(TrySendError::Full(back)) => {
+                    if let Some(e) = stopped(&werr) { return Err(e); }
+                    if start.elapsed() > STALL { return Err("stalled".to_string()); }
+                    f = back;
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(TrySendError::Disconnected(_)) => return Err(stopped(&werr).unwrap_or_else(|| "The encoder stopped".into())),
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    sent?;
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     let job = guard.as_mut().ok_or("No export is running")?;
-    let stdin = job.stdin.as_mut().ok_or("The export has finished")?;
-    if let Err(e) = stdin.write_all(bytes) {
-        let msg = tail(&job.log);
-        return Err(if msg.is_empty() { format!("The encoder stopped: {e}") } else { format!("The encoder stopped:\n{msg}") });
-    }
     job.frames += 1;
     Ok(job.frames)
 }
@@ -258,8 +310,9 @@ pub fn export_frame(state: State<'_, ExportState>, request: tauri::ipc::Request<
 pub async fn export_finish(state: State<'_, ExportState>) -> Result<String, String> {
     let job = state.0.lock().map_err(|e| e.to_string())?.take();
     let Some(mut job) = job else { return Err("No export is running".into()) };
-    drop(job.stdin.take());
+    drop(job.frames_tx.take());
     let status = tauri::async_runtime::spawn_blocking(move || {
+        if let Some(w) = job.writer.take() { let _ = w.join(); }
         let st = job.child.wait();
         (st, job)
     })
@@ -280,9 +333,11 @@ pub async fn export_finish(state: State<'_, ExportState>) -> Result<String, Stri
 #[tauri::command]
 pub fn export_cancel(state: State<'_, ExportState>) -> Result<(), String> {
     if let Some(mut job) = state.0.lock().map_err(|e| e.to_string())?.take() {
-        drop(job.stdin.take());
+        drop(job.frames_tx.take());
+        // killing FFmpeg also frees a writer thread stuck in a write
         let _ = job.child.kill();
         let _ = job.child.wait();
+        if let Some(w) = job.writer.take() { let _ = w.join(); }
         let _ = std::fs::remove_file(&job.part);
         remove_temp(&job.temp_audio);
     }

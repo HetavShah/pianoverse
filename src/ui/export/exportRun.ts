@@ -68,10 +68,23 @@ export const tauriSink: Sink = {
 export const testSink = (): Sink | null => (window as unknown as { __pvExportSink?: Sink }).__pvExportSink ?? null;
 
 export async function detectEncoders(): Promise<Encoders> {
-  if (!inTauri()) return { h264: ['libx264'], hevc: ['libx265'], prores: true };
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<Encoders>('export_encoders');
+  const forTests = (window as unknown as { __pvEncoders?: Encoders }).__pvEncoders;
+  if (!inTauri() && !forTests) return { h264: ['libx264'], hevc: ['libx265'], prores: true };
+  const e = forTests ?? await (await import('@tauri-apps/api/core')).invoke<Encoders>('export_encoders');
+  // an encoder that got stuck in an export on this computer isn't offered again
+  const bad = badEncoders();
+  const keep = (l: string[], cpu: string) => { const k = l.filter((x) => !bad.includes(x)); return k.length ? k : [cpu]; };
+  return { ...e, h264: keep(e.h264, 'libx264'), hevc: keep(e.hevc, 'libx265') };
 }
+
+const BAD_KEY = 'pv.badEncoders';
+function badEncoders(): string[] {
+  try { return JSON.parse(localStorage.getItem(BAD_KEY) ?? '[]'); } catch { return []; }
+}
+function markBadEncoder(enc: string) {
+  try { localStorage.setItem(BAD_KEY, JSON.stringify([...new Set([...badEncoders(), enc])])); } catch { /* not kept */ }
+}
+const isHardware = (enc: string) => /_(nvenc|amf|qsv)$/.test(enc);
 
 // The graphics card that encodes isn't always the one that draws (a laptop with Intel and NVIDIA), so the label names
 // the encoder only.
@@ -130,7 +143,7 @@ const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>((res) => {
   setTimeout(done, 4000);
 });
 
-export interface ExportProgress { phase: 'sound' | 'video' | 'effects'; done: number; total: number; elapsed: number; eta: number; preview?: string }
+export interface ExportProgress { phase: 'sound' | 'video' | 'effects'; done: number; total: number; elapsed: number; eta: number; preview?: string; /** something that changed on the way (the encoder) */ note?: string }
 
 /** render and encode; resolves with the saved file's path */
 export async function runExport(args: {
@@ -183,8 +196,12 @@ export async function runExport(args: {
       r.alphaOut = phase === 'effects';
       await r.texturesReady?.();
       const { width, height } = r.size;
-      const enc = phase === 'effects' ? 'prores_ks' : (s.codec === 'hevc' ? args.encoders.hevc[0] : args.encoders.h264[0]) ?? 'libx264';
       const out = phase === 'effects' ? s.out.replace(/\.[a-z0-9]+$/i, '') + ' (effects).mov' : s.out;
+      let enc = phase === 'effects' ? 'prores_ks' : (s.codec === 'hevc' ? args.encoders.hevc[0] : args.encoders.h264[0]) ?? 'libx264';
+      let note: string | undefined;
+      // a graphics-card encoder that gets stuck or stops: the pass starts again on the processor
+      for (;;) {
+      try {
       await sink.start({
         out, width, height, fps, outWidth: outW, outHeight: outH, fit: s.fit,
         codec: phase === 'effects' ? 'prores' : s.codec, encoder: enc, quality: s.quality,
@@ -211,11 +228,23 @@ export async function runExport(args: {
           const el = (performance.now() - t0) / 1000;
           let preview: string | undefined;
           if (i % 60 === 0) preview = thumb(img);
-          args.onProgress({ phase, done: i + 1, total: frames, elapsed: el, eta: (el / (i + 1)) * (frames - i - 1), preview });
+          args.onProgress({ phase, done: i + 1, total: frames, elapsed: el, eta: (el / (i + 1)) * (frames - i - 1), preview, note });
         }
       }
       if (pending) await pending;
       saved.push(await sink.finish());
+      break;
+      } catch (e) {
+        const m = String((e as Error)?.message ?? e);
+        if (m === 'cancelled' || !isHardware(enc)) throw e;
+        await sink.cancel().catch(() => {});
+        markBadEncoder(enc);
+        const was = encoderLabel(enc);
+        enc = s.codec === 'hevc' ? 'libx265' : 'libx264';
+        note = `${was} ${m === 'stalled' ? 'stopped responding' : 'stopped'}, so this export is made on the processor (a little slower). It won't be used again on this computer.`;
+        args.onProgress({ phase, done: 0, total: frames, elapsed: 0, eta: 0, note });
+      }
+      }
     }
   } finally {
     r.alphaOut = false;

@@ -15,7 +15,7 @@ const fmtLen = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t 
 const fmtDur = (s: number) => (s < 60 ? `${Math.max(1, Math.round(s))} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`);
 const safeName = (n: string) => n.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'Pianoverse';
 
-type Run = { kind: 'idle' } | { kind: 'running'; p: ExportProgress | null } | { kind: 'done'; files: string[]; secs: number } | { kind: 'error'; message: string };
+type Run = { kind: 'idle' } | { kind: 'running'; p: ExportProgress | null } | { kind: 'done'; files: string[]; secs: number; note?: string } | { kind: 'error'; message: string };
 
 export default function ExportStep({ ws }: { ws: WS }) {
   const { project } = ws;
@@ -92,14 +92,15 @@ export default function ExportStep({ ws }: { ws: WS }) {
     cancel.current = false;
     setRun({ kind: 'running', p: null });
     const t0 = performance.now();
+    let note: string | undefined;
     try {
       r.setProject(project);
       const files = await runExport({
         renderer: r, video: v, project, duration, settings: s, encoders: enc, sink, range: part,
-        onProgress: (p) => { setRun({ kind: 'running', p }); if (p.preview) setThumb(p.preview); },
+        onProgress: (p) => { if (p.note) note = p.note; setRun({ kind: 'running', p }); if (p.preview) setThumb(p.preview); },
         cancelled: () => cancel.current,
       });
-      setRun({ kind: 'done', files, secs: (performance.now() - t0) / 1000 });
+      setRun({ kind: 'done', files, secs: (performance.now() - t0) / 1000, note });
     } catch (e) {
       const m = String((e as Error)?.message ?? e);
       setRun(m === 'cancelled' ? { kind: 'idle' } : { kind: 'error', message: m });
@@ -245,12 +246,14 @@ export default function ExportStep({ ws }: { ws: WS }) {
               <span className="mono dim">{run.p && run.p.done > 10 ? `${fmtDur(run.p.eta)} left` : ''}</span>
             </div>
             <div className="bar"><i style={{ width: `${run.p ? (100 * run.p.done) / run.p.total : 0}%` }} /></div>
+            {run.p?.note && <small className="ex-note">{run.p.note}</small>}
             <div className="row"><span /><button type="button" className="btn small" onClick={() => { cancel.current = true; }}><Icon name="cancel" />Cancel</button></div>
           </div>
         )}
         {run.kind === 'done' && (
           <div className="ex-done">
             <b>Saved in {fmtDur(run.secs)}</b>
+            {run.note && <small className="ex-note">{run.note}</small>}
             {run.files.map((f) => (
               <div key={f} className="ex-file"><span className="mono" title={f}>{f.split(/[\\/]/).pop()}</span>
                 {inTauri() && <button type="button" className="link" onClick={() => showFile(f)}><Icon name="folder" />Show in folder</button>}</div>
