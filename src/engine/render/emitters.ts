@@ -8,7 +8,9 @@
 //
 // Each particle style is a strategy (PARTICLE_MODES): given a note it returns its emitters. Add a style by adding an
 // entry there and its kind to the shader.
-import { gauss, Keyboard, mulberry32, Note, trackingMatrix } from '../project';
+import { Note, trackingMatrix } from '../project';
+import { gauss, mulberry32 } from '../random';
+import { Keyboard } from '../keyboard';
 import type { Look } from '../look';
 import type { DrawModel } from './model';
 

@@ -6,15 +6,10 @@ import type { CalibratedProject } from '../engine/calibration';
 import { aspectInfo, cameraAt, CameraFrame, followPath, FollowPath } from '../engine/camera';
 import { inTauri } from './media';
 import { sourceRect, trimRange } from '../engine/project';
+import { ExportSettings, SIZES } from '../engine/exportSettings';
+export type { ExportSettings, SizeId } from '../engine/exportSettings';
+export { SIZES } from '../engine/exportSettings';
 
-export type SizeId = 'source' | 'shorts' | 'landscape' | 'square' | 'k4' | 'k4l';
-export const SIZES: { id: SizeId; label: string; w: number; h: number }[] = [
-  { id: 'shorts', label: 'Shorts 9:16', w: 1080, h: 1920 },
-  { id: 'landscape', label: 'Landscape', w: 1920, h: 1080 },
-  { id: 'square', label: 'Square', w: 1080, h: 1080 },
-  { id: 'k4', label: '4K vertical', w: 2160, h: 3840 },
-  { id: 'k4l', label: '4K landscape', w: 3840, h: 2160 },
-];
 
 // ---------- the camera (Camera step) ----------
 export const cameraOn = (p: CalibratedProject) => !!p.cameraTrack?.on;
@@ -40,18 +35,6 @@ export function cameraFrameAt(p: CalibratedProject, t: number, duration: number)
   return cameraAt(p, p.cameraTrack!, cameraPath(p), t, duration);
 }
 
-export interface ExportSettings {
-  size: SizeId;
-  fit: 'crop' | 'fit';
-  fps: number; // 0 = same as the video
-  codec: 'h264' | 'hevc';
-  quality: 'high' | 'medium' | 'small';
-  audioCopy: boolean;
-  transparent: boolean;
-  out: string;
-  /** export only the selected part of the timeline */
-  onlySelection?: boolean;
-}
 
 export interface Encoders { h264: string[]; hevc: string[]; prores: boolean }
 

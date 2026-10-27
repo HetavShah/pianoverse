@@ -3,7 +3,7 @@
 // between frames), and the particles are drawn into the light layer.
 import simSrc from '../shaders/particles_sim.wgsl?raw';
 import partsSrc from '../shaders/particles_draw.wgsl?raw';
-import { mulberry32 } from '../project';
+import { mulberry32 } from '../random';
 import type { UserFiles } from '../noteTextures';
 import type { Gpu } from './gpu';
 import type { FrameData, LightLayer } from './layers';

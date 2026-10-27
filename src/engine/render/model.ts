@@ -3,7 +3,8 @@
 import { fallUp } from '../direction';
 import { Look, resolveLook } from '../look';
 import { Lighting, resolveLighting } from '../lighting';
-import { Keyboard, keyboardOf, Note, ParticleScene, prepareNotes, ProjectFile, Rect, sourceRect, trackingMatrix, trimRange } from '../project';
+import { Note, ParticleScene, prepareNotes, ProjectFile, Rect, sourceRect, trackingMatrix, trimRange } from '../project';
+import { Keyboard, keyboardOf } from '../keyboard';
 import { resolveTitles, Titles } from '../titles';
 
 /** drawings shape particles can use at once (slot 0: the look's own shape, then one per section) */

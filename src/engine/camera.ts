@@ -1,7 +1,8 @@
 // The virtual camera: a list of shots over the video, each a framing (Wide, Follow your hands, or a fixed Close-up),
 // joined by transitions (Cut, Glide, Punch, Dip to black, Dip to white). `cameraAt` gives the window of the video
 // to show at any moment; the renderer draws the frame through it.
-import { keyboardOf, ProjectFile, RawNote, sourceRect, trackingMatrix, trimRange } from './project';
+import { ProjectFile, RawNote, sourceRect, trackingMatrix, trimRange } from './project';
+import { keyboardOf } from './keyboard';
 import { BeatGrid, estimateBeats, nearestBeat } from './audio/beats';
 
 export type Aspect = 'vertical' | 'landscape' | 'square';

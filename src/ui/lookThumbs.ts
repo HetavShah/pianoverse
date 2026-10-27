@@ -1,7 +1,8 @@
 // Gallery pictures: each look rendered on the user's own video, cropped to where the notes meet the keys.
 // They are drawn by a renderer of their own, so the main preview is never touched.
 import { applyPreset, Preset } from '../engine/look';
-import { keyboardOf, sourceRect, trackingMatrix, type ProjectFile } from '../engine/project';
+import { sourceRect, trackingMatrix, type ProjectFile } from '../engine/project';
+import { keyboardOf } from '../engine/keyboard';
 import { Renderer } from '../engine/render';
 import type { UserFiles } from '../engine/noteTextures';
 

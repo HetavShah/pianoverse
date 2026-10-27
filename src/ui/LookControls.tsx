@@ -2,7 +2,8 @@
 import { noteName } from '../engine/calibration';
 import { useEffect, useRef, useState } from 'react';
 import Dial from './Dial';
-import { COLOR_BY, Control, GRADIENTS, hexToHsv, hsvToHex, LayerId, Look, LOOK_SCHEMA, NOTE_STYLE_CARDS, NOTE_TEXTURES, noteColor, PaletteId, toHex } from '../engine/look';
+import { COLOR_BY, GRADIENTS, hexToHsv, hsvToHex, Look, NOTE_TEXTURES, noteColor, PaletteId, toHex } from '../engine/look';
+import { Control, LayerId, LOOK_SCHEMA, NOTE_STYLE_CARDS } from './style/lookSchema';
 import { deleteTexture, importShape, importTexture, isSvg, textureThumb, UserTexture, useUserTextures } from './textureStore';
 import { sameValue } from '../engine/look';
 import ShapePicker from './ShapePicker';

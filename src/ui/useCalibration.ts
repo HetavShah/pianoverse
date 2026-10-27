@@ -5,7 +5,7 @@ import {
 } from '../engine/calibration';
 import { cornersOf, Quad } from '../engine/geometry';
 import { startTracking, TrackJob, TrackProgress } from './trackRun';
-import type { KeyFit } from '../engine/project';
+import type { KeyFit } from '../engine/keyboard';
 
 export function defaultCorners(w: number, h: number): Quad {
   // a keyboard-shaped box in the lower middle of the frame, to be dragged into place

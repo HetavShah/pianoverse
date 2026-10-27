@@ -1,5 +1,6 @@
 // Which way notes fall on screen.
-import { keyboardOf, ProjectFile, trackingMatrix } from './project';
+import { ProjectFile, trackingMatrix } from './project';
+import { keyboardOf } from './keyboard';
 
 export type ProjectWithLook = ProjectFile & { look?: { noteAngle?: number | null } };
 
