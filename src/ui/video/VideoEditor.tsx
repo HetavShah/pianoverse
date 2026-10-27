@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { Rect } from '../../engine/project';
 import { sourceRect, trimRange } from '../../engine/project';
 import type { WS } from '../app/workspace';
+import Icon from '../components/icons';
+import MiniTransport from '../components/MiniTransport';
 
 const SHAPES: { id: string; label: string; r: number | null }[] = [
   { id: 'free', label: 'Free', r: null },
@@ -178,23 +180,16 @@ export default function VideoEditor({ ws }: { ws: WS }) {
           </div>
           <small className="help">Drag a corner of the picture to crop{ratio ? ' (keeps the shape)' : ''}; drag inside to move it.</small>
           <span className="mono small-text">{Math.round(crop.w)}×{Math.round(crop.h)}{cropped ? ` of ${W}×${H}` : ''}</span>
-          {cropped && <button type="button" className="btn small" onClick={() => { setShape('free'); setCrop(null); }}>Reset crop</button>}
+          {cropped && <button type="button" className="btn small" onClick={() => { setShape('free'); setCrop(null); }}><Icon name="reset" />Reset crop</button>}
         </div>
       </div>
 
       <div className="ve-trim">
-        <div className="ve-trim-head">
-          <button type="button" className="btn icon small" onClick={ws.togglePlay} aria-label={ws.playing ? 'Pause' : 'Play'}>
-            {ws.playing
-              ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
-              : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z" /></svg>}
-          </button>
-          <span className="mono small-text">{fmt(ws.time)}</span>
-          <span className="spacer" />
+        <MiniTransport ws={ws}>
           <span className="small-text">Start <b className="mono">{fmt(trimA)}</b></span>
           <span className="small-text">End <b className="mono">{fmt(trimB)}</b></span>
           <span className="small-text dim">Length <span className="mono">{fmt(trimB - trimA)}</span></span>
-        </div>
+        </MiniTransport>
         <div className="ve-bar" ref={bar} onPointerDown={onTrimDown} onPointerMove={onTrimMove} onPointerUp={() => { tdrag.current = null; }}
           role="group" aria-label="Trim: drag the two handles">
           <div className="ve-strip">{strip.map((s, i) => <img key={i} src={s} alt="" />)}</div>
@@ -206,9 +201,9 @@ export default function VideoEditor({ ws }: { ws: WS }) {
           <div className="ve-head-line" style={{ left: pc(ws.time) }} />
         </div>
         <div className="row">
-          <button type="button" className="btn small" onClick={() => setTrim(ws.time, trimB)} disabled={ws.time >= trimB - MIN_LEN}>Start here</button>
-          <button type="button" className="btn small" onClick={() => setTrim(trimA, ws.time)} disabled={ws.time <= trimA + MIN_LEN}>End here</button>
-          {trimmed && <button type="button" className="link inline small-text" onClick={() => setEdit({ trim: undefined })}>Use the whole video</button>}
+          <button type="button" className="btn small" onClick={() => setTrim(ws.time, trimB)} disabled={ws.time >= trimB - MIN_LEN} title="Start the video at the playhead"><Icon name="trimStart" />Start here</button>
+          <button type="button" className="btn small" onClick={() => setTrim(trimA, ws.time)} disabled={ws.time <= trimA + MIN_LEN} title="End the video at the playhead"><Icon name="trimEnd" />End here</button>
+          {trimmed && <button type="button" className="link inline small-text" onClick={() => setEdit({ trim: undefined })}><Icon name="reset" size={13} />Use the whole video</button>}
         </div>
       </div>
     </section>

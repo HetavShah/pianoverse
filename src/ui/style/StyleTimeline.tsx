@@ -7,6 +7,7 @@ import { FONT, INK } from '../components/palette';
 import type { CalibratedProject } from '../../engine/calibration';
 import { pal, ParticleScene } from '../../engine/project';
 import { sceneName } from './ShapeSections';
+import Icon from '../components/icons';
 
 const LABEL_W = 0; // labels live in HTML beside the canvas
 const RULER = 22, NOTES_H = 116, GAP = 12, TRACK_H = 6, GAP2 = 26, PART_H = 20;
@@ -148,7 +149,7 @@ export default function StyleTimeline(props: {
       <div className="tl-head">
         <b>The take</b>
         <span className="dim">{range ? <>Section <span className="mono">{fmt(range[0], true)} – {fmt(range[1], true)}</span></> : 'Click to jump, or drag the playhead. Drag across to pick a section to loop.'}</span>
-        {range && <button type="button" className="btn small ghost" onClick={() => onRange(null)}>Clear section</button>}
+        {range && <button type="button" className="btn small ghost" onClick={() => onRange(null)}><Icon name="clear" />Clear section</button>}
         <span className="spacer" />
         <span className="tl-legend">{grid.bpm ? <span className="mono">{Math.round(grid.bpm)} bpm</span> : null}{trackOn && <><i className="sw locked" />Locked <i className="sw unsure" />Unsure <i className="sw lost" />Lost <i className="sw fix" />Fix</>}</span>
       </div>

@@ -7,6 +7,8 @@ import { Control, LayerId, LOOK_SCHEMA, NOTE_STYLE_CARDS } from './lookSchema';
 import { deleteTexture, importShape, importTexture, isSvg, textureThumb, UserTexture, useUserTextures } from '../services/textureStore';
 import { sameValue } from '../../engine/look';
 import ShapePicker from './ShapePicker';
+import Icon from '../components/icons';
+import ValueEdit from '../components/ValueEdit';
 
 type Set = (k: keyof Look, v: unknown) => void;
 type Patch = (p: Partial<Look>) => void;
@@ -205,14 +207,14 @@ function Row({ c, look, base, set, patch }: { c: Control; look: Look; base: Look
   const v = look[c.key];
   const changed = !sameValue(v, base[c.key]);
   const reset = changed ? (
-    <button type="button" className="reset" onClick={() => set(c.key, base[c.key])} title="Back to the preset's value" aria-label={`Reset ${c.label}`}>Reset</button>
+    <button type="button" className="reset" onClick={() => set(c.key, base[c.key])} title="Back to the preset's value" aria-label={`Reset ${c.label}`}><Icon name="reset" size={13} /></button>
   ) : null;
   switch (c.kind) {
     case 'slider': {
       const n = v as number;
       return (
         <div className="ctl" title={c.hint}>
-          <div className="ctl-head"><span>{c.label}</span>{reset}<span className="mono val">{c.fmt ? c.fmt(n) : n}</span></div>
+          <div className="ctl-head"><span>{c.label}</span>{reset}<ValueEdit value={n} min={c.min} max={c.max} step={c.step} fmt={c.fmt} label={c.label} onChange={(v) => set(c.key, v)} /></div>
           {c.hue
             ? <input type="range" min={c.min} max={c.max} step={c.step} value={n} className="hue-track"
                 onChange={(e) => set(c.key, Number(e.target.value))} onDoubleClick={() => set(c.key, base[c.key])} aria-label={c.label} />

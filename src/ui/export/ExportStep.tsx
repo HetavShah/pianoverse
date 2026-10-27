@@ -223,7 +223,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
           <span className="ex-label">Save to</span>
           <div className="ex-save">
             <input type="text" className="mono" value={s.out} onChange={(e) => set({ out: e.target.value })} disabled={running} spellCheck={false} />
-            <button type="button" className="btn" onClick={browse} disabled={running || !inTauri()}>Browse</button>
+            <button type="button" className="btn" onClick={browse} disabled={running || !inTauri()}><Icon name="folder" />Browse</button>
           </div>
         </div>
       </div>
@@ -246,7 +246,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
               <span className="mono dim">{run.p && run.p.done > 10 ? `${fmtDur(run.p.eta)} left` : ''}</span>
             </div>
             <div className="bar"><i style={{ width: `${run.p ? (100 * run.p.done) / run.p.total : 0}%` }} /></div>
-            <div className="row"><span /><button type="button" className="btn small" onClick={() => { cancel.current = true; }}>Cancel</button></div>
+            <div className="row"><span /><button type="button" className="btn small" onClick={() => { cancel.current = true; }}><Icon name="cancel" />Cancel</button></div>
           </div>
         )}
         {run.kind === 'done' && (
@@ -254,14 +254,14 @@ export default function ExportStep({ ws }: { ws: WS }) {
             <b>Saved in {fmtDur(run.secs)}</b>
             {run.files.map((f) => (
               <div key={f} className="ex-file"><span className="mono" title={f}>{f.split(/[\\/]/).pop()}</span>
-                {inTauri() && <button type="button" className="link" onClick={() => showFile(f)}>Show in folder</button>}</div>
+                {inTauri() && <button type="button" className="link" onClick={() => showFile(f)}><Icon name="folder" />Show in folder</button>}</div>
             ))}
           </div>
         )}
         {run.kind === 'error' && <div className="ex-error"><b>The export stopped</b><pre>{run.message}</pre></div>}
 
         <button type="button" className="btn primary big" onClick={start} disabled={running || !enc || !s.out}><Icon name="export" size={18} />{run.kind === 'done' ? 'Export again' : 'Export video'}</button>
-        <button type="button" className="btn" onClick={savePng} disabled={running}>Save current frame as PNG</button>
+        <button type="button" className="btn" onClick={savePng} disabled={running}><Icon name="saveImage" />Save current frame as PNG</button>
         {msg && <small className="dim">{msg}</small>}
       </aside>
 

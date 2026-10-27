@@ -9,7 +9,11 @@ import Dial from '../components/Dial';
 import { sourceOf } from './useNotes';
 import type { NoteFinderId as NoteFinder } from '../../engine/ml/noteFinder';
 import WaveSync, { attackTimes, matchScore } from './WaveSync';
+import Icon from '../components/icons';
+import { trimRange } from '../../engine/project';
+import MiniTransport from '../components/MiniTransport';
 import type { WS } from '../app/workspace';
+import ValueEdit from '../components/ValueEdit';
 
 const fmtOffset = (o: number) => (Math.abs(o) < 1 ? `${o >= 0 ? '+' : '−'}${Math.abs(o * 1000).toFixed(0)} ms` : `${o >= 0 ? '+' : '−'}${Math.abs(o).toFixed(3)} s`);
 
@@ -31,7 +35,10 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
   const [center, setCenter] = useState<number | null>(null);
   useEffect(() => { if (src) setCenter((c) => (c === null || Math.abs(src.offset - c) > 1 ? src.offset : c)); }, [src?.offset]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!project) return null;
-  const score = n.audio && src ? matchScore(attacks, placed, ws.duration || n.audio.duration) : null;
+  // only the part kept on the Video step counts
+  const kept = trimRange(project, ws.duration || n.audio?.duration || project.video.frames / (project.video.fps || 30));
+  const inKept = placed.filter((x) => x.s >= kept[0] && x.s <= kept[1]);
+  const score = n.audio && src ? matchScore(attacks, placed, kept) : null;
   const range = pitchRange(placed);
   const out = outOfRange(placed, project.keyboard.lowestNote, project.keyboard.keys);
   const outside = out.below + out.above;
@@ -51,8 +58,8 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
         <div className="title-row">
           <p className="sub">Each white tick is a note. It should sit on an attack in your audio.</p>
           <div className="seg big" role="radiogroup" aria-label="Where the notes come from">
-            <PickButton what="midi" className={'seg-btn' + (src?.kind === 'midi' ? ' on' : '')} onPick={ws.pick} onFiles={ws.onFiles} disabled={!!busy}>From MIDI file</PickButton>
-            <button type="button" className={'seg-btn' + (src && src.kind === 'audio' ? ' on' : '')} disabled={!!busy} onClick={runDetect}>Detect from audio</button>
+            <PickButton what="midi" className={'seg-btn' + (src?.kind === 'midi' ? ' on' : '')} onPick={ws.pick} onFiles={ws.onFiles} disabled={!!busy}><Icon name="midiFile" />From MIDI file</PickButton>
+            <button type="button" className={'seg-btn' + (src && src.kind === 'audio' ? ' on' : '')} disabled={!!busy} onClick={runDetect}><Icon name="detect" />Detect from audio</button>
           </div>
         </div>
 
@@ -75,7 +82,7 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
             <span className="dim" title="The MIDI file">{src.name}</span>
             <span className="mono dim">offset {fmtOffset(src.offset)}</span>
             {syncLabel}
-            <button type="button" className="btn small" onClick={n.autoAlign}>Re-run alignment</button>
+            <button type="button" className="btn small" onClick={n.autoAlign} title="Line the notes up with the audio again"><Icon name="update" />Align again</button>
           </div>
         ) : (
           <div className="banner">
@@ -83,12 +90,18 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
             <b>{src.name}</b>
             <span className="mono dim">{src.notes.length} notes</span>
             {syncLabel}
-            <button type="button" className="btn small" onClick={() => setShowDetect(true)}>Detection settings</button>
+            <button type="button" className="btn small" onClick={() => setShowDetect(true)}><Icon name="settings" />Detection settings</button>
           </div>
         )}
 
         <div className="wave-card">
+          <MiniTransport ws={ws}>
+            <label className="toggle-inline" title="A click on every note, to hear whether the notes and the audio line up">
+              <input type="checkbox" checked={clickOn} onChange={(e) => setClickOn(e.target.checked)} /> Click on each note
+            </label>
+          </MiniTransport>
           <WaveSync
+            range={kept}
             audio={n.audio}
             notes={placed}
             attacks={attacks}
@@ -101,7 +114,7 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
         </div>
 
         <div className="stat-cards">
-          <div className="stat"><span>Notes</span><b>{placed.length || '—'}</b></div>
+          <div className="stat"><span>Notes</span><b>{inKept.length || '—'}</b></div>
           <div className="stat"><span>Range</span><b>{range ? `${noteName(range[0])}–${noteName(range[1])}` : '—'}</b></div>
           <div className="stat"><span>Sustain pedal</span><b>{src?.kind === 'midi' ? (src.sustain ? 'Used' : 'Not used') : '—'}</b></div>
           <div className={'stat' + (outside ? ' warn' : '')}>
@@ -114,7 +127,8 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
       <aside className="page-side">
         <h2>Fine-tune</h2>
         <div className="side-field">
-          <span className="ctl-head"><span>Offset</span><span className="mono val">{src ? fmtOffset(src.offset) : '—'}</span></span>
+          <span className="ctl-head"><span>Offset</span>{src ? <ValueEdit value={src.offset} min={c - 1} max={c + 1} step={0.001} fmt={fmtOffset} label="Offset" onChange={(v) => n.setOffset(v)}
+            parse={(t) => { const x = Number(t.replace(/[−–]/g, '-').replace(/[^\d.+-]/g, '')); return Number.isFinite(x) ? (/\bs\b/.test(t) && !/ms/.test(t) ? x : x / 1000) : null; }} /> : <span className="mono val">—</span>}</span>
           <Dial value={src?.offset ?? 0} min={c - 1} max={c + 1} step={0.001} label="Offset" fmt={fmtOffset} stops={false} disabled={!src}
             onChange={(v) => n.setOffset(v)} />
           <div className="nudge">
@@ -123,13 +137,6 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
             ))}
           </div>
         </div>
-        <label className="toggle-row">
-          <span><b>Play click on each note</b><small>Hear whether the notes and the audio line up</small></span>
-          <input type="checkbox" checked={clickOn} onChange={(e) => setClickOn(e.target.checked)} />
-        </label>
-        <button type="button" className="btn wide" onClick={ws.togglePlay}>
-          {ws.playing ? 'Pause' : 'Play from the playhead'}
-        </button>
         <label className="side-field">
           <span>Transpose</span>
           <select value={src?.transpose ?? 0} disabled={!src} onChange={(e) => n.setTranspose(Number(e.target.value))}>
@@ -156,13 +163,13 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
               <span>More</span>
             </label>
           )}
-          <button type="button" className="btn small" disabled={!!busy} onClick={runDetect}>Detect notes again</button>
-          {src && <button type="button" className="btn small ghost" disabled={!!busy} onClick={n.clear}>Remove notes</button>}
+          <button type="button" className="btn small" disabled={!!busy} onClick={runDetect}><Icon name="detect" />Detect notes again</button>
+          {src && <button type="button" className="btn small ghost" disabled={!!busy} onClick={n.clear}><Icon name="remove" />Remove notes</button>}
         </details>
       </aside>
 
       <footer className="page-foot">
-        <button type="button" className="btn" onClick={() => ws.goStep('video')}>Back</button>
+        <button type="button" className="btn" onClick={() => ws.goStep('video')}><Icon name="back" />Back</button>
         <button type="button" className="btn primary" onClick={() => ws.goStep('calibrate')}>Continue to calibration <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
       </footer>
     </div>

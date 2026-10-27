@@ -5,6 +5,10 @@ import { apply, planeToImage } from '../../engine/geometry';
 import CalibrateCanvas from './CalibrateCanvas';
 import { QualityStrip } from './QualityStrip';
 import type { WS } from '../app/workspace';
+import Icon from '../components/icons';
+import MiniTransport from '../components/MiniTransport';
+import ScrubBar from '../components/ScrubBar';
+import { trimRange } from '../../engine/project';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 const DEFAULT_EDGE = { a: -0.03, b: 0 };
@@ -77,9 +81,9 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
             <span className="dim">Frame {fmtT(ws.time)} · {c.tracked ? (c.fixHere ? 'this frame has a fix' : 'drag a corner to fix this frame') : 'drag a corner handle to adjust'}</span>
           </div>
           <div className="zoom-ctl">
-            <button type="button" className="btn icon" onClick={() => setZoomCmd({ n: zoomCmd.n + 1, k: 1 / 1.4 })} aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10" stroke="currentColor" strokeWidth="1.6" /></svg></button>
+            <button type="button" className="btn icon" onClick={() => setZoomCmd({ n: zoomCmd.n + 1, k: 1 / 1.4 })} aria-label="Zoom out" title="Zoom out"><Icon name="zoomOut" /></button>
             <button type="button" className="btn zoom-val" onClick={() => setZoomCmd({ n: zoomCmd.n + 1, k: 'fit' })} title="Fit">{Math.round(z * 100)}%</button>
-            <button type="button" className="btn icon" onClick={() => setZoomCmd({ n: zoomCmd.n + 1, k: 1.4 })} aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M7 2v10" stroke="currentColor" strokeWidth="1.6" /></svg></button>
+            <button type="button" className="btn icon" onClick={() => setZoomCmd({ n: zoomCmd.n + 1, k: 1.4 })} aria-label="Zoom in" title="Zoom in"><Icon name="zoomIn" /></button>
           </div>
         </div>
         <div className="canvas-card">
@@ -103,20 +107,21 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
             />
           )}
         </div>
-        <div className="mini-transport">
-          <button type="button" className="play small" onClick={ws.togglePlay} aria-label={ws.playing ? 'Pause' : 'Play'}>
-            {ws.playing ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg> : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z" /></svg>}
-          </button>
-          <div className="scrub-col">
-            <div className="row"><span className="dim">Tracking quality across the clip</span><span className="mono dim">{fmtT(ws.time)} / {fmtT(ws.duration)}</span></div>
-            <QualityStrip project={project} duration={ws.duration} onSeek={ws.seek} />
-            <input className="scrub" type="range" min={0} max={ws.duration || 1} step={0.001} value={ws.time} onChange={(ev) => ws.seek(Number(ev.target.value))} aria-label="Timeline" />
-            <div className="legend-row">
-              <span><i className="sw locked" />Locked</span><span><i className="sw unsure" />Unsure</span><span><i className="sw lost" />Lost</span>
-              <span><i className="sw ref" />Marked frame</span><span><i className="sw fix" />Fix</span>
-              <span className="dim">· click the bar to check a spot · scroll the frame to zoom, drag to pan</span>
+        <div className="cal-timeline">
+          <MiniTransport ws={ws} />
+          {cal?.cameraMoves ? (
+            <div className="scrub-col">
+              <QualityStrip project={project} duration={ws.duration} onSeek={ws.seek} />
+              <input className="scrub" type="range" min={0} max={ws.duration || 1} step={0.001} value={ws.time} onChange={(ev) => ws.seek(Number(ev.target.value))} aria-label="Timeline" />
+              <div className="legend-row">
+                <span className="dim">Tracking:</span>
+                <span><i className="sw locked" />Locked</span><span><i className="sw unsure" />Unsure</span><span><i className="sw lost" />Lost</span>
+                <span><i className="sw ref" />Marked frame</span><span><i className="sw fix" />Fix</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="scrub-col"><ScrubBar time={ws.time} duration={ws.duration} trim={project.edit?.trim ? trimRange(project, ws.duration) : null} onSeek={ws.seek} /></div>
+          )}
         </div>
       </div>
 
@@ -154,7 +159,7 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
             <div className="track-run">
               <div className="bar"><div style={{ width: `${tp ? Math.min(100, (tp.done / Math.max(0.01, tp.total)) * 100) : 0}%` }} /></div>
               <small>{tp ? `Tracking ${fmtT(tp.done)} of ${fmtT(tp.total)}${tp.lost ? ` · ${tp.lost} unsure frames` : ''}` : 'Preparing…'}</small>
-              <button type="button" className="btn small ghost" onClick={c.cancelTracking}>Cancel</button>
+              <button type="button" className="btn small ghost" onClick={c.cancelTracking}><Icon name="cancel" />Cancel</button>
             </div>
           ) : cal?.cameraMoves ? (
             <>
@@ -177,7 +182,7 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
               ))}
             </ul>
           )}
-          {c.tracked && <button type="button" className="link inline small-text" onClick={c.clearTracking}>Discard tracking</button>}
+          {c.tracked && <button type="button" className="link inline small-text" onClick={c.clearTracking}><Icon name="remove" size={13} />Discard tracking</button>}
         </Item>
         <Item n={6} done={!!kb.fit && c.fitting === null} active={trackDone && !kb.fit} title="Line up the keys"
           sub={c.fitting !== null ? 'Matching the keys to the picture…'
@@ -194,7 +199,7 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
       </aside>
 
       <footer className="page-foot">
-        <button type="button" className="btn" onClick={() => ws.goStep('audio')}>Back</button>
+        <button type="button" className="btn" onClick={() => ws.goStep('audio')}><Icon name="back" />Back</button>
         <button type="button" className="btn primary" disabled={running} onClick={() => { ws.setProject({ ...project, progress: { ...project.progress, calibrated: true } }); ws.goStep('style'); }}>Continue to style <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
       </footer>
     </div>

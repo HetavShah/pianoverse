@@ -14,6 +14,8 @@ export interface ShortcutActions {
   goStep: (s: Step) => void;
   togglePlay: () => void;
   seek: (t: number) => void;
+  /** the part kept on the Video step (Home and End jump to its ends) */
+  trim: [number, number] | null;
   loop: Loop;
   setLoop: (l: Loop) => void;
   toggleStats: () => void;
@@ -52,8 +54,8 @@ export function useShortcuts(videoRef: React.MutableRefObject<HTMLVideoElement |
       if (e.code === 'Space') { e.preventDefault(); x.togglePlay(); }
       else if (e.code === 'ArrowRight' && v && !onSlider) { e.preventDefault(); x.seek(v.currentTime + (e.shiftKey ? 1 : st)); }
       else if (e.code === 'ArrowLeft' && v && !onSlider) { e.preventDefault(); x.seek(v.currentTime - (e.shiftKey ? 1 : st)); }
-      else if (e.code === 'Home' && v && !onSlider) { e.preventDefault(); x.seek(0); }
-      else if (e.code === 'End' && v && !onSlider) { e.preventDefault(); x.seek(v.duration || 0); }
+      else if (e.code === 'Home' && v && !onSlider) { e.preventDefault(); x.seek(x.trim ? x.trim[0] : 0); }
+      else if (e.code === 'End' && v && !onSlider) { e.preventDefault(); x.seek(x.trim ? Math.max(x.trim[0], x.trim[1] - 0.05) : v.duration || 0); }
       else if (e.code === 'KeyL') { const l = x.loop; x.setLoop({ ...l, on: !l.on }); toast(l.on ? 'Loop off' : l.range ? 'Looping the selected part' : 'Looping the whole video'); }
       else if (e.code === 'KeyP') x.toggleStats();
       else if (e.key === '?') x.toggleHelp();

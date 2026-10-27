@@ -4,6 +4,7 @@ import { noteName, PRESETS } from '../../engine/calibration';
 import PickButton from '../components/PickButton';
 import { makeThumb, fmtDur } from '../services/projectStore';
 import type { WS } from '../app/workspace';
+import Icon from '../components/icons';
 
 export default function ImportStep({ ws }: { ws: WS }) {
   const { project, video, videoIssue } = ws;
@@ -51,11 +52,11 @@ export default function ImportStep({ ws }: { ws: WS }) {
             </div>
             <div className="actions">
               {(videoIssue?.kind === 'unsupported' || videoIssue?.kind === 'error') && video.path && (
-                <button type="button" className="btn primary small" onClick={ws.convert}>Convert video</button>
+                <button type="button" className="btn primary small" onClick={ws.convert}><Icon name="convert" />Convert video</button>
               )}
               {videoIssue?.kind === 'missing'
                 ? <PickButton what="video" className="btn primary small" onPick={ws.pick} onFiles={ws.onFiles}>Choose the video again</PickButton>
-                : <PickButton what="video" className="btn small" onPick={ws.pick} onFiles={ws.onFiles}>Replace</PickButton>}
+                : <PickButton what="video" className="btn small" onPick={ws.pick} onFiles={ws.onFiles}><Icon name="replace" />Replace</PickButton>}
             </div>
           </div>
         ) : (
@@ -68,7 +69,7 @@ export default function ImportStep({ ws }: { ws: WS }) {
               <b>Choose the performance video</b>
               <small>mp4, mov or webm · or drop it anywhere on this window (with its MIDI file too, if you have one)</small>
             </div>
-            <div className="actions"><PickButton what="video" className="btn primary small" onPick={ws.pick} onFiles={ws.onFiles}>Choose video</PickButton></div>
+            <div className="actions"><PickButton what="video" className="btn primary small" onPick={ws.pick} onFiles={ws.onFiles}><Icon name="folder" />Choose video</PickButton></div>
           </div>
         )}
 

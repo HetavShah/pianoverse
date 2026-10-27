@@ -43,15 +43,15 @@ export default function TopBar(props: {
           <span className="trail">
             {STEPS.slice(0, FLOW_STEPS).map((s, i) => (
               <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done(s.id) ? ' done' : '')} disabled={s.id !== 'import' && !ready}
-                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'step' : undefined}>
-                <Icon name={s.id} size={15} />{s.label}{done(s.id) && step !== s.id && <Tick />}
+                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'step' : undefined} title={s.label}>
+                <Icon name={s.id} size={15} /><span className="lbl">{s.label}</span>{done(s.id) && step !== s.id && <Tick />}
               </button>
             ))}
           </span>
           <span className="rooms">
             {STEPS.slice(FLOW_STEPS).map((s) => (
               <button key={s.id} type="button" className={'step-btn room' + (step === s.id ? ' on' : '')} disabled={!ready}
-                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'page' : undefined}><Icon name={s.id} size={15} />{s.label}</button>
+                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'page' : undefined} title={s.label}><Icon name={s.id} size={15} /><span className="lbl">{s.label}</span></button>
             ))}
           </span>
         </nav>

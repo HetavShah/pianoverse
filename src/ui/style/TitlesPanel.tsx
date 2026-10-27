@@ -4,6 +4,7 @@ import Dial from '../components/Dial';
 import { cardTimes, resolveTitles, Titles, TITLE_STYLES } from '../../engine/titles';
 import { toastError } from '../components/toast';
 import type { WS } from '../app/workspace';
+import Icon from '../components/icons';
 
 /** a picked logo, shrunk to at most 512 px and kept as a PNG data URL */
 async function logoFrom(file: File): Promise<string> {
@@ -45,7 +46,7 @@ export default function TitlesPanel({ ws }: { ws: WS }) {
               <input type="checkbox" checked={T.intro.credit} onChange={(e) => set({ intro: { credit: e.target.checked } })} /></label>
             <div className="ctl"><div className="ctl-head"><span>Length</span><span className="val">{secs(T.intro.dur)}</span></div>
               <Dial value={T.intro.dur} min={2} max={8} step={0.5} label="Opening title length" fmt={secs} base={4.5} onChange={(v) => set({ intro: { dur: v } }, true)} /></div>
-            <button type="button" className="link inline small-text" onClick={() => ws.seek(Math.min(1.6, (times.intro?.[1] ?? 2) / 2))}>Show it on the preview</button>
+            <button type="button" className="link inline small-text" onClick={() => ws.seek(Math.min(1.6, (times.intro?.[1] ?? 2) / 2))}><Icon name="show" size={13} />Show it on the preview</button>
           </>
         )}
       </div>
@@ -61,7 +62,7 @@ export default function TitlesPanel({ ws }: { ws: WS }) {
               <input type="checkbox" checked={T.outro.logo} disabled={!brand.logo} onChange={(e) => set({ outro: { logo: e.target.checked } })} /></label>
             <div className="ctl"><div className="ctl-head"><span>Length</span><span className="val">{secs(T.outro.dur)}</span></div>
               <Dial value={T.outro.dur} min={3} max={10} step={0.5} label="End card length" fmt={secs} base={5} onChange={(v) => set({ outro: { dur: v } }, true)} /></div>
-            <button type="button" className="link inline small-text" onClick={() => times.outro && ws.seek(times.outro[0] + 2.4)}>Show it on the preview</button>
+            <button type="button" className="link inline small-text" onClick={() => times.outro && ws.seek(times.outro[0] + 2.4)}><Icon name="show" size={13} />Show it on the preview</button>
           </>
         )}
       </div>
@@ -83,7 +84,7 @@ export default function TitlesPanel({ ws }: { ws: WS }) {
           <span className="logo-pick">
             {brand.logo && <img src={brand.logo} alt="Your logo" />}
             <button type="button" className="btn small" onClick={() => logoInput.current?.click()}>{brand.logo ? 'Replace' : 'Add image'}</button>
-            {brand.logo && <button type="button" className="link inline small-text" onClick={() => ws.setBrand({ ...brand, logo: '' })}>Remove</button>}
+            {brand.logo && <button type="button" className="link inline small-text" onClick={() => ws.setBrand({ ...brand, logo: '' })}><Icon name="remove" size={13} />Remove</button>}
           </span>
           <input ref={logoInput} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden
             onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { ws.setBrand({ ...brand, logo: await logoFrom(f) }); } catch (err) { toastError(err); } }} />

@@ -4,6 +4,7 @@ import { fmtDur } from '../services/projectStore';
 import { trimRange } from '../../engine/project';
 import type { WS } from '../app/workspace';
 import VideoEditor from './VideoEditor';
+import Icon from '../components/icons';
 
 const Arrow = () => <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg>;
 
@@ -36,7 +37,7 @@ export default function VideoStep({ ws }: { ws: WS }) {
       </aside>
 
       <footer className="page-foot">
-        <button type="button" className="btn" onClick={() => ws.goStep('import')}>Back</button>
+        <button type="button" className="btn" onClick={() => ws.goStep('import')}><Icon name="back" />Back</button>
         <button type="button" className="btn primary" onClick={() => ws.goStep('audio')}>Continue to audio <Arrow /></button>
       </footer>
     </div>

@@ -7,6 +7,8 @@ import type { CalibratedProject } from '../../engine/calibration';
 import { pal } from '../../engine/project';
 import type { BeatGrid } from '../../engine/audio/beats';
 import { DEFAULT_DUR, Shot, Transition, TRANSITION_LABEL } from '../../engine/camera';
+import Icon from '../components/icons';
+import ValueEdit from '../components/ValueEdit';
 
 const KIND_LABEL = { wide: 'Wide', follow: 'Follow', close: 'Close-up' } as const;
 const fmt = (t: number, fine = false) => {
@@ -133,14 +135,14 @@ export default function CameraTimeline(props: {
                 </div>
                 {join.in !== 'cut' && (
                   <div className="ctl">
-                    <div className="ctl-head"><span>Length</span><span className="mono val">{join.inDur.toFixed(2)} s</span></div>
+                    <div className="ctl-head"><span>Length</span><ValueEdit value={join.inDur} min={DUR_RANGE[join.in][0]} max={DUR_RANGE[join.in][1]} step={0.05} fmt={(v) => `${v.toFixed(2)} s`} label="Transition length" onChange={(v) => onTransition(selJoin, join.in, v)} /></div>
                     <Dial value={join.inDur} min={DUR_RANGE[join.in][0]} max={DUR_RANGE[join.in][1]} step={0.05} label="Transition length" fmt={(v) => `${v.toFixed(2)} s`} base={DEFAULT_DUR[join.in]}
                       onChange={(v) => onTransition(selJoin, join.in, v)} />
                   </div>
                 )}
                 <div className="row">
                   <small>{join.in === 'cut' ? 'Jumps straight to the next shot.' : join.in === 'glide' ? 'Moves smoothly into the next framing.' : join.in === 'punch' ? 'A quick push in, then settles back.' : `Fades to ${join.in === 'dipWhite' ? 'white' : 'black'}, then into the next shot.`}</small>
-                  <button type="button" className="link inline small-text danger-text" onClick={() => onRemoveJoin(selJoin)}>Remove this cut</button>
+                  <button type="button" className="link inline small-text danger-text" onClick={() => onRemoveJoin(selJoin)}><Icon name="remove" size={13} />Remove this cut</button>
                 </div>
               </div>
             )}

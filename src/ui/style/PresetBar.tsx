@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Preset, presetLookFrom } from '../../engine/look';
 import { deletePreset, savePreset, setDefaultPreset } from '../services/presetStore';
 import type { WS } from '../app/workspace';
+import Icon from '../components/icons';
 
 export default function PresetBar({ ws, preset, modified, onOpenLooks }: { ws: WS; preset: Preset; modified: boolean; onOpenLooks?: () => void }) {
   const project = ws.project!;
@@ -42,16 +43,16 @@ export default function PresetBar({ ws, preset, modified, onOpenLooks }: { ws: W
       {modified && <small className="mod">Changed from “{preset.name}”</small>}
       {naming === null ? (
         <div className="preset-actions">
-          <button type="button" className="btn small" onClick={() => setNaming(modified ? `${preset.name} 2` : 'My look')}>Save as a new look</button>
+          <button type="button" className="btn small" onClick={() => setNaming(modified ? `${preset.name} 2` : 'My look')}><Icon name="save" />Save as a new look</button>
           {modified && !preset.builtIn && <button type="button" className="btn small" disabled={busy} onClick={update}>Update “{preset.name}”</button>}
           {!isDefault && <button type="button" className="link inline small-text" onClick={async () => { await setDefaultPreset(preset.id); await ws.refreshPresets(); }}>Use for new projects</button>}
-          {!preset.builtIn && <button type="button" className="link inline small-text danger-text" disabled={busy} onClick={remove}>Delete this look</button>}
+          {!preset.builtIn && <button type="button" className="link inline small-text danger-text" disabled={busy} onClick={remove}><Icon name="remove" size={13} />Delete this look</button>}
         </div>
       ) : (
         <form className="preset-actions" onSubmit={(e) => { e.preventDefault(); saveNew(); }}>
           <input type="text" autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} aria-label="Preset name" />
           <div className="row">
-            <button type="button" className="btn small ghost" onClick={() => setNaming(null)}>Cancel</button>
+            <button type="button" className="btn small ghost" onClick={() => setNaming(null)}><Icon name="cancel" />Cancel</button>
             <button type="submit" className="btn small primary" disabled={busy || !naming.trim()}>Save</button>
           </div>
         </form>

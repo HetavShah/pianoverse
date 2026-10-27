@@ -269,7 +269,7 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .calib-wrap { position: absolute; inset: 0; }
 .calib-wrap canvas { display: block; outline: none; touch-action: none; }
 .calib-hud { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 6px 12px; background: rgba(22, 22, 21, 0.9); font-size: 12px; white-space: nowrap; pointer-events: none; }
-.mini-transport { display: flex; align-items: flex-start; gap: 14px; }
+.cal-timeline { display: flex; flex-direction: column; gap: 8px; }
 .scrub-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
 .quality { width: 100%; height: 12px; cursor: pointer; display: block; }
 .legend-row { display: flex; gap: 14px; flex-wrap: wrap; color: var(--stone); font-size: 12px; align-items: center; }
@@ -726,3 +726,48 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .menu button kbd { margin-left: auto; }
 .seg button .icon, .seg .seg-btn .icon { margin-right: 7px; }
 .row-actions .btn .icon { margin-right: -2px; }
+
+/* ---------- the small transport (MiniTransport) and icon buttons ---------- */
+.mini-transport { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.mini-transport .mt-time { margin-left: 8px; font-size: 12.5px; color: var(--stone); white-space: nowrap; }
+.mini-transport .mt-time b { color: var(--paper); font-weight: 600; }
+.mini-transport > .small-text { white-space: nowrap; margin-left: 12px; }
+.play-round { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--paper); color: var(--ground); cursor: pointer; flex: none; }
+.play-round:hover { background: #fff; }
+.play-round .icon { fill: currentColor; }
+.hear { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--rule-2); background: none; color: var(--paper); cursor: pointer; }
+.hear:hover:not(:disabled) { border-color: var(--paper); }
+.hear:disabled { opacity: 0.4; cursor: default; }
+.hear .icon { fill: currentColor; margin-left: 1px; }
+.toggle-inline { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--stone); cursor: pointer; white-space: nowrap; }
+.toggle-inline:hover { color: var(--paper); }
+.reset { display: inline-flex; align-items: center; text-decoration: none; }
+.btn .icon { margin-right: -1px; }
+.wave-card { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- the top bar on narrower windows: it gives way step by step and never pushes the page wider ---------- */
+.topbar { min-width: 0; overflow: hidden; }
+.stepper, .trail, .rooms { min-width: 0; }
+@media (max-width: 1440px) {
+  .project-name { max-width: 140px; }
+  .stepper { gap: 24px; }
+  .rooms { gap: 18px; padding-left: 24px; }
+}
+@media (max-width: 1320px) {
+  .step-btn.room .lbl { display: none; }
+  .rooms { gap: 4px; }
+  .step-btn.room { padding: 0 8px; }
+}
+@media (max-width: 1120px) {
+  .project-name, .saved { display: none; }
+  .trail .step-btn:not(.on) .lbl { display: none; }
+  .trail { gap: 12px; }
+}
+
+/* ---------- a dial's value, typeable (ValueEdit) ---------- */
+.ctl-head .val-edit { margin-left: auto; padding: 0 2px; border: 0; background: none; cursor: text; border-bottom: 1px dashed transparent; }
+.ctl-head .val-edit:hover:not(:disabled) { border-bottom-color: var(--dim); }
+.ctl-head .val-edit:disabled { cursor: default; }
+.ctl-head .val-input { margin-left: auto; width: 96px; padding: 0 4px; text-align: right; background: var(--raise-2); color: var(--paper); border: 1px solid var(--live); border-radius: 0; outline: none; font-size: 16px; height: 24px; }
+/* a text link with an icon keeps them on one line */
+.link:has(.icon) { display: inline-flex; align-items: center; gap: 5px; }

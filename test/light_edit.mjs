@@ -36,7 +36,7 @@ await seekBar(20.02);
 await page.click('text=Start here'); await page.waitForTimeout(300);
 await seekBar(30.02);
 await page.click('text=End here'); await page.waitForTimeout(300);
-const th = await page.locator('.ve-trim-head').innerText();
+const th = await page.locator('.video-edit .mini-transport').innerText();
 ok(/Start\s*0:(19\.9|20\.[01])/.test(th) && /End\s*0:(29\.9|30\.[01])/.test(th), 'trim 20–30 s  ' + th.replace(/\s+/g, ' '));
 
 // ---- Style keeps the crop ----

@@ -13,6 +13,8 @@ import Transport from '../components/Transport';
 import { INK } from '../components/palette';
 import { sourceRect } from '../../engine/project';
 import type { WS } from '../app/workspace';
+import Icon from '../components/icons';
+import ValueEdit from '../components/ValueEdit';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 const KIND_LABEL: Record<ShotKind, string> = { wide: 'Wide', follow: 'Follow', close: 'Close-up' };
@@ -168,7 +170,7 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
 
       <aside className="style-side">
         <div className="insp-head"><h2>Camera</h2></div>
-        <button type="button" className="btn primary wide" disabled={!on} onClick={() => rebuild(track.auto)}>Auto camera</button>
+        <button type="button" className="btn primary wide" disabled={!on} onClick={() => rebuild(track.auto)}><Icon name="auto" />Auto camera</button>
         <div className={'cam-auto' + (on ? '' : ' off')}>
           <div className="cam-opt"><span className="section-label">Cuts</span>
             <Seg3 value={track.auto.cuts} options={[['none', 'None'], ['bars', 'On bars'], ['often', 'Often']]} onChange={(v) => setAuto({ cuts: v })} /></div>
@@ -186,18 +188,18 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
             <div className="row"><h2>Shot {shotI + 1}</h2><span className="mono dim small-text">{fmtT(shot.start)} – {fmtT(shots[shotI + 1]?.start ?? duration)}</span></div>
             <Seg3 value={shot.kind} options={[['wide', 'Wide'], ['follow', 'Follow'], ['close', 'Close-up']]} onChange={(k) => setKind(shotI, k)} />
             {shot.kind === 'follow' && (
-              <div className="ctl"><div className="ctl-head"><span>How close</span><span className="mono val">{shot.zoom.toFixed(2)}×</span></div>
+              <div className="ctl"><div className="ctl-head"><span>How close</span><ValueEdit value={shot.zoom} min={0.7} max={1.8} step={0.05} fmt={(v) => `${v.toFixed(2)}×`} label="How close" onChange={(v) => setShot(shotI, { zoom: v })} /></div>
                 <Dial value={shot.zoom} min={0.7} max={1.8} step={0.05} label="How close" fmt={(v) => `${v.toFixed(2)}×`} base={1} onChange={(v) => setShot(shotI, { zoom: v })} /></div>
             )}
             {shot.kind === 'close' && (
-              <div className="ctl"><div className="ctl-head"><span>Zoom</span><span className="mono val">{Math.min(shot.zoom, zMax).toFixed(2)}×</span></div>
+              <div className="ctl"><div className="ctl-head"><span>Zoom</span><ValueEdit value={Math.min(shot.zoom, zMax)} min={1.1} max={Math.max(1.2, zMax)} step={0.05} fmt={(v) => `${v.toFixed(2)}×`} label="Zoom" onChange={(v) => setShot(shotI, { zoom: v })} /></div>
                 <Dial value={Math.min(shot.zoom, zMax)} min={1.1} max={Math.max(1.2, zMax)} step={0.05} label="Zoom" fmt={(v) => `${v.toFixed(1)}×`} base={2} onChange={(v) => setShot(shotI, { zoom: v })} /></div>
             )}
             <p className="help">
               {shot.kind === 'wide' ? 'The whole video.' : shot.kind === 'follow' ? 'Keeps your hands in frame, closer when they are together.' : 'A fixed close-up. Drag the box in the small picture to frame it.'}
             </p>
             <div className="row">
-              <button type="button" className="btn small" onClick={addCut} title="Add a cut at the playhead (on the nearest beat)">Add a cut here</button>
+              <button type="button" className="btn small" onClick={addCut} title="Add a cut at the playhead (on the nearest beat)"><Icon name="cut" />Add a cut here</button>
               {shotI > 0 && <button type="button" className="link inline small-text" onClick={() => { setSelJoin(shotI); setSelShot(null); }}>Its transition: {shot.in === 'cut' ? 'Cut' : shot.in === 'dipBlack' ? 'Dip black' : shot.in === 'dipWhite' ? 'Dip white' : shot.in === 'glide' ? 'Glide' : 'Punch'}</button>}
             </div>
           </div>

@@ -30,6 +30,7 @@ import { useSession } from './ui/app/useSession';
 import { useShortcuts } from './ui/app/useShortcuts';
 import { useSound } from './ui/app/useSound';
 import { exposeForTests } from './ui/app/testHooks';
+import { trimRange } from './engine/project';
 
 export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -82,6 +83,7 @@ export default function App() {
   useShortcuts(videoRef, {
     active: inProject, fps: project?.video.fps ?? 30, canLeaveImport: ready,
     undo, redo, goStep: session.goStep, togglePlay: playback.togglePlay, seek: playback.seek,
+    trim: project && playback.duration ? trimRange(project, playback.duration) : null,
     loop: playback.loop, setLoop: playback.setLoop,
     toggleStats: () => setShowStats((s) => !s), toggleHelp: () => setShortcuts((s) => !s), closeHelp: () => setShortcuts(false),
   });

@@ -2,8 +2,10 @@
 // a family. Screens ask for an icon by what it stands for (a step, a Style panel, an action), never by its drawing,
 // so changing an icon is a one-line change in this file.
 import {
-  Aperture, AudioLines, AudioWaveform, Crosshair, Download, Droplets, Film, FolderOpen, Image, Keyboard, LayoutGrid,
-  Lightbulb, LucideIcon, Music2, Palette, Plus, RefreshCw, Save, Sparkles, Sun, Type, Upload, Video, Wand2, Zap,
+  Aperture, ArrowLeft, ArrowLeftToLine, ArrowRightToLine, AudioLines, AudioWaveform, Columns2, Crop, Crosshair, Download,
+  Droplets, Eraser, Eye, FileMusic, Film, FolderOpen, Headphones, Image, ImageDown, Keyboard, LayoutGrid, Lightbulb,
+  LocateFixed, LucideIcon, Maximize2, Music2, Palette, Pause, Play, Plus, RefreshCw, Repeat, Replace, RotateCcw, RotateCw,
+  Save, Scissors, SkipBack, SkipForward, SlidersHorizontal, Sparkles, Star, Sun, Trash2, Type, Upload, Video, Wand2, X, Zap, ZoomIn, ZoomOut,
 } from 'lucide-react';
 
 const ICONS = {
@@ -14,8 +16,14 @@ const ICONS = {
   background: Image, finish: Aperture, titles: Type,
   // the Audio pages
   notesSync: Music2, sound: AudioWaveform,
+  // playback
+  play: Play, pause: Pause, toStart: SkipBack, toEnd: SkipForward, loop: Repeat, zoomIn: ZoomIn, zoomOut: ZoomOut, fit: Maximize2, follow: LocateFixed,
   // actions
   newProject: Plus, openFile: FolderOpen, save: Save, update: RefreshCw, shortcuts: Keyboard,
+  reset: RotateCcw, remove: Trash2, clear: Eraser, replace: Replace, folder: FolderOpen, saveImage: ImageDown, back: ArrowLeft,
+  cancel: X, settings: SlidersHorizontal, midiFile: FileMusic, detect: Wand2, compareVideo: Columns2, compareSound: Headphones,
+  trimStart: ArrowLeftToLine, trimEnd: ArrowRightToLine, crop: Crop, cut: Scissors, auto: Wand2, clockwise: RotateCw,
+  anticlockwise: RotateCcw, show: Eye, favourite: Star, convert: RefreshCw,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

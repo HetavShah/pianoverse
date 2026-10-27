@@ -8,6 +8,8 @@ import ScrubBar from '../components/ScrubBar';
 import { DEFAULT_LIGHTING, LIGHT_PRESETS, Lighting, lightPresetOf, resolveLighting } from '../../engine/lighting';
 import { sourceRect, trimRange } from '../../engine/project';
 import type { WS } from '../app/workspace';
+import Icon from '../components/icons';
+import ValueEdit from '../components/ValueEdit';
 
 type Ctl = { key: keyof Lighting; label: string; min: number; max: number; step: number; fmt: (v: number) => string; hint?: string };
 const pct = (v: number) => `${Math.round(v * 100)}%`;
@@ -54,8 +56,8 @@ export default function LightStep({ ws, attachPreview }: { ws: WS; attachPreview
       <div className={'ctl' + (off ? ' off' : '')} key={c.key}>
         <div className="ctl-head">
           <span>{c.label}</span>
-          {changed && <button type="button" className="link inline small-text" onClick={() => set({ [c.key]: DEFAULT_LIGHTING[c.key] })} title="Back to as filmed">Reset</button>}
-          <span className="mono val">{c.fmt(v)}</span>
+          {changed && <button type="button" className="reset" onClick={() => set({ [c.key]: DEFAULT_LIGHTING[c.key] })} aria-label={`Reset ${c.label}`} title="Back to as filmed"><Icon name="reset" size={13} /></button>}
+          <ValueEdit value={v} min={c.min} max={c.max} step={c.step} fmt={c.fmt} label={c.label} disabled={off} onChange={(x) => set({ [c.key]: x })} />
         </div>
         <Dial value={v} min={c.min} max={c.max} step={c.step} label={c.label} fmt={c.fmt} base={DEFAULT_LIGHTING[c.key]} disabled={off} onChange={(x) => set({ [c.key]: x })} />
         {c.hint && <small className="help">{c.hint}</small>}
@@ -73,7 +75,7 @@ export default function LightStep({ ws, attachPreview }: { ws: WS; attachPreview
             onPointerDown={() => setCompare(true)} onPointerUp={() => setCompare(false)} onPointerLeave={() => setCompare(false)}
             onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setCompare(true); } }}
             onKeyUp={() => setCompare(false)}
-            title="Hold to see the video as filmed">Hold to compare</button>
+            title="Hold to see the video as filmed, without the lighting"><Icon name="compareVideo" />Hold for original</button>
         </div>
         <div className="preview-stage">
           <div className="preview-frame" style={{ aspectRatio: `${Math.round(R.w)} / ${Math.round(R.h)}` }} onClick={ws.togglePlay} title={ws.playing ? 'Click to pause' : 'Click to play'}>

@@ -60,12 +60,12 @@ const px = await page.$eval('.sound-wave canvas', (c) => {
 ok(px.live > 1000 && px.riser > 200, 'waveform drawn  ' + JSON.stringify(px));
 ok(/1:05\.4/.test(await page.locator('.stat-cards').innerText()), 'export length includes the swell and the ring-out  ' + (await page.locator('.stat-cards').innerText()).replace(/\s+/g, ' '));
 // play through the chain for a moment
-await page.waitForFunction(() => /Hear it/.test(document.querySelector('.sound-end button')?.textContent ?? ''), null, { timeout: 60000 });
-await page.click('.sound-end >> nth=0 >> text=Hear it'); await page.waitForTimeout(2000); await page.waitForTimeout(2500);
+await page.waitForSelector('[aria-label="Hear the start"]:not([disabled])', { timeout: 60000 });
+await page.click('[aria-label="Hear the start"]'); await page.waitForTimeout(4500);
 const t = await page.evaluate(() => document.querySelector('video').currentTime);
 ok(t > 0.5, 'plays through the sound chain  t=' + t.toFixed(2));
 await page.screenshot({ path: `${S}/step_audio_sound.png` });
-await page.click('.sound-bar .btn.icon'); await page.waitForTimeout(300);
+await page.click('.sound-card .play-round'); await page.waitForTimeout(300);
 // undo goes back
 await page.keyboard.press('Control+z'); await page.waitForTimeout(300);
 p = await proj();

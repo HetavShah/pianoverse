@@ -4,6 +4,8 @@
 import type { ParticleScene } from '../../engine/project';
 import ShapePicker, { BUILT_IN_SHAPES } from './ShapePicker';
 import Dial from '../components/Dial';
+import Icon from '../components/icons';
+import ValueEdit from '../components/ValueEdit';
 
 const fmt = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 const newId = () => 's' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
@@ -68,21 +70,21 @@ export default function ShapeSections(props: {
           {range && <button type="button" className="link" onClick={() => edit({ start: range[0], end: range[1] })}>Use the selected part of the timeline</button>}
           <ShapePicker value={sel.shape} onPick={(shape) => edit({ shape })} />
           <div className="ctl">
-            <div className="ctl-head"><span>Size</span><span className="mono val">{sel.size.toFixed(2)}×</span></div>
+            <div className="ctl-head"><span>Size</span><ValueEdit value={sel.size} min={0.3} max={1.6} step={0.01} fmt={(v) => `${v.toFixed(2)}×`} label="Shape size" onChange={(v) => edit({ size: v })} /></div>
             <Dial value={sel.size} min={0.3} max={1.6} step={0.01} label="Shape size" fmt={(v) => `${v.toFixed(2)}×`} base={1} onChange={(v) => edit({ size: v })} />
           </div>
           <div className="ctl">
             <div className="ctl-head"><span>Direction</span></div>
             <div className="seg full">
-              <button type="button" className={sel.dir === 'cw' ? 'on' : ''} onClick={() => edit({ dir: 'cw' })}>Clockwise</button>
-              <button type="button" className={sel.dir === 'ccw' ? 'on' : ''} onClick={() => edit({ dir: 'ccw' })}>Anticlockwise</button>
+              <button type="button" className={sel.dir === 'cw' ? 'on' : ''} onClick={() => edit({ dir: 'cw' })}><Icon name="clockwise" />Clockwise</button>
+              <button type="button" className={sel.dir === 'ccw' ? 'on' : ''} onClick={() => edit({ dir: 'ccw' })}><Icon name="anticlockwise" />Anticlockwise</button>
             </div>
           </div>
           <label className="toggle-row compact ctl">
             <span>Keep the normal particles too</span>
             <input type="checkbox" checked={sel.keep !== false} onChange={(e) => edit({ keep: e.target.checked })} />
           </label>
-          <button type="button" className="btn small ghost danger-text" onClick={() => { setScenes(scenes.filter((s) => s.id !== sel.id)); setSelected(null); }}>Remove this section</button>
+          <button type="button" className="btn small ghost danger-text" onClick={() => { setScenes(scenes.filter((s) => s.id !== sel.id)); setSelected(null); }}><Icon name="remove" />Remove this section</button>
         </div>
       )}
     </div>

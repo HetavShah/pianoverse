@@ -7,6 +7,9 @@ import { DEFAULT_SOUND, evenGainDb, Sound, SOUND_ENDS, SOUND_STARTS, TARGET_LUFS
 import { trimRange } from '../../engine/project';
 import type { WS } from '../app/workspace';
 import SoundWave from './SoundWave';
+import MiniTransport from '../components/MiniTransport';
+import Icon from '../components/icons';
+import ValueEdit from '../components/ValueEdit';
 
 type Ctl = { key: 'volume' | 'bass' | 'treble' | 'hall'; label: string; min: number; max: number; step: number; fmt: (v: number) => string; hint?: string };
 const db = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} dB`;
@@ -34,8 +37,8 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
     <div className="ctl" key={c.key}>
       <div className="ctl-head">
         <span>{c.label}</span>
-        {s[c.key] !== DEFAULT_SOUND[c.key] && <button type="button" className="link inline small-text" onClick={() => set({ [c.key]: DEFAULT_SOUND[c.key] })}>Reset</button>}
-        <span className="mono val">{c.fmt(s[c.key])}</span>
+        {s[c.key] !== DEFAULT_SOUND[c.key] && <button type="button" className="reset" onClick={() => set({ [c.key]: DEFAULT_SOUND[c.key] })} aria-label={`Reset ${c.label}`} title="Reset"><Icon name="reset" size={13} /></button>}
+        <ValueEdit value={s[c.key]} min={c.min} max={c.max} step={c.step} fmt={c.fmt} label={c.label} onChange={(v) => set({ [c.key]: v })} />
       </div>
       <Dial value={s[c.key]} min={c.min} max={c.max} step={c.step} label={c.label} fmt={c.fmt} base={DEFAULT_SOUND[c.key]} onChange={(v) => set({ [c.key]: v })} />
       {c.hint && <small className="help">{c.hint}</small>}
@@ -58,32 +61,26 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
         <p className="sub">Shape how the sound starts and ends, and how it sounds. Your video file isn't changed.</p>
 
         <div className="sound-card">
-          <div className="sound-bar">
-            <button type="button" className="btn icon small" onClick={ws.togglePlay} aria-label={ws.playing ? 'Pause' : 'Play'}>
-              {ws.playing
-                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
-                : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z" /></svg>}
-            </button>
-            <span className="mono small-text">{fmtT(ws.time)}</span>
-            <span className="spacer" />
+          <MiniTransport ws={ws}>
             <button type="button" className={'btn small' + (live.bypass ? ' on' : '')} disabled={!live.active}
               onPointerDown={() => live.setBypass(true)} onPointerUp={() => live.setBypass(false)} onPointerLeave={() => live.setBypass(false)}
               onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); live.setBypass(true); } }}
               onKeyUp={() => live.setBypass(false)}
-              title="Hold to hear the sound as recorded">Hold to hear as recorded</button>
-          </div>
+              title="Hold to hear the sound as recorded, without your settings"><Icon name="compareSound" />Hold for original</button>
+          </MiniTransport>
           <div className="sound-ends">
             <div className="sound-end">
               <div className="sound-end-head">
                 <span><span className="dim">Start</span> <b>{startInfo.label}</b>{s.start !== 'none' && <span className="mono dim"> · {secs(lens.start)}</span>}</span>
-                <button type="button" className="btn small" disabled={s.start === 'swell' && !live.swellReady} onClick={() => (s.start === 'swell' ? live.hearSwell(() => { if (ws.playing) ws.togglePlay(); ws.seek(span[0]); }, () => { if (ws.videoEl.current?.paused) ws.togglePlay(); }) : listen(span[0]))}>{s.start === 'swell' && !live.swellReady ? 'Making the swell…' : 'Hear it'}</button>
+                <button type="button" className="hear" disabled={s.start === 'swell' && !live.swellReady} onClick={() => (s.start === 'swell' ? live.hearSwell(() => { if (ws.playing) ws.togglePlay(); ws.seek(span[0]); }, () => { if (ws.videoEl.current?.paused) ws.togglePlay(); }) : listen(span[0]))}
+                  aria-label="Hear the start" title={s.start === 'swell' && !live.swellReady ? 'Making the swell…' : 'Hear the start'}><Icon name="play" size={14} /></button>
               </div>
               <SoundWave {...wave} view={startView} className="zoom" />
             </div>
             <div className="sound-end">
               <div className="sound-end-head">
                 <span><span className="dim">End</span> <b>{endInfo.label}</b>{s.end !== 'cut' && <span className="mono dim"> · {secs(lens.end)}</span>}</span>
-                <button type="button" className="btn small" onClick={() => listen(endView[0])}>Hear it</button>
+                <button type="button" className="hear" onClick={() => listen(endView[0])} aria-label="Hear the end" title="Hear the end"><Icon name="play" size={14} /></button>
               </div>
               <SoundWave {...wave} view={endView} className="zoom" />
             </div>
@@ -119,7 +116,7 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
           <small className="help">{startInfo.hint}.</small>
           {s.start !== 'none' && (
             <div className="ctl">
-              <div className="ctl-head"><span>Length</span><span className="mono val">{secs(s.startLen)}</span></div>
+              <div className="ctl-head"><span>Length</span><ValueEdit value={s.startLen} min={0.5} max={8} step={0.1} fmt={secs} label="Start length" onChange={(v) => set({ startLen: v })} /></div>
               <Dial value={s.startLen} min={0.5} max={8} step={0.1} label="Start length" fmt={secs} base={DEFAULT_SOUND.startLen} onChange={(v) => set({ startLen: v })} />
               {s.start === 'swell' && <small className="help">{project.titles?.intro?.on ? 'It plays over your opening title.' : 'The picture fades in from black meanwhile.'}</small>}
             </div>
@@ -138,7 +135,7 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
           <small className="help">{endInfo.hint}.</small>
           {s.end !== 'cut' && (
             <div className="ctl">
-              <div className="ctl-head"><span>{s.end === 'ring' ? 'Rings for' : 'Length'}</span><span className="mono val">{secs(s.endLen)}</span></div>
+              <div className="ctl-head"><span>{s.end === 'ring' ? 'Rings for' : 'Length'}</span><ValueEdit value={s.endLen} min={0.5} max={8} step={0.1} fmt={secs} label="End length" onChange={(v) => set({ endLen: v })} /></div>
               <Dial value={s.endLen} min={0.5} max={8} step={0.1} label="End length" fmt={secs} base={DEFAULT_SOUND.endLen} onChange={(v) => set({ endLen: v })} />
             </div>
           )}
@@ -160,11 +157,11 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
           )}
         </div>
 
-        {live.active && <button type="button" className="btn small ghost" onClick={() => ws.setProject({ ...project, sound: undefined })}>Back to the sound as recorded</button>}
+        {live.active && <button type="button" className="btn small ghost" onClick={() => ws.setProject({ ...project, sound: undefined })}><Icon name="reset" />Back to the sound as recorded</button>}
       </aside>
 
       <footer className="page-foot">
-        <button type="button" className="btn" onClick={() => ws.goStep('video')}>Back</button>
+        <button type="button" className="btn" onClick={() => ws.goStep('video')}><Icon name="back" />Back</button>
         <button type="button" className="btn primary" onClick={() => ws.goStep('calibrate')}>Continue to calibration <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg></button>
       </footer>
     </div>
