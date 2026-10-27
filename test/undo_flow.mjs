@@ -70,7 +70,7 @@ await page.evaluate(() => document.activeElement?.blur());
 await key('Control+z');
 check('undo restores the colour mode', JSON.stringify(await look()) === before, JSON.stringify(await look()).slice(0, 80));
 // calibration screen
-await key('Control+3'); await page.waitForTimeout(800);
+await key('Control+4'); await page.waitForTimeout(800);
 const cam0 = (await P()).camera ?? 'angled';
 await page.click(`.seg >> text=${cam0 === 'angled' ? 'Top-down' : 'Angled'}`).catch(async () => { await page.click(`text=${cam0 === 'angled' ? 'Top-down' : 'Angled'}`); });
 await page.waitForTimeout(300);
