@@ -514,7 +514,7 @@ export class Renderer {
         const hold = Math.min(dur, 6);
         const nS = Math.min(400, Math.round((fan ? 16 + 22 * vv + 40 * hold : 3 + 4 * vv) * lk.partSparks * amt));
         const nD = Math.round((30 + 45 * vv) * lk.partGlitter * amt);
-        const nG = lk.partGlow > 0 ? 1 + Math.min(150, Math.round((lk.partSmokeStyle === 'fountain' ? 14 + 10 * vv + 12 * hold : 1 + vv) * lk.partGlow)) : 0;
+        const nG = lk.partGlow > 0 ? 1 + Math.min(150, Math.round((lk.partSmokeStyle === 'fountain' ? 12 + 8 * vv + 5 * hold : 1 + vv) * lk.partGlow)) : 0;
         if (nS + nD + nG > 0) {
           const k = Math.min(1, (PER_EMIT - 8) / (nS + nD + nG));
           rows.push({ start: n.s, end: n.s + hold + 0.4 + 3.4 * lk.partLife, data: [n.s, Math.round(nG * k), Math.round(nS * k), Math.round(nD * k), tg.x, tg.y, 0, 0, ...n.col, vv, n.idx * 16 + 13, 6, tg.unit, dur] });
@@ -554,10 +554,12 @@ export class Renderer {
           const mid = this.whiteKeys / 2;
           const c0 = kb.P(mid, kb.edgeY(mid));
           const up = this.up, u = kb.unit(mid, kb.edgeY(mid));
-          const C: [number, number] = [c0[0] + up[0] * u * 4, c0[1] + up[1] * u * 4];
           const ang = Math.atan2(tg.along[1], tg.along[0]);
           const ends = [kb.P(0, kb.edgeY(0)), kb.P(this.whiteKeys, kb.edgeY(this.whiteKeys))];
           const half = Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) / 2;
+          // the ring floats above the keys: its near side (about a third of its radius below the centre) clears them
+          const lift = u * 2 + half * (1 + lk.partSpread) * 0.38;
+          const C: [number, number] = [c0[0] + up[0] * lift, c0[1] + up[1] * lift];
           const rate = 320 * (0.6 + 0.8 * vv) * lk.partAmount;
           if (rate > 0) rows.push({ start: n.s, end: n.s + 0.6 + 4.9 * lk.partLife, data: [n.s, Math.min(0.6, dur), rate, 0, tg.x, tg.y, C[0], C[1], ...n.col, vv, n.idx * 16, 4, ang, half * (1 + lk.partSpread)] });
         }

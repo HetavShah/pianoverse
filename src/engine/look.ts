@@ -702,7 +702,7 @@ const parts = (id: string) => PARTICLE_PRESETS.find((p) => p.id === id)!.set;
 //   rising haze, a star of light on each key and a saber lit only where you play.
 const fountainStyle: Partial<Look> = {
   ...parts('fountain'), partAmount: 0.3, partSize: 0.8, partRays: false,
-  partSparkStyle: 'fan', partSparks: 1.2, partSmokeStyle: 'fountain', partGlow: 1.5, partGlitter: 0.3, partAmbient: 1.1,
+  partSparkStyle: 'fan', partSparks: 1.2, partSmokeStyle: 'fountain', partGlow: 1.2, partGlitter: 0.3, partAmbient: 1.1,
   flashStar: 0.6, saberIdle: 0.25,
 };
 const concertStyle: Partial<Look> = {

@@ -421,7 +421,7 @@ fn layered(E: Emitter, k: u32, t: f32, st: ptr<function, u32>) -> Particle {
     let env = smoothstep(0.0, 0.35, age) * pow(clamp(1.0 - age / plife, 0.0, 1.0), 1.2);
     o.pos = pos;
     o.vel = vec2f(0.0);
-    o.b = env * (0.1 + 0.08 * E.vn);               // faint: the plumes build up where they overlap
+    o.b = env * (0.06 + 0.05 * E.vn);              // faint: the plumes build up where they overlap
     o.star = 0.0;
     o.z = u * (0.35 + 0.25 * rnd(st)) * (1.0 + 1.8 * age);   // radius in video px, swelling as it spreads
     o.pad = 2.0;
