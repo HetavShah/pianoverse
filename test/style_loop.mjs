@@ -12,7 +12,7 @@ await page.setInputFiles('.row-actions input[type=file]', 'samples/interstellar-
 await page.waitForTimeout(800);
 await page.setInputFiles('.file-card .actions input[type=file]', CLIP);
 await page.waitForTimeout(1500);
-await page.click('.stepper >> text=Style');
+await page.click('.stepper [title="Style"]');
 await page.waitForTimeout(1200);
 const vtime = () => page.evaluate(() => document.querySelector('video').currentTime);
 const paused = () => page.evaluate(() => document.querySelector('video').paused);

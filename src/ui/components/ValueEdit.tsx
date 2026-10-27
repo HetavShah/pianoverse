@@ -1,10 +1,11 @@
-// The value over a dial, which you can also type into: click it, type a number in the units shown ("0" for an offset
-// shown as "+421 ms", "50" for "50%"), Enter to set it, Esc to leave it as it was.
+// The value over a dial, which you can also type into: click it and it becomes editable right where it is, in the same
+// type (only a cursor and a thin line show you're typing). Type a number in the units shown ("0" for an offset shown
+// as "+421 ms", "50" for "50%"; the units can stay or go), Enter to set it, Esc to leave it as it was.
 //
 // Any dial's formatting works without a parser of its own: the typed number is matched against the formatted value of
 // every step on the dial and the closest is taken (a dial has at most a few thousand steps). A dial whose units change
 // across its range (an offset shown in ms, then in s) passes `parse`.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /** the first number in a formatted value ("−3.5 dB" → −3.5, "Off" → 0) */
 const numberIn = (s: string) => {
@@ -24,7 +25,9 @@ export default function ValueEdit({ value, min, max, step, fmt, onChange, disabl
   const [text, setText] = useState<string | null>(null);
   // Esc unmounts the field, which also blurs it: the blur mustn't set the value
   const cancelled = useRef(false);
-  const shown = fmt ? fmt(value) : String(value);
+  // a big jump (a stop on the dial, a typed value, Reset) rolls to the new number; dragging the dial shows it at once
+  const rolled = useRolling(value, max - min);
+  const shown = fmt ? fmt(rolled) : String(rolled);
 
   const commit = () => {
     if (text === null || cancelled.current) { cancelled.current = false; return; }
@@ -46,13 +49,36 @@ export default function ValueEdit({ value, min, max, step, fmt, onChange, disabl
 
   if (text === null) {
     return (
-      <button type="button" className="mono val val-edit" disabled={disabled} onClick={() => { cancelled.current = false; setText(String(numberIn(shown))); }}
+      <button type="button" className="val val-edit" disabled={disabled} onClick={() => { cancelled.current = false; setText(fmt ? fmt(value) : String(value)); }}
         title="Click to type a value" aria-label={`${label}: ${shown}. Click to type a value`}>{shown}</button>
     );
   }
   return (
-    <input className="mono val val-input" autoFocus value={text} aria-label={`${label}, type a value`}
+    <input className="val val-input" autoFocus value={text} aria-label={`${label}, type a value`} spellCheck={false}
+      style={{ width: `${Math.max(3, text.length) + 0.6}ch` }}
       onChange={(e) => setText(e.target.value)} onFocus={(e) => e.target.select()} onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') { e.preventDefault(); cancelled.current = true; setText(null); } e.stopPropagation(); }} />
   );
+}
+
+/** the value shown, rolling over ~a third of a second when it jumps by more than a tenth of the dial's range */
+function useRolling(value: number, range: number): number {
+  const [shown, setShown] = useState(value);
+  const cur = useRef(value);
+  useEffect(() => {
+    const from = cur.current;
+    const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (still || Math.abs(value - from) < range * 0.1) { cur.current = value; setShown(value); return; }
+    const t0 = performance.now(), d = 320;
+    let raf = 0;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - k, 3);
+      cur.current = from + (value - from) * e;
+      setShown(k < 1 ? cur.current : value);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value, range]);
+  return shown;
 }

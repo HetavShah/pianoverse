@@ -66,6 +66,33 @@ await type(label, '2');
 const look = (await proj()).look;
 ok(Object.values(look).includes(2), `typed ${label} 2`);
 
+// ---- every dial has a value you can type, and typing keeps the value's look ----
+const untyped = async () => page.evaluate(() => [...document.querySelectorAll('.dial')].filter((d) => {
+  let p = d.parentElement;
+  for (let i = 0; i < 3 && p; i++, p = p.parentElement) if (p.querySelector('.val-edit, .val-input')) return false;
+  return true;
+}).map((d) => d.querySelector('input')?.getAttribute('aria-label') ?? '?'));
+const missing = [];
+for (const step of ['Audio', 'Calibrate', 'Light']) { await page.click(`.stepper [title="${step}"]`); await page.waitForTimeout(1200); missing.push(...await untyped()); }
+await page.click('.stepper [title="Audio"]'); await page.waitForTimeout(800); await page.click('[role=tab] >> text=Sound'); await page.waitForTimeout(800); missing.push(...await untyped());
+await page.click('.stepper [title="Style"]'); await page.waitForTimeout(1500);
+for (const row of await page.locator('.layer-row').all()) { await row.click(); await page.waitForTimeout(400); missing.push(...await untyped()); }
+ok(missing.length === 0, 'every dial has a typeable value  ' + [...new Set(missing)].join(', '));
+await page.click('.layer-row >> text=Particles'); await page.waitForTimeout(500);
+const editLook = await page.evaluate(async () => {
+  const b = document.querySelector('.style-side button.val-edit');
+  const st = (el) => { const c = getComputedStyle(el); return [c.fontFamily, c.fontSize, c.color].join(' | '); };
+  const before = st(b); b.click(); await new Promise((r) => setTimeout(r, 100));
+  const after = st(document.querySelector('.style-side input.val-input'));
+  const input = document.querySelector('.style-side input.val-input');
+  const cs = getComputedStyle(input);
+  const line = cs.borderBottomStyle + (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 ? ' +outline' : '') + (cs.borderTopStyle !== 'none' ? ' +box' : '');
+  input.blur(); await new Promise((r) => setTimeout(r, 100));
+  return { before, after, line, gone: !document.querySelector('.style-side input.val-input') };
+});
+ok(editLook.before === editLook.after, 'typing keeps the same font, size and colour  ' + JSON.stringify(editLook));
+ok(editLook.line === 'solid' && editLook.gone, 'a line shows while typing and goes when you click away');
+
 // ---- the settings menu opens and its items can be used ----
 await page.click('[aria-label="Settings"]'); await page.waitForTimeout(300);
 const menu = await page.locator('.menu').boundingBox();

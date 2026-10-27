@@ -45,7 +45,7 @@ proj.keyboard.fit = FIT;
 writeFileSync('test/out/golden-project.pvproj.json', JSON.stringify(proj));
 await page.setInputFiles('.row-actions input[type=file]', 'test/out/golden-project.pvproj.json'); await page.waitForTimeout(600);
 await page.setInputFiles('.file-card .actions input[type=file]', 'samples/interstellar-take1.mp4'); await page.waitForTimeout(1500);
-await page.click('.stepper >> text=Style'); await page.waitForTimeout(1000);
+await page.click('.stepper [title="Style"]'); await page.waitForTimeout(1000);
 await page.keyboard.press('0'); await page.waitForTimeout(500);
 
 let fails = 0;

@@ -20,7 +20,7 @@ const labels = await page.$$eval('.stepper .step-btn', (els) => els.map((e) => e
 ok(labels.join(',') === 'Import,Video,Audio,Calibrate,Style,Light,Camera,Export', 'steps: ' + labels.join(', '));
 
 // Import: no MIDI card or trim any more
-await page.click('.stepper >> text=Import'); await page.waitForTimeout(500);
+await page.click('.stepper [title="Import"]'); await page.waitForTimeout(500);
 ok(await page.locator('.video-edit').count() === 0 && (await page.locator('.file-card').count()) === 1, 'Import has only the video');
 await page.screenshot({ path: `${S}/step_import.png` });
 

@@ -12,7 +12,7 @@ await page.setInputFiles('.row-actions input[type=file]', 'samples/interstellar-
 await page.waitForTimeout(600);
 await page.setInputFiles('.file-card .actions input[type=file]', CLIP);
 await page.waitForTimeout(1500);
-await page.click('.stepper >> text=Style');
+await page.click('.stepper [title="Style"]');
 await page.waitForTimeout(800);
 const look = () => page.evaluate(() => window.pianoverseProject.look ?? {});
 const panel = (name) => page.screenshot({ path: `${OUT}/${name}`, clip: { x: 1140, y: 56, width: 300, height: 690 } });

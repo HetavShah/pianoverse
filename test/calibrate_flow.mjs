@@ -19,7 +19,7 @@ await page.click('.row-actions >> text=New project');
 await page.setInputFiles('.file-card .actions input[type=file]', process.env.CLIP ?? '/home/claude/sample15.webm'); // a WebM copy of the sample (headless Chromium has no H.264)
 await page.waitForFunction(() => !!window.pianoverseProject, null, { timeout: 20000 });
 await page.screenshot({ path: `${OUT}/0-video-picked.png` });
-await page.click('.stepper >> text=Calibrate');
+await page.click('.stepper [title="Calibrate"]');
 await page.waitForSelector('.calib-wrap canvas');
 await page.waitForTimeout(800);
 await page.screenshot({ path: `${OUT}/1-calibrate-start.png` });

@@ -7,7 +7,6 @@ import { inTauri } from '../services/media';
 import Icon from '../components/icons';
 import { FLOW_STEPS, STEPS, Step } from './workspace';
 
-const Tick = () => <svg className="tick" width="11" height="11" viewBox="0 0 12 12" aria-label="done"><path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
 
 export default function TopBar(props: {
   inProject: boolean;
@@ -40,18 +39,21 @@ export default function TopBar(props: {
       {inProject && <span className="project-name" title={project?.name}>{project?.name ?? 'New project'}</span>}
       {inProject && (
         <nav className="stepper" aria-label="Steps">
+          {/* icons only; the step you're on slides open to show its name (the orange line under it: slidingInk.ts) */}
           <span className="trail">
-            {STEPS.slice(0, FLOW_STEPS).map((s, i) => (
+            {STEPS.slice(0, FLOW_STEPS).map((s) => (
               <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done(s.id) ? ' done' : '')} disabled={s.id !== 'import' && !ready}
-                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'step' : undefined} title={s.label}>
-                <Icon name={s.id} size={15} /><span className="lbl">{s.label}</span>{done(s.id) && step !== s.id && <Tick />}
+                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'step' : undefined} title={s.label} aria-label={s.label + (done(s.id) ? ' (done)' : '')}>
+                <Icon name={s.id} size={17} /><span className="lbl"><span>{s.label}</span></span>
               </button>
             ))}
           </span>
           <span className="rooms">
             {STEPS.slice(FLOW_STEPS).map((s) => (
               <button key={s.id} type="button" className={'step-btn room' + (step === s.id ? ' on' : '')} disabled={!ready}
-                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'page' : undefined} title={s.label}><Icon name={s.id} size={15} /><span className="lbl">{s.label}</span></button>
+                onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'page' : undefined} title={s.label} aria-label={s.label}>
+                <Icon name={s.id} size={17} /><span className="lbl"><span>{s.label}</span></span>
+              </button>
             ))}
           </span>
         </nav>

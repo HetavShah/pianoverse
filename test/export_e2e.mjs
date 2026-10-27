@@ -62,7 +62,7 @@ await page.setInputFiles('.row-actions input[type=file]', PROJ); await page.wait
 await page.setInputFiles('.file-card .actions input[type=file]', CLIP); await page.waitForTimeout(1500);
 // pick 0:02 - 0:04 (as if dragged on the Style timeline)
 await page.evaluate((r) => window.pianoverseSetLoop({ on: false, range: r }), RANGE);
-await page.click('.stepper >> text=Export'); await page.waitForTimeout(1500);
+await page.click('.stepper [title="Export"]'); await page.waitForTimeout(1500);
 await page.evaluate(() => {
   const b64 = (u8) => { let s = ''; const C = 0x8000; for (let i = 0; i < u8.length; i += C) s += String.fromCharCode.apply(null, u8.subarray(i, i + C)); return btoa(s); };
   window.__pvExportSink = {

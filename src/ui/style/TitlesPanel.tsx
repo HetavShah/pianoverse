@@ -5,6 +5,7 @@ import { cardTimes, resolveTitles, Titles, TITLE_STYLES } from '../../engine/tit
 import { toastError } from '../components/toast';
 import type { WS } from '../app/workspace';
 import Icon from '../components/icons';
+import ValueEdit from '../components/ValueEdit';
 
 /** a picked logo, shrunk to at most 512 px and kept as a PNG data URL */
 async function logoFrom(file: File): Promise<string> {
@@ -44,7 +45,7 @@ export default function TitlesPanel({ ws }: { ws: WS }) {
               <input type="text" value={T.intro.subtitle} placeholder="Composer or film, e.g. Hans Zimmer" onChange={(e) => set({ intro: { subtitle: e.target.value } }, true)} /></label>
             <label className="toggle-row compact"><span>Show “Played by {brand.name.trim() || 'your name'}”</span>
               <input type="checkbox" checked={T.intro.credit} onChange={(e) => set({ intro: { credit: e.target.checked } })} /></label>
-            <div className="ctl"><div className="ctl-head"><span>Length</span><span className="val">{secs(T.intro.dur)}</span></div>
+            <div className="ctl"><div className="ctl-head"><span>Length</span><ValueEdit value={T.intro.dur} min={2} max={8} step={0.5} fmt={secs} label="Opening title length" onChange={(v) => set({ intro: { dur: v } }, true)} /></div>
               <Dial value={T.intro.dur} min={2} max={8} step={0.5} label="Opening title length" fmt={secs} base={4.5} onChange={(v) => set({ intro: { dur: v } }, true)} /></div>
             <button type="button" className="link inline small-text" onClick={() => ws.seek(Math.min(1.6, (times.intro?.[1] ?? 2) / 2))}><Icon name="show" size={13} />Show it on the preview</button>
           </>
@@ -60,7 +61,7 @@ export default function TitlesPanel({ ws }: { ws: WS }) {
               <input type="text" value={T.outro.line} placeholder="Thanks for listening" onChange={(e) => set({ outro: { line: e.target.value } }, true)} /></label>
             <label className="toggle-row compact"><span>Show your logo{!brand.logo && <small>Add one under Your brand</small>}</span>
               <input type="checkbox" checked={T.outro.logo} disabled={!brand.logo} onChange={(e) => set({ outro: { logo: e.target.checked } })} /></label>
-            <div className="ctl"><div className="ctl-head"><span>Length</span><span className="val">{secs(T.outro.dur)}</span></div>
+            <div className="ctl"><div className="ctl-head"><span>Length</span><ValueEdit value={T.outro.dur} min={3} max={10} step={0.5} fmt={secs} label="End card length" onChange={(v) => set({ outro: { dur: v } }, true)} /></div>
               <Dial value={T.outro.dur} min={3} max={10} step={0.5} label="End card length" fmt={secs} base={5} onChange={(v) => set({ outro: { dur: v } }, true)} /></div>
             <button type="button" className="link inline small-text" onClick={() => times.outro && ws.seek(times.outro[0] + 2.4)}><Icon name="show" size={13} />Show it on the preview</button>
           </>

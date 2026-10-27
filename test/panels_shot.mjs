@@ -8,7 +8,7 @@ await page.addInitScript(() => { window.__pvHeadless = true; });
 await page.goto('http://localhost:4173/'); await page.waitForTimeout(800);
 await page.setInputFiles('.row-actions input[type=file]', 'samples/interstellar-take1.pvproj.json'); await page.waitForTimeout(600);
 await page.setInputFiles('.file-card .actions input[type=file]', '/home/claude/sample15a.webm'); await page.waitForTimeout(1500);
-await page.click('.stepper >> text=Style'); await page.waitForTimeout(1000);
+await page.click('.stepper [title="Style"]'); await page.waitForTimeout(1000);
 const shot = async (name) => {
   const box = await page.$eval('aside .ctl-section', (e) => { const r = e.parentElement.getBoundingClientRect(); return { x: r.x, w: r.width }; });
   await page.screenshot({ path: `${OUT}-${name}.png`, clip: { x: box.x, y: 56, width: box.w, height: 1500 } });

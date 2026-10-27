@@ -30,7 +30,7 @@ const fill = async () => page.evaluate(async () => {
 const shot = async (name) => { await fill(); await page.waitForTimeout(250); await page.screenshot({ path: `${OUT}/${name}.png` }); };
 const seek = (t) => page.evaluate((t) => new Promise((res) => { const v = document.querySelector('video'); v.addEventListener('seeked', () => setTimeout(res, 150), { once: true }); window.pianoverseSeek(t); }), t);
 
-await page.click('.stepper >> text=Camera'); await page.waitForTimeout(1500);
+await page.click('.stepper [title="Camera"]'); await page.waitForTimeout(1500);
 let tr = await track();
 check('first visit makes a camera with an automatic edit', !!tr && tr.on && tr.shots.length > 3, `${tr?.shots.length} shots, aspect ${tr?.aspect}`);
 check('the automatic edit is not an undo step', await page.$eval('button[aria-label=Undo]', (b) => b.disabled));
@@ -115,7 +115,7 @@ check('camera off', (await track()).on === false);
 await page.click('label:has-text("Camera") input[aria-label="Camera on"]'); await page.waitForTimeout(300);
 
 // export follows the frame shape
-await page.click('.stepper >> text=Export'); await page.waitForTimeout(1500);
+await page.click('.stepper [title="Export"]'); await page.waitForTimeout(1500);
 const sizes = await page.$$eval('.ex-size b', (e) => e.map((x) => x.textContent));
 check('export offers landscape sizes only', sizes.join() === 'Landscape,4K landscape', sizes.join());
 check('a size is selected', !!(await page.$('.ex-size.on')));

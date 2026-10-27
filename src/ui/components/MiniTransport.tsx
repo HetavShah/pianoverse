@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { WS } from '../app/workspace';
 import Icon from './icons';
+import PlayPause from './PlayPause';
 import { trimRange } from '../../engine/project';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
@@ -27,7 +28,7 @@ export default function MiniTransport({ ws, loop = false, children }: { ws: WS; 
         <button type="button" className="btn icon ghost" onClick={() => ws.seek(a)} aria-label="Skip to the start" title="Skip to the start (Home)"><Icon name="toStart" /></button>
         {jump5(true)}
         <button type="button" className="play-round" onClick={ws.togglePlay} aria-label={ws.playing ? 'Pause' : 'Play'} title={ws.playing ? 'Pause (Space)' : 'Play (Space)'}>
-          <Icon name={ws.playing ? 'pause' : 'play'} size={16} />
+          <PlayPause playing={ws.playing} />
         </button>
         {jump5(false)}
         <button type="button" className="btn icon ghost" onClick={() => ws.seek(Math.max(a, b - 0.05))} aria-label="Skip to the end" title="Skip to the end (End)"><Icon name="toEnd" /></button>

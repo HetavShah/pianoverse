@@ -9,6 +9,7 @@ import Icon from '../components/icons';
 import MiniTransport from '../components/MiniTransport';
 import ScrubBar from '../components/ScrubBar';
 import { trimRange } from '../../engine/project';
+import ValueEdit from '../components/ValueEdit';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 const DEFAULT_EDGE = { a: -0.03, b: 0 };
@@ -147,9 +148,9 @@ export default function CalibrateStep({ ws }: { ws: WS }) {
         <Item n={3} done={cornersDone} active={!cornersDone} title={cornersDone ? 'Corners placed' : 'Place the corners'}
           sub={cornersDone ? 'Key outlines match the keys in the frame' : 'Drag the four round handles onto the corners of the keys: back is where keys go under the case, front is nearest you.'} />
         <Item n={4} done={cornersDone && saberMoved} active={cornersDone && !c.tracked} title="Saber line" sub="Where the notes land: just behind the keys (the glowing line)">
-          <label className="slider-row"><span>Offset</span><span className="mono">{offsetPx} px</span></label>
+          <div className="ctl-head"><span>Offset</span><ValueEdit value={offsetPx} min={-Math.round(depthPx * 0.6)} max={Math.round(depthPx * 0.6)} step={1} fmt={(v) => `${v} px`} label="Saber offset" onChange={(v) => setSaber(v, tiltDeg)} /></div>
           <Dial value={offsetPx} min={-Math.round(depthPx * 0.6)} max={Math.round(depthPx * 0.6)} step={1} label="Saber offset" fmt={(v) => `${v} px`} base={0} stops={false} onChange={(v) => setSaber(v, tiltDeg)} />
-          <label className="slider-row"><span>Tilt</span><span className="mono">{tiltDeg.toFixed(1)}°</span></label>
+          <div className="ctl-head"><span>Tilt</span><ValueEdit value={Number(tiltDeg.toFixed(1))} min={-8} max={8} step={0.1} fmt={(v) => `${v.toFixed(1)}°`} label="Saber tilt" onChange={(v) => setSaber(offsetPx, v)} /></div>
           <Dial value={Number(tiltDeg.toFixed(1))} min={-8} max={8} step={0.1} label="Saber tilt" fmt={(v) => `${v.toFixed(1)}°`} base={0} stops={false} onChange={(v) => setSaber(offsetPx, v)} />
           <button type="button" className="btn small" onClick={() => c.onEdge(DEFAULT_EDGE, true)} disabled={!saberMoved}>Snap to key edge again</button>
         </Item>

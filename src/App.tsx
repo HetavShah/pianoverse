@@ -31,6 +31,7 @@ import { useShortcuts } from './ui/app/useShortcuts';
 import { useSound } from './ui/app/useSound';
 import { exposeForTests } from './ui/app/testHooks';
 import { trimRange } from './engine/project';
+import { installSlidingInk } from './ui/components/slidingInk';
 
 export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -38,6 +39,8 @@ export default function App() {
   const [showStats, setShowStats] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const library = useLibrary();
+  // the orange underline that slides to the chosen step or choice, everywhere in the app
+  useEffect(() => installSlidingInk(), []);
 
   // undo history: every edit goes through setProject
   const history = useHistory(project, setProjectState);

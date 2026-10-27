@@ -3,6 +3,7 @@
 import type { WS } from '../app/workspace';
 import { trimRange } from '../../engine/project';
 import Icon from './icons';
+import PlayPause from './PlayPause';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
 
@@ -20,7 +21,7 @@ export default function Transport({ ws, loopHint }: { ws: WS; loopHint?: string 
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.6" /><path d="M4 3v4h4" /><text x="12" y="15.5" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" stroke="none">5</text></svg>
         </button>
         <button type="button" className="play-round" onClick={ws.togglePlay} aria-label={ws.playing ? 'Pause' : 'Play'} title={ws.playing ? 'Pause (Space)' : 'Play (Space)'}>
-          <Icon name={ws.playing ? 'pause' : 'play'} size={16} />
+          <PlayPause playing={ws.playing} />
         </button>
         <button type="button" className="btn icon ghost" onClick={() => ws.seek(Math.min(b, ws.time + 5))} aria-label="Forward 5 seconds" title="Forward 5 s">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6" /><path d="M20 3v4h-4" /><text x="12" y="15.5" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" stroke="none">5</text></svg>

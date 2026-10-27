@@ -16,7 +16,7 @@ let fails = 0;
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 
 // ---- Video: crop ----
-await page.click('.stepper >> text=Video'); await page.waitForTimeout(600);
+await page.click('.stepper [title="Video"]'); await page.waitForTimeout(600);
 ok(await page.locator('.video-edit').count() === 1, 'trim and crop panel on Video');
 await page.click('.ve-side .seg >> text=1:1'); await page.waitForTimeout(400);
 const size = await page.locator('.ve-side .mono').innerText();
@@ -40,13 +40,13 @@ const th = await page.locator('.video-edit .mini-transport').innerText();
 ok(/Start\s*0:(19\.9|20\.[01])/.test(th) && /End\s*0:(29\.9|30\.[01])/.test(th), 'trim 20–30 s  ' + th.replace(/\s+/g, ' '));
 
 // ---- Style keeps the crop ----
-await page.click('.stepper >> text=Style'); await page.waitForTimeout(1500);
+await page.click('.stepper [title="Style"]'); await page.waitForTimeout(1500);
 const st = await page.evaluate(() => { const r = window.pianoverse.renderer; return { size: r.size, edit: r.project.edit }; });
 ok(st.size.width === st.size.height, 'preview is square  ' + JSON.stringify(st.size));
 ok(st.edit?.crop?.y > 0, 'crop moved down  ' + JSON.stringify(st.edit));
 
 // ---- Light ----
-await page.click('.stepper >> text=Light'); await page.waitForTimeout(1200);
+await page.click('.stepper [title="Light"]'); await page.waitForTimeout(1200);
 ok(await page.locator('.light-page').count() === 1, 'Light step opens');
 const frame = async () => page.evaluate(async () => {
   const r = window.pianoverse.renderer, v = document.querySelector('video');
@@ -79,7 +79,7 @@ await page.keyboard.press('Control+z'); await page.waitForTimeout(500);
 ok((await page.locator('.light-page .insp-kind').innerText()) === 'Night', 'undo brings the lighting back');
 
 // ---- export follows the trim ----
-await page.click('.stepper >> text=Export'); await page.waitForTimeout(1200);
+await page.click('.stepper [title="Export"]'); await page.waitForTimeout(1200);
 const len = await page.locator('.ex-stats').innerText();
 ok(/Length\s*0?:?10/.test(len.replace(/\n/g, ' ')) || /0:10/.test(len), 'export length is the trim  ' + len.split('\n').slice(0, 2).join(' '));
 ok(errors.length === 0, 'no errors  ' + errors.slice(0, 3).join(' | '));

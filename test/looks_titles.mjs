@@ -42,7 +42,7 @@ const still = async (name, t) => {
   writeFileSync(`${OUT}/${name}.jpg`, Buffer.from(png.split(',')[1], 'base64'));
 };
 
-await page.click('.stepper >> text=Style'); await page.waitForTimeout(1200);
+await page.click('.stepper [title="Style"]'); await page.waitForTimeout(1200);
 await seek(23.5);
 await page.keyboard.press('0'); await page.waitForTimeout(300);
 check('0 opens Looks', (await page.textContent('.insp-head h2')) === 'Looks');

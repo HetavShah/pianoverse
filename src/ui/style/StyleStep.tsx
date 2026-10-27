@@ -15,6 +15,7 @@ import type { WS } from '../app/workspace';
 import ShapeSections from './ShapeSections';
 import Icon from '../components/icons';
 import { sourceRect, type ParticleScene } from '../../engine/project';
+import ValueEdit from '../components/ValueEdit';
 
 type Panel = { id: LayerId; label: string; kind: (l: Look) => string; toggle?: keyof Layers };
 const PANELS: Panel[] = [
@@ -231,7 +232,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
                 </g>
               </svg>
               <Dial value={angle} min={-MAX_TILT} max={MAX_TILT} step={1} label="Note angle" fmt={(v) => `${v}°`} base={autoAngle} onChange={(v) => setNoteAngle(v)} />
-              <span className="deg">{angle}°</span>
+              <span className="deg"><ValueEdit value={angle} min={-MAX_TILT} max={MAX_TILT} step={1} fmt={(v) => `${v}°`} label="Note angle" onChange={(v) => setNoteAngle(v)} /></span>
             </div>
             <p className="help">
               {typeof setAngle === 'number'

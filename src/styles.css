@@ -93,7 +93,7 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .seg button, .seg .seg-btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 8px; border: 0; background: transparent; color: var(--stone); font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; }
 .seg button:hover:not(:disabled), .seg .seg-btn:hover { color: var(--paper); }
 .seg button:disabled, .seg .seg-btn:disabled { opacity: 0.4; cursor: default; }
-.seg button.on, .seg .seg-btn.on { color: var(--paper); font-weight: 700; box-shadow: inset 0 -2px 0 var(--live); }
+.seg button.on, .seg .seg-btn.on { color: var(--paper); font-weight: 700; }
 .seg.full { display: flex; width: 100%; }
 .seg.full button { flex: 1; }
 .seg.big .seg-btn, .seg.big button { height: 38px; padding: 0 12px; font-size: 14.5px; }
@@ -131,19 +131,8 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .brand { display: flex; align-items: center; font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; background: none; border: 0; color: var(--paper); cursor: pointer; padding: 0; font-family: inherit; }
 .brand:hover { color: var(--stone); }
 .project-name { align-self: center; color: var(--stone); font-size: 13px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stepper { display: flex; align-items: stretch; gap: 36px; margin: 0 auto 0 24px; }
-.trail { display: flex; align-items: stretch; gap: 16px; }
-.rooms { display: flex; align-items: stretch; gap: 26px; padding-left: 36px; border-left: 1px solid var(--rule); }
-.step-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--stone); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .step-btn:hover:not(:disabled) { color: var(--paper); }
 .step-btn:disabled { opacity: 0.35; cursor: default; }
-.step-btn .dot { font-size: 11px; font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; }
-.step-btn .tick { color: var(--ok); }
-.step-btn.on { color: var(--paper); font-weight: 600; box-shadow: inset 0 -2px 0 var(--live); }
-.step-btn.on .dot { color: var(--live); }
-.step-btn.room { font-family: var(--display); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
-.step-btn.room { transition: box-shadow 0.35s var(--ease), color 0.2s; }
-.step-btn.room.on { box-shadow: inset 0 -3px 0 var(--live); }
 .top-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .stepper + .top-right { margin-left: 0; }
 .saved { font-size: 12.5px; white-space: nowrap; }
@@ -611,9 +600,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
   .style-page { grid-template-columns: 80px minmax(0, 1fr) 310px; }
   .score { grid-template-columns: 210px minmax(0, 1fr); }
   .timecode { font-size: 28px; }
-  .rooms { padding-left: 24px; gap: 20px; }
-  .stepper { gap: 24px; }
-  .trail .step-btn { font-size: 12px; }
 }
 
 /* ---------- the dial: a tape of ticks under a fixed centre line ---------- */
@@ -721,9 +707,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 
 /* ---------- icons (ui/components/icons.tsx) ---------- */
 .icon { flex: none; display: block; }
-.step-btn .icon { opacity: 0.8; }
-.step-btn.on .icon { opacity: 1; color: var(--live); }
-.step-btn.room { gap: 7px; }
 .layer-row .num .icon { color: inherit; }
 .menu button { display: flex; align-items: center; gap: 10px; }
 .menu button kbd { margin-left: auto; }
@@ -751,31 +734,60 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .btn .icon { margin-right: -1px; }
 .wave-card { display: flex; flex-direction: column; gap: 10px; }
 
-/* ---------- the top bar on narrower windows: it gives way step by step and never pushes the page wider ---------- */
 /* only the steps may be cut off: the settings menu drops down out of the bar and must stay visible */
 .topbar { min-width: 0; }
-.stepper { min-width: 0; overflow: hidden; }
-.trail, .rooms { min-width: 0; }
-@media (max-width: 1440px) {
-  .project-name { max-width: 140px; }
-  .stepper { gap: 24px; }
-  .rooms { gap: 18px; padding-left: 24px; }
-}
-@media (max-width: 1320px) {
-  .step-btn.room .lbl { display: none; }
-  .rooms { gap: 4px; }
-  .step-btn.room { padding: 0 8px; }
-}
-@media (max-width: 1120px) {
-  .project-name, .saved { display: none; }
-  .trail .step-btn:not(.on) .lbl { display: none; }
-  .trail { gap: 12px; }
-}
+@media (max-width: 1320px) { .project-name { max-width: 140px; } }
+@media (max-width: 1000px) { .project-name, .saved { display: none; } }
 
-/* ---------- a dial's value, typeable (ValueEdit) ---------- */
-.ctl-head .val-edit { margin-left: auto; padding: 0 2px; border: 0; background: none; cursor: text; border-bottom: 1px dashed transparent; }
-.ctl-head .val-edit:hover:not(:disabled) { border-bottom-color: var(--dim); }
-.ctl-head .val-edit:disabled { cursor: default; }
-.ctl-head .val-input { margin-left: auto; width: 96px; padding: 0 4px; text-align: right; background: var(--raise-2); color: var(--paper); border: 1px solid var(--live); border-radius: 0; outline: none; font-size: 16px; height: 24px; }
-/* a text link with an icon keeps them on one line */
-.link:has(.icon) { display: inline-flex; align-items: center; gap: 5px; }
+/* ---------- a dial's value, typeable (ValueEdit): editing looks exactly like the value, plus a cursor ---------- */
+.val-edit, .val-input { font: inherit; color: inherit; letter-spacing: inherit; }
+.val-edit { padding: 0; border: 0; border-bottom: 1px dashed transparent; background: none; cursor: text; }
+.val-edit:hover:not(:disabled) { border-bottom-color: var(--dim); }
+.val-edit:disabled { cursor: default; }
+.val-input { padding: 0; border: 0; border-bottom: 1px solid var(--live); border-radius: 0; background: transparent; color: var(--paper); text-align: right; outline: none; caret-color: var(--live); max-width: 100%; }
+.val-input::selection { background: var(--live-soft); color: var(--paper); }
+/* only the line under it shows it's being typed in: no box round it */
+.val-input:focus, .val-input:focus-visible { outline: none; box-shadow: none; border-top: 0; border-left: 0; border-right: 0; }
+.ctl-head .val-edit, .ctl-head .val-input { margin-left: auto; }
+
+/* ---------- motion (kept short; none at all with "reduce animations" on in Windows) ---------- */
+:root { --t-ui: 260ms; }
+@media (prefers-reduced-motion: reduce) { :root { --t-ui: 0ms; } *, *::before, *::after { animation-duration: 0ms !important; } }
+
+/* the sliding underline (slidingInk.ts) under the chosen step or choice */
+.seg, .stepper { position: relative; }
+.ink { position: absolute; left: 0; top: 0; height: 2px; background: var(--live); pointer-events: none; z-index: 2;
+  transition: transform var(--t-ui) var(--ease), width var(--t-ui) var(--ease), opacity 120ms; }
+.ink.instant { transition: none; }
+
+/* the steps: icons only; the one you're on slides open to show its name */
+.stepper { display: flex; align-items: stretch; gap: 18px; margin: 0 auto 0 24px; min-width: 0; overflow: hidden; }
+.trail, .rooms { display: flex; align-items: stretch; gap: 2px; min-width: 0; }
+.rooms { padding-left: 18px; border-left: 1px solid var(--rule); }
+.step-btn { position: relative; display: inline-flex; align-items: center; padding: 0 10px; border: 0; background: transparent; color: var(--stone); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: color var(--t-ui) var(--ease); }
+.step-btn .icon { transition: color var(--t-ui) var(--ease), transform 120ms var(--ease); }
+.step-btn:active:not(:disabled) .icon { transform: scale(0.88); }
+.step-btn .lbl { display: grid; grid-template-columns: 0fr; opacity: 0; margin-left: 0; transition: grid-template-columns var(--t-ui) var(--ease), opacity var(--t-ui) var(--ease), margin var(--t-ui) var(--ease); }
+.step-btn .lbl > span { overflow: hidden; }
+.step-btn.on { color: var(--paper); }
+.step-btn.on .icon { color: var(--live); }
+.step-btn.on .lbl { grid-template-columns: 1fr; opacity: 1; margin-left: 8px; }
+.step-btn.done:not(.on)::after { content: ""; position: absolute; top: 14px; right: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--ok); }
+
+/* play turns into pause */
+.playpause path { fill: currentColor; transition: d var(--t-ui) var(--ease); }
+.playpause .pp-a { d: path("M7 4.5 L12.5 8 L12.5 16 L7 19.5 Z"); }
+.playpause .pp-b { d: path("M12.5 8 L19 12 L19 12 L12.5 16 Z"); }
+.playpause.playing .pp-a { d: path("M6 5 L10 5 L10 19 L6 19 Z"); }
+.playpause.playing .pp-b { d: path("M14 5 L18 5 L18 19 L14 19 Z"); }
+
+/* buttons press in */
+.btn, .play-round, .hear, .choice, .layer-row, .seg button, .seg .seg-btn { transition: transform 120ms var(--ease), color var(--t-ui), background-color var(--t-ui), box-shadow var(--t-ui), border-color var(--t-ui); }
+.btn:active:not(:disabled), .hear:active:not(:disabled), .choice:active { transform: scale(0.96); }
+.play-round:active { transform: scale(0.9); }
+
+/* a step's page comes in with a short fade and lift; menus ease open */
+@keyframes pv-enter { from { opacity: 0; transform: translateY(6px); } }
+@keyframes pv-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+.route > * { animation: pv-enter var(--t-ui) var(--ease); }
+.menu { animation: pv-pop 180ms var(--ease); transform-origin: top right; }
