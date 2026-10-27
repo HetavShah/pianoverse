@@ -2,7 +2,7 @@
 // off, so the keys slant across the real ones. This compares the expected pattern of the keys (bright white keys,
 // dark gaps, dark black keys) with a few frames of the video, and finds the sideways shift, width and slant
 // (see KeyFit) that match them best. Only an improvement worth having is kept.
-import { Keyboard, KeyFit, NO_FIT, ProjectFile, trackingMatrix } from './project';
+import { Keyboard, KeyFit, NO_FIT, ProjectFile, trackingMatrix } from '../project';
 
 /** one frame of the video in grey (0..1), scaled by `scale` from video pixels */
 export interface FitShot { frame: number; gray: Float32Array; w: number; h: number; scale: number }

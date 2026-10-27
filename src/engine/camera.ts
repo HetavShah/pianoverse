@@ -2,7 +2,7 @@
 // joined by transitions (Cut, Glide, Punch, Dip to black, Dip to white). `cameraAt` gives the window of the video
 // to show at any moment; the renderer draws the frame through it.
 import { keyboardOf, ProjectFile, RawNote, sourceRect, trackingMatrix, trimRange } from './project';
-import { BeatGrid, estimateBeats, nearestBeat } from './beats';
+import { BeatGrid, estimateBeats, nearestBeat } from './audio/beats';
 
 export type Aspect = 'vertical' | 'landscape' | 'square';
 export type ShotKind = 'wide' | 'follow' | 'close';

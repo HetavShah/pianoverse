@@ -161,7 +161,7 @@ export function useCalibration(opts: {
     if (!p0 || !v || !v.videoWidth || fitting !== null || job.current) return;
     setFitting(0);
     try {
-      const { fitKeys, grabShots } = await import('../engine/keyFit');
+      const { fitKeys, grabShots } = await import('../engine/vision/keyFit');
       const dur = p0.video.frames / (p0.video.fps || 30);
       const times = [0.15, 0.35, 0.55, 0.75, 0.9].map((k) => Math.min(dur - 0.1, k * dur));
       const shots = await grabShots(v, p0, times);

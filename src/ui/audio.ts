@@ -1,6 +1,9 @@
-// The video's soundtrack: decoded once per video, mono at 22.05 kHz, plus its onset envelope.
-import { mixDown } from '../engine/sync';
-import { DETECT_RATE } from '../engine/detectConfig';
+// The video's soundtrack: decoded once per video, mono at 22.05 kHz, plus its onset envelope (for syncing) and a
+// waveform overview (for drawing). A note finder that listens at another rate gets its own copy (loadMonoAudio).
+import { mixDown } from '../engine/audio/sync';
+
+/** the rate the soundtrack is analysed at */
+const ANALYSIS_RATE = 22050;
 
 /** peaks: min/max pairs at PEAK_RATE bins per second, for drawing the waveform */
 export interface VideoAudio { mono: Float32Array; rate: number; envelope: Float32Array; peaks: Float32Array; duration: number }
@@ -18,10 +21,11 @@ export function loadAudio(url: string): Promise<VideoAudio> {
   return p;
 }
 
-const pianoCache = new Map<string, Promise<Float32Array>>();
-/** the soundtrack, mono, at the piano note finder's rate (44.1 kHz) */
-export function loadPianoAudio(url: string, rate: number): Promise<Float32Array> {
-  let p = pianoCache.get(url);
+const monoCache = new Map<string, Promise<Float32Array>>();
+/** the soundtrack, mono, at another rate (a note finder's) */
+export function loadMonoAudio(url: string, rate: number): Promise<Float32Array> {
+  const key = `${rate}|${url}`;
+  let p = monoCache.get(key);
   if (!p) {
     p = (async () => {
       const res = await fetch(url);
@@ -33,8 +37,8 @@ export function loadPianoAudio(url: string, rate: number): Promise<Float32Array>
       for (let c = 0; c < buf.numberOfChannels; c++) chans.push(buf.getChannelData(c));
       return mixDown(chans);
     })();
-    pianoCache.set(url, p);
-    p.catch(() => pianoCache.delete(url));
+    monoCache.set(key, p);
+    p.catch(() => monoCache.delete(key));
   }
   return p;
 }
@@ -43,7 +47,7 @@ async function decode(url: string): Promise<VideoAudio> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not read the video file (${res.status})`);
   const bytes = await res.arrayBuffer();
-  const ctx = new OfflineAudioContext(1, 1, DETECT_RATE);
+  const ctx = new OfflineAudioContext(1, 1, ANALYSIS_RATE);
   let buf: AudioBuffer;
   try {
     buf = await ctx.decodeAudioData(bytes);
@@ -54,10 +58,10 @@ async function decode(url: string): Promise<VideoAudio> {
   for (let c = 0; c < buf.numberOfChannels; c++) chans.push(buf.getChannelData(c));
   const mono = mixDown(chans);
   const { envelope, peaks } = await new Promise<{ envelope: Float32Array; peaks: Float32Array }>((resolve, reject) => {
-    const w = new Worker(new URL('../engine/audioWorker.ts', import.meta.url), { type: 'module' });
+    const w = new Worker(new URL('../engine/audio/audioWorker.ts', import.meta.url), { type: 'module' });
     w.onmessage = (ev) => { resolve(ev.data); w.terminate(); };
     w.onerror = (e) => { reject(new Error(e.message)); w.terminate(); };
-    w.postMessage({ samples: mono, rate: DETECT_RATE });
+    w.postMessage({ samples: mono, rate: ANALYSIS_RATE });
   });
-  return { mono, rate: DETECT_RATE, envelope, peaks, duration: buf.duration };
+  return { mono, rate: ANALYSIS_RATE, envelope, peaks, duration: buf.duration };
 }

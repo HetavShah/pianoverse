@@ -1,37 +1,9 @@
 // Automatic alignment of notes to a video: the attacks heard in the video's audio are matched against the
 // note onsets, and the time shift with the best agreement wins. Pure TypeScript; runs in the app and in Node.
-import type { RawNote } from './project';
+import type { RawNote } from '../project';
+import { fftOf, pow2 } from './fft';
 
 export const RATE = 100; // analysis frames per second (10 ms)
-
-// ---------- FFT (radix-2, in place) ----------
-function fft(re: Float64Array, im: Float64Array, inverse = false) {
-  const n = re.length;
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
-  }
-  for (let len = 2; len <= n; len <<= 1) {
-    const ang = ((inverse ? 2 : -2) * Math.PI) / len;
-    const wr = Math.cos(ang), wi = Math.sin(ang);
-    for (let i = 0; i < n; i += len) {
-      let cr = 1, ci = 0;
-      for (let k = 0; k < len / 2; k++) {
-        const a = i + k, b = a + len / 2;
-        const xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
-        re[b] = re[a] - xr; im[b] = im[a] - xi;
-        re[a] += xr; im[a] += xi;
-        const t = cr * wr - ci * wi;
-        ci = cr * wi + ci * wr; cr = t;
-      }
-    }
-  }
-  if (inverse) for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
-}
-
-const pow2 = (n: number) => { let p = 1; while (p < n) p <<= 1; return p; };
 
 /**
  * Onset strength at 100 frames per second: log-spectral flux of the mono audio (half-wave rectified,
@@ -55,7 +27,7 @@ export function onsetEnvelope(samples: Float32Array, sampleRate: number): Float3
       re[i] = idx >= 0 && idx < samples.length ? samples[idx] * win[i] : 0;
       im[i] = 0;
     }
-    fft(re, im);
+    fftOf(N).forward(re, im);
     let s = 0;
     for (let k = k0; k <= k1; k++) {
       const m = Math.log1p(1000 * Math.hypot(re[k], im[k]));
@@ -125,13 +97,14 @@ export function findOffset(envelope: Float32Array, notes: RawNote[], maxShift?: 
   const n = pow2(nA + nB);
   const ar = new Float64Array(n), ai = new Float64Array(n), br = new Float64Array(n), bi = new Float64Array(n);
   ar.set(A); br.set(B);
-  fft(ar, ai); fft(br, bi);
+  const F = fftOf(n);
+  F.forward(ar, ai); F.forward(br, bi);
   for (let i = 0; i < n; i++) {
     const r = ar[i] * br[i] + ai[i] * bi[i];
     const im = ai[i] * br[i] - ar[i] * bi[i];
     ar[i] = r; ai[i] = im;
   }
-  fft(ar, ai, true);
+  F.inverse(ar, ai);
   // prefix sums of squares for the energy inside each overlap
   const cA = new Float64Array(nA + 1), cB = new Float64Array(nB + 1);
   for (let i = 0; i < nA; i++) cA[i + 1] = cA[i] + A[i] * A[i];

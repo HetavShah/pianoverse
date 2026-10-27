@@ -6,7 +6,7 @@ import Dial from '../Dial';
 import {
   ASPECTS, Aspect, AutoSettings, autoCamera, CameraTrack, DEFAULT_DUR, maxZoom, newCameraTrack, Shot, shotId, shotIndexAt, ShotKind, Transition,
 } from '../../engine/camera';
-import { estimateBeats, nearestBeat } from '../../engine/beats';
+import { estimateBeats, nearestBeat } from '../../engine/audio/beats';
 import { cameraFrameAt, cameraPath } from '../exportRun';
 import CameraTimeline from '../CameraTimeline';
 import Transport from '../Transport';

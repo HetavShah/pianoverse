@@ -8,8 +8,8 @@
 //
 // Pure TypeScript, no DOM: runs in a Web Worker in the app and in Node for tests.
 
-import { apply, findHomography, inv, mul, Pt, Quad } from './geometry';
-import type { Mat3 } from './project';
+import { apply, findHomography, inv, mul, Pt, Quad } from '../geometry';
+import type { Mat3 } from '../project';
 
 export interface GrayImage { w: number; h: number; data: Float32Array } // 0..1
 

@@ -4,7 +4,8 @@ import { outOfRange, pitchRange } from '../../engine/notes';
 import { useClickTrack } from '../clicks';
 import PickButton from '../PickButton';
 import Dial from '../Dial';
-import { sourceOf, type NoteFinder } from '../useNotes';
+import { sourceOf } from '../useNotes';
+import type { NoteFinderId as NoteFinder } from '../../engine/ml/noteFinder';
 import WaveSync, { attackTimes, matchScore } from '../WaveSync';
 import type { WS } from '../workspace';
 

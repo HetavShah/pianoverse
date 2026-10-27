@@ -1,6 +1,6 @@
 // Web Worker: runs the keyboard tracker off the main thread.
 import { KeyboardTracker, toGray } from './tracker';
-import type { Quad } from './geometry';
+import type { Quad } from '../geometry';
 
 export type WorkerIn =
   | { kind: 'init'; w: number; h: number; rgba: ArrayBuffer; scale: number; corners: Quad; whiteKeys: number }

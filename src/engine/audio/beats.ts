@@ -1,7 +1,7 @@
 // The beat of a performance, from its notes alone.
 // Played without a click, so the tempo drifts: a beat tracker that follows it (dynamic programming over onset
 // strength, after Ellis 2007) rather than a fixed grid. Bars are groups of beats starting on the strongest one.
-import type { RawNote } from './project';
+import type { RawNote } from '../project';
 
 export interface BeatGrid { beats: number[]; bars: number[]; bpm: number }
 

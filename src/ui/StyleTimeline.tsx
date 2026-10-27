@@ -2,7 +2,7 @@
 // well the keyboard was tracked. Click to jump; drag across it to pick a section to loop; drag the section's
 // edges to adjust it.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { estimateBeats } from '../engine/beats';
+import { estimateBeats } from '../engine/audio/beats';
 import { FONT, INK } from './palette';
 import type { CalibratedProject } from '../engine/calibration';
 import { pal, ParticleScene } from '../engine/project';

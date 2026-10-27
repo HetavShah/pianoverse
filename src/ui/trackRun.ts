@@ -2,7 +2,7 @@
 // frame is shrunk, read back and handed to the tracking worker. Playback pauses whenever the worker
 // falls behind, so no frame is skipped because of slow tracking.
 import type { Quad } from '../engine/geometry';
-import type { WorkerIn, WorkerOut } from '../engine/trackWorker';
+import type { WorkerIn, WorkerOut } from '../engine/vision/trackWorker';
 
 export interface TrackSample { t: number; corners: Quad | null; quality: number }
 
@@ -39,7 +39,7 @@ export function startTracking(opts: {
   v.preload = 'auto';
   v.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
   document.body.appendChild(v);
-  const worker = new Worker(new URL('../engine/trackWorker.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL('../engine/vision/trackWorker.ts', import.meta.url), { type: 'module' });
 
   let cleaned = false;
   const cleanup = () => {

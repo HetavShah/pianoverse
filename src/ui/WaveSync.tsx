@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FONT, INK } from './palette';
 import type { RawNote } from '../engine/project';
-import { RATE } from '../engine/sync';
+import { RATE } from '../engine/audio/sync';
 import { PEAK_RATE, VideoAudio } from './audio';
 
 const MATCH_MS = 25;

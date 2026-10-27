@@ -2,13 +2,10 @@
 import { useCallback, useRef, useState } from 'react';
 import type { CalibratedProject } from '../engine/calibration';
 import { NoteSource, parseMidi, placeNotes } from '../engine/notes';
-import { findOffset } from '../engine/sync';
-import { DEFAULT_DETECT } from '../engine/detectConfig';
-import { loadAudio, loadPianoAudio, VideoAudio } from './audio';
+import { findOffset } from '../engine/audio/sync';
+import { createNoteFinder, DEFAULT_SENSITIVITY, NoteFinderId } from '../engine/ml/noteFinder';
+import { loadAudio, loadMonoAudio, VideoAudio } from './audio';
 import type { PickedMidi } from './media';
-
-/** which note finder listens to the audio */
-export type NoteFinder = 'piano' | 'any';
 
 export type NotesBusy =
   | { kind: 'audio' }
@@ -61,18 +58,13 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
   }), [run, getAudio, setProject]);
 
   /** find the notes in the soundtrack: 'piano' (Transkun, for piano) or 'any' (Basic Pitch, any instrument) */
-  const detect = useCallback((onset = DEFAULT_DETECT.onset, finder: NoteFinder = 'piano') => run(async () => {
+  const detect = useCallback((sensitivity = DEFAULT_SENSITIVITY, finder: NoteFinderId = 'piano') => run(async () => {
     const a = await getAudio();
     setBusy({ kind: 'detect', pct: 0 });
-    let notes;
-    if (finder === 'piano') {
-      const { transcribePiano, TK_RATE } = await import('../engine/transkun'); // keeps the model code out of start-up
-      const x = await loadPianoAudio(videoUrl!, TK_RATE);
-      notes = await transcribePiano(x, (pct) => setBusy({ kind: 'detect', pct: pct / 100 }));
-    } else {
-      const { detectNotes } = await import('../engine/detect');
-      notes = await detectNotes(a.mono, '/models/basic-pitch/model.json', (pct) => setBusy({ kind: 'detect', pct }), { ...DEFAULT_DETECT, onset });
-    }
+    const model = await createNoteFinder(finder, { sensitivity });
+    // each finder listens at its own sample rate
+    const x = model.sampleRate === a.rate ? a.mono : await loadMonoAudio(videoUrl!, model.sampleRate);
+    const notes = await model.find(x, (pct) => setBusy({ kind: 'detect', pct }));
     if (!notes.length) throw new Error(finder === 'piano' ? 'No piano notes were found in the audio.' : 'No notes were found in the audio. Try more sensitivity.');
     const p = latest.current;
     const name = finder === 'piano' ? "Piano notes from the video's audio" : "Detected from the video's audio";

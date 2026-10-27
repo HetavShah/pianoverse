@@ -5,7 +5,7 @@ import { INK } from './palette';
 import Dial from './Dial';
 import type { CalibratedProject } from '../engine/calibration';
 import { pal } from '../engine/project';
-import type { BeatGrid } from '../engine/beats';
+import type { BeatGrid } from '../engine/audio/beats';
 import { DEFAULT_DUR, Shot, Transition, TRANSITION_LABEL } from '../engine/camera';
 
 const KIND_LABEL = { wide: 'Wide', follow: 'Follow', close: 'Close-up' } as const;
