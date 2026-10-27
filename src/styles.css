@@ -752,8 +752,10 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .wave-card { display: flex; flex-direction: column; gap: 10px; }
 
 /* ---------- the top bar on narrower windows: it gives way step by step and never pushes the page wider ---------- */
-.topbar { min-width: 0; overflow: hidden; }
-.stepper, .trail, .rooms { min-width: 0; }
+/* only the steps may be cut off: the settings menu drops down out of the bar and must stay visible */
+.topbar { min-width: 0; }
+.stepper { min-width: 0; overflow: hidden; }
+.trail, .rooms { min-width: 0; }
 @media (max-width: 1440px) {
   .project-name { max-width: 140px; }
   .stepper { gap: 24px; }

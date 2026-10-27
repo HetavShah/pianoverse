@@ -66,6 +66,15 @@ await type(label, '2');
 const look = (await proj()).look;
 ok(Object.values(look).includes(2), `typed ${label} 2`);
 
+// ---- the settings menu opens and its items can be used ----
+await page.click('[aria-label="Settings"]'); await page.waitForTimeout(300);
+const menu = await page.locator('.menu').boundingBox();
+const hit = menu && await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.menu'), [menu.x + menu.width / 2, menu.y + menu.height / 2]);
+ok(!!menu && menu.height > 60 && hit, 'settings menu opens and is visible  ' + JSON.stringify(menu));
+await page.click('.menu >> text=Keyboard shortcuts'); await page.waitForTimeout(300);
+ok(await page.locator('text=Go to a step').count() > 0, 'a menu item works (keyboard shortcuts)');
+await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+
 // ---- nothing wider than the window ----
 for (const w of [1366, 1100]) {
   await page.setViewportSize({ width: w, height: 800 });
