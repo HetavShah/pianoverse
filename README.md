@@ -92,7 +92,7 @@ Pick a stretch of the timeline and the sparks from the notes played there trace 
 <table>
   <tr>
     <td width="50%"><img src="docs/images/screen-import.png" alt="Import screen with the video and project settings"><br><b>1 · Import and Video</b> — drop in the performance video, pick the camera setup and keyboard size, then trim and crop it.</td>
-    <td width="50%"><img src="docs/images/screen-sync.png" alt="Notes and sync screen with the waveform and the notes lined up"><br><b>2 · Audio</b> — the MIDI lines itself up with the audio; check it by ear and nudge it to the millisecond. No MIDI? Detect the notes from the audio. On <b>Sound</b>: fade, open up or a riser at the start, fade, muffle or ring out at the end, tone, a concert hall, and loudness evened out for social media.</td>
+    <td width="50%"><img src="docs/images/screen-sync.png" alt="Notes and sync screen with the waveform and the notes lined up"><br><b>2 · Audio</b> — the MIDI lines itself up with the audio; check it by ear and nudge it to the millisecond. No MIDI? Detect the notes from the audio. On <b>Sound</b>: play your notes on a recorded concert grand (with the sustain pedal) instead of, or under, your video's sound; an intro and outro (fade, open up, swell; fade, muffle, ring out); reverb rooms from a studio to a cathedral; EQ; and loudness matched to social media.</td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/images/screen-calibrate.png" alt="Calibrate screen with the keyboard corners and the saber line"><br><b>3 · Calibrate</b> — drag four corners onto the keys once; the keyboard is tracked through the whole clip.</td>
@@ -111,7 +111,7 @@ Pick a stretch of the timeline and the sparks from the notes played there trace 
 | **Encoder** | NVIDIA NVENC, AMD AMF or Intel Quick Sync, detected automatically; x264 / x265 on the processor otherwise |
 | **Format** | MP4 in H.264, or H.265 for smaller files; quality High, Medium or Small file |
 | **Frame rate** | Same as the video, or 24, 30 or 60 fps |
-| **Sound** | The original audio, copied without re-encoding when it is AAC, otherwise converted at high quality |
+| **Sound** | The original audio, copied without re-encoding when it is AAC, otherwise converted at high quality; with Sound settings (or the grand piano), rendered and encoded at high quality |
 | **For editors** | The effects alone on a transparent background, as ProRes 4444 `.mov`, for DaVinci Resolve or Premiere |
 | **Extras** | Export only the part picked on the timeline · save the current frame as a PNG · show the file in its folder |
 
@@ -242,3 +242,7 @@ Note textures use CC0 materials from [ambientCG](https://ambientcg.com).
 ---
 
 <p align="center"><sub>Made by Hetav Shah</sub></p>
+
+## Credits
+
+The grand piano is **Salamander Grand Piano V3** by Alexander Holm, licensed under [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) (see `assets/piano/README.md`).

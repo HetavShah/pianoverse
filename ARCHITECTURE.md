@@ -105,23 +105,32 @@ createNoteFinder('piano' | 'any')   // factory; each model's code loads on first
 
 | File | Job |
 |---|---|
-| `sound.ts` | The `Sound` settings, and `soundAt(sound, span, t)`: the level, muffling and reverb send at any moment |
+| `sound.ts` | The `Sound` settings (source, pedal, intro/outro, reverb room, EQ, loudness), and `soundAt(sound, span, t)`: the level, muffling and reverb send at any moment |
 | `soundChain.ts` | `SoundChain`: the Web Audio nodes the sound runs through, for the preview and the export alike |
-| `synth.ts` | Sounds made in code: the hall and ring-out reverbs (impulse responses) and the riser |
+| `piano.ts` | The grand piano: the sample pack (`PianoSamples`, decoded only as a piece needs), notes → voices (`pianoVoices`, with the pedal modes), `PianoPlayer` (plays a voice: nearest recording, loudness layer, damper, key-release thump) and `PianoFollower` (plays just ahead of the video in the preview) |
+| `synth.ts` | Sounds made in code: the room and ring-out reverbs (impulse responses) and the swell |
 | `loudness.ts` | Integrated loudness in LUFS (ITU-R BS.1770), for evening it out to −14 LUFS |
-| `mixdown.ts` | The export's soundtrack: rendered offline, written as a 16-bit WAV |
+| `mixdown.ts` | The export's soundtrack (video and piano, rendered offline, written as a 16-bit WAV); `renderSource` for the raw mix (its loudness, its waveform, the swell) |
 
 ```
-in → bass → treble → muffle → level ─┬──────────────────────┬→ mix → master → limiter → soft clip → out
-                        │            └→ hall send → hall reverb ┘ ↑
-                        └→ ring send → ring-out reverb ───────────┤
-                                       riser ─────────────────────┘
+video in ─┐
+piano in ─┴→ bass → treble → muffle → level ─┬─────────────────────────────────┬→ mix → master → limiter → soft clip → out
+                              │              └→ room send → pre-delay → reverb ┘ ↑
+                              └→ ring send → ring-out reverb ────────────────────┤
+                                             swell ──────────────────────────────┘
 ```
+
+**The grand piano.** Salamander Grand Piano V3 (Alexander Holm, CC-BY 3.0), cut down by `tools/piano-pack/make.py`
+to one file (`assets/piano/salamander-v1.pvpiano`, 16 MB: a recording every three keys at six loudnesses, plus each
+key's release thump, as Ogg Opus). The desktop app downloads it once from the repository on first use and checks
+its SHA-256 (`src-tauri/src/piano.rs`). A note plays the recording nearest its key, re-pitched by up to a semitone
+and a half. The preview schedules voices 0.3 s ahead of the video on the audio clock and re-anchors on a jump; the
+export schedules them all in the offline context. Same `PianoPlayer` both ways.
 
 **One description of time, two drivers.** What changes over time is one pure function, `soundAt`. The preview
 (`ui/app/useSound.ts`) routes the video element into an `AudioContext` and calls `chain.follow(t)` every frame; the
 export builds the same chain in an `OfflineAudioContext` and calls `chain.schedule()`, which turns `soundAt` into
-automation curves. Same nodes, same function: what you hear while editing is what ends up in the file. The riser and
+automation curves. Same nodes, same function: what you hear while editing is what ends up in the file. The swell and
 the reverbs are made from seeded noise, so they are the same every time too.
 
 The video element is only routed into Web Audio once the sound is changed: until then it plays its sound directly.
@@ -191,9 +200,16 @@ rows, a new `Kind` and its case in `shaders/particles_sim.wgsl`, and the option 
 **Add a note finder**: a class implementing `NoteFinder` in `engine/ml/`, a branch in `createNoteFinder`, and
 the option in the Notes step.
 
+**Add a reverb room**: an entry in `ROOMS` (`engine/audio/sound.ts`): its length, brightness, build-up and
+pre-delay. The impulse response is made in code from those, so nothing has to be downloaded.
+
+**Add another piano (or instrument)**: record or take a free sample set, build a pack with `tools/piano-pack/make.py`
+(its note grid and loudness layers are at the top), put it in `assets/`, and point `src-tauri/src/piano.rs` at it
+with its checksum. `PianoPlayer` works with any pack whose notes are a few keys apart.
+
 **Add a sound transition**: an id and label in `SOUND_STARTS` or `SOUND_ENDS` and its case in `soundAt`
 (`engine/audio/sound.ts`), shaping the level, the muffle and the ring send. A transition that needs a sound of its
-own (like the riser) makes it in `synth.ts` and plays it from `SoundChain`.
+own (like the swell) makes it in `synth.ts` and plays it from `SoundChain`.
 
 **Add a step**: its id and label in `STEPS` (`ui/app/workspace.ts`), a folder under `ui/` with its component,
 and a line in `App.tsx`'s router.

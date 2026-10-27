@@ -8,8 +8,8 @@ import { PEAK_RATE, VideoAudio } from '../services/audio';
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const SWELL = '#9b8cff';
 
-export default function SoundWave({ audio, sound, span, tail, measuredLufs, time, onSeek, view, className }: {
-  audio: VideoAudio | null; sound: Sound; span: [number, number]; tail: number; measuredLufs: number | null;
+export default function SoundWave({ audio, sound, span, tail, measuredLufs, time, onSeek, view, className, waitText = 'Reading the soundtrack…', error, onRetry }: {
+  audio: VideoAudio | null; waitText?: string; error?: string | null; onRetry?: () => void; sound: Sound; span: [number, number]; tail: number; measuredLufs: number | null;
   time: number; onSeek: (t: number) => void;
   /** the part shown, seconds (default: all of it, with the ring-out) */
   view?: [number, number];
@@ -106,7 +106,13 @@ export default function SoundWave({ audio, sound, span, tail, measuredLufs, time
       <canvas ref={ref} aria-label="The sound over time. Click to move the playhead"
         onPointerDown={(e) => { drag.current = true; e.currentTarget.setPointerCapture(e.pointerId); at(e); }}
         onPointerMove={(e) => { if (drag.current) at(e); }} onPointerUp={() => { drag.current = false; }} />
-      {!audio && <div className="sound-wave-wait dim small-text"><span className="spinner" /> Reading the soundtrack…</div>}
+      {!audio && !error && <div className="sound-wave-wait dim small-text"><span className="spinner" /> {waitText}</div>}
+      {!audio && error && (
+        <div className="sound-wave-wait sound-wave-error small-text" role="alert">
+          <span>{error}</span>
+          {onRetry && <button type="button" className="link inline" onClick={onRetry}>Try again</button>}
+        </div>
+      )}
       {lead > 0 && a > t0 + (t1 - t0) * 0.25 && <span className="sound-wave-tag end" style={{ right: `${(1 - (a - t0) / (t1 - t0)) * 100}%` }}>Swell · video starts</span>}
       {tail > 0 && b > t0 && b < t1 - (t1 - t0) * 0.25 && <span className="sound-wave-tag" style={{ left: `${((b - t0) / (t1 - t0)) * 100}%` }}>Video ends · rings on</span>}
     </div>

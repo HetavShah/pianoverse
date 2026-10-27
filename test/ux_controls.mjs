@@ -128,13 +128,15 @@ await page.keyboard.press('Escape'); await page.waitForTimeout(200);
 // ---- nothing wider than the window ----
 for (const w of [1366, 1100]) {
   await page.setViewportSize({ width: w, height: 800 });
-  for (const step of ['Video', 'Audio', 'Style', 'Export']) {
+  for (const step of ['Video', 'Audio', 'Calibrate', 'Style', 'Light', 'Export']) {
     await page.click(`.stepper [title="${step}"]`); await page.waitForTimeout(700);
     const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     if (wide > 1) ok(false, `${step} at ${w}px is ${wide}px wider than the window`);
+    const sideways = await page.evaluate(() => [...document.querySelectorAll('.page-side, .style-side, .page-main')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.className));
+    if (sideways.length) ok(false, `${step} at ${w}px: a panel scrolls sideways  ${sideways.join(', ')}`);
   }
 }
-ok(true, 'pages fit the window at 1366 and 1100 px');
+ok(true, 'pages fit the window at 1366 and 1100 px, and no panel scrolls sideways');
 ok(errors.length === 0, 'no errors  ' + errors.join(' | '));
 console.log(fails ? `${fails} FAILED` : 'all passed');
 await b.close();

@@ -1,10 +1,10 @@
 // Notes for the project: MIDI import, detection from audio, and lining them up with the video.
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CalibratedProject } from '../../engine/calibration';
 import { NoteSource, parseMidi, placeNotes } from '../../engine/notes';
 import { findOffset } from '../../engine/audio/sync';
 import { createNoteFinder, DEFAULT_SENSITIVITY, NoteFinderId } from '../../engine/ml/noteFinder';
-import { loadAudio, loadMonoAudio, VideoAudio } from '../services/audio';
+import { forgetAudio, loadAudio, loadMonoAudio, VideoAudio } from '../services/audio';
 import type { PickedMidi } from '../services/media';
 
 export type NotesBusy =
@@ -23,20 +23,43 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
   const { project, setProject, videoUrl } = opts;
   const [busy, setBusy] = useState<NotesBusy | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [audio, setAudio] = useState<VideoAudio | null>(null);
-  const [audioFor, setAudioFor] = useState<string | null>(null);
+  // the soundtrack of the video that is open now. Kept with its URL: when you switch projects while one is still
+  // loading, its late result must not land on the next project's video
+  const [loaded, setLoaded] = useState<{ url: string; audio: VideoAudio | null; error: string | null } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  // read only once a step asks for it (Audio): a long video's sound takes memory and time
+  const [wanted, setWanted] = useState<string | null>(null);
   const latest = useRef(project);
   latest.current = project;
+  const urlNow = useRef(videoUrl);
+  urlNow.current = videoUrl;
 
   const getAudio = useCallback(async () => {
     if (!videoUrl) throw new Error('Open a video first.');
-    if (audio && audioFor === videoUrl) return audio;
+    if (loaded?.url === videoUrl && loaded.audio) return loaded.audio;
     setBusy({ kind: 'audio' });
     const a = await loadAudio(videoUrl);
-    setAudio(a);
-    setAudioFor(videoUrl);
+    if (urlNow.current === videoUrl) setLoaded({ url: videoUrl, audio: a, error: null });
     return a;
-  }, [videoUrl, audio, audioFor]);
+  }, [videoUrl, loaded]);
+
+  // read it once a step asks (the waveforms on Audio), once more after a moment if it fails (a video found again
+  // can take a moment to become readable), and give up after two minutes with a message
+  useEffect(() => {
+    if (!videoUrl || wanted !== videoUrl) return;
+    let gone = false;
+    const url = videoUrl;
+    const fail = (e: unknown) => { if (!gone && urlNow.current === url) setLoaded({ url, audio: null, error: String((e as Error)?.message ?? e) }); };
+    const read = () => Promise.race([
+      loadAudio(url),
+      new Promise<never>((_, reject) => setTimeout(() => { forgetAudio(url); reject(new Error("Reading the video's sound took too long.")); }, 120_000)),
+    ]);
+    read()
+      .catch(() => new Promise((r) => setTimeout(r, 1500)).then(() => (gone ? Promise.reject(new Error('gone')) : read())))
+      .then((a) => { if (!gone && urlNow.current === url) setLoaded({ url, audio: a, error: null }); })
+      .catch(fail);
+    return () => { gone = true; };
+  }, [videoUrl, wanted, attempt]);
 
   const run = useCallback(async (job: () => Promise<void>) => {
     setError(null);
@@ -99,8 +122,18 @@ export function useNotes(opts: { project: CalibratedProject | null; setProject: 
     if (p) setProject(withSource(p, undefined));
   }, [setProject]);
 
-  /** load the audio in the background so the sync strip can show it */
-  const prepareAudio = useCallback(() => { if (videoUrl && audioFor !== videoUrl) run(async () => { await getAudio(); }); }, [videoUrl, audioFor, run, getAudio]);
+  /** read the soundtrack in the background (the Audio step's waveforms); after a failure, try again */
+  const prepareAudio = useCallback(() => {
+    if (!videoUrl) return;
+    if (wanted !== videoUrl) setWanted(videoUrl);
+    else if (loaded?.url === videoUrl && loaded.error) setAttempt((n) => n + 1);
+  }, [videoUrl, wanted, loaded]);
 
-  return { busy, error, audio: audioFor === videoUrl ? audio : null, importMidi, detect, autoAlign, setOffset, setTranspose, clear, prepareAudio };
+  const mine = loaded?.url === videoUrl ? loaded : null;
+  return {
+    busy, error, audio: mine?.audio ?? null,
+    /** why the soundtrack couldn't be read (null while reading or once read) */
+    audioError: mine?.error ?? null,
+    importMidi, detect, autoAlign, setOffset, setTranspose, clear, prepareAudio,
+  };
 }

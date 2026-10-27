@@ -32,6 +32,8 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-124
 const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) console.log('[console]', m.text()); });
+await page.route('**/piano-test.pvpiano', (r) => r.fulfill({ path: 'test/out/salamander-v1.pvpiano' }));
+await page.addInitScript(() => { window.__pvPianoUrl = '/piano-test.pvpiano'; });
 await page.addInitScript(() => { window.__pvHeadless = true; });
 
 let ff = null, part = '', out = '', frames = 0, errLog = '';

@@ -22,11 +22,11 @@ struct Progress {
     detail: String,
 }
 
-fn emit(app: &AppHandle, phase: &'static str, done: f64, total: f64, detail: impl Into<String>) {
+pub(crate) fn emit(app: &AppHandle, phase: &'static str, done: f64, total: f64, detail: impl Into<String>) {
     let _ = app.emit("media-progress", Progress { phase, done, total, detail: detail.into() });
 }
 
-fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_local_data_dir().map_err(|e| format!("No app data folder: {e}"))
 }
 
@@ -183,6 +183,46 @@ fn run_ffmpeg(app: &AppHandle, exe: &Path, input: &Path, out: &Path, video_args:
     } else {
         Err(tail)
     }
+}
+
+/// The sound of a video as a WAV file (48 kHz stereo, cached), so the app reads a few MB of audio instead of the
+/// whole video file. Only with FFmpeg already downloaded (it is, once any video was converted or exported);
+/// otherwise "no-converter" and the app reads the video itself.
+#[tauri::command]
+pub async fn extract_audio(app: AppHandle, path: String) -> Result<String, String> {
+    let exe = ffmpeg_path(&app)?;
+    if !exe.exists() {
+        return Err("no-converter".into());
+    }
+    let input = PathBuf::from(&path);
+    let meta = std::fs::metadata(&input).map_err(|e| format!("Could not open {path}: {e}"))?;
+    let stem = input.file_stem().and_then(|s| s.to_str()).unwrap_or("video").to_string();
+    let modified = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
+    let dir = data_dir(&app)?.join("sound-cache");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let out = dir.join(format!("{stem}-{}-{modified}.wav", meta.len()));
+    if !out.exists() {
+        let part = out.with_extension("part.wav");
+        let part2 = part.clone();
+        let status = tauri::async_runtime::spawn_blocking(move || {
+            let mut cmd = Command::new(&exe);
+            cmd.args(["-hide_banner", "-loglevel", "error", "-y", "-i"]).arg(&input)
+                .args(["-vn", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", "-f", "wav"]).arg(&part2);
+            cmd.stdout(Stdio::null()).stderr(Stdio::null());
+            hide_window(&mut cmd);
+            cmd.status()
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+        if !status.success() {
+            let _ = std::fs::remove_file(&part);
+            return Err("This video's sound couldn't be read. Does it have an audio track?".into());
+        }
+        std::fs::rename(&part, &out).map_err(|e| e.to_string())?;
+    }
+    app.asset_protocol_scope().allow_file(&out).map_err(|e| e.to_string())?;
+    Ok(out.to_string_lossy().into_owned())
 }
 
 /// Convert a video into an H.264 editing copy (cached). Returns the copy's path.

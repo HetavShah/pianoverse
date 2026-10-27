@@ -46,8 +46,6 @@ export function impulse(rate: number, seconds: number, bright: number, seed: num
   return out;
 }
 
-/** the concert hall (Sound → Hall) */
-export const hallImpulse = (rate: number) => impulse(rate, 2.6, 9000, 101);
 /** the ring-out: a big, warm hall that rings for `seconds` */
 export const ringImpulse = (rate: number, seconds: number) => impulse(rate, Math.max(0.5, seconds), 6500, 202, 0.04);
 

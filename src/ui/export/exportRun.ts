@@ -8,7 +8,8 @@ import { inTauri } from '../services/media';
 import { sourceRect, trimRange } from '../../engine/project';
 import { ExportSettings, SIZES } from '../../engine/exportSettings';
 import { resolveSound, soundActive, soundLead, soundTail } from '../../engine/audio/sound';
-import { renderSound, wavBytes } from '../../engine/audio/mixdown';
+import { renderSound, sourceLoudness, wavBytes } from '../../engine/audio/mixdown';
+import { pianoPartFor } from '../services/piano';
 import { loadSoundtrack, measureLoudness } from '../services/audio';
 export type { ExportSettings, SizeId } from '../../engine/exportSettings';
 export { SIZES } from '../../engine/exportSettings';
@@ -168,9 +169,10 @@ export async function runExport(args: {
       if (!sink.audio) throw new Error('This exporter can\'t take a changed soundtrack.');
       args.onProgress({ phase: 'sound', done: 0, total: 1, elapsed: 0, eta: 0 });
       const url = v.currentSrc || v.src;
-      const src = await loadSoundtrack(url);
-      const lufs = sound.even ? await measureLoudness(url, [t0, t1]) : null;
-      audio = await sink.audio(wavBytes(await renderSound(src, sound, [from, to], lufs)));
+      const piano = await pianoPartFor(p.notes, sound);
+      const src = sound.source === 'piano' ? null : await loadSoundtrack(url);
+      const lufs = !sound.even ? null : piano ? await sourceLoudness(src, sound, piano, [t0, t1]) : await measureLoudness(url, [t0, t1]);
+      audio = await sink.audio(wavBytes(await renderSound(src, sound, [from, to], lufs, piano)));
       if (args.cancelled()) throw new Error('cancelled');
     }
     const titles = resolveTitles(p.titles);

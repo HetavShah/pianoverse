@@ -8,6 +8,8 @@ const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/favicon/.test(JSON.stringify(m.location()))) return; if (m.type() === 'error') errors.push(m.text()); });
+await page.route('**/piano-test.pvpiano', (r) => r.fulfill({ path: 'test/out/salamander-v1.pvpiano', contentType: 'application/octet-stream' }));
+await page.addInitScript(() => { window.__pvPianoUrl = '/piano-test.pvpiano'; });
 await page.addInitScript(() => { window.__pvHeadless = true; localStorage.clear(); });
 await page.goto('http://localhost:4173/'); await page.waitForTimeout(800);
 await page.setInputFiles('.row-actions input[type=file]', 'samples/interstellar-take1.pvproj.json'); await page.waitForTimeout(600);
@@ -43,13 +45,13 @@ ok(await page.locator('.sound-wave canvas').count() === 3, 'Sound tab opens: sta
 await page.waitForFunction(() => !document.querySelector('.sound-wave-wait'), null, { timeout: 30000 });
 await page.click('.page-side .choice >> text=Swell');
 await page.click('.page-side .choice >> text=Ring out');
-await page.locator('label:has-text("Even out the loudness") input').check();
+await page.locator('input[aria-label="Match social media loudness"]').check();
 await page.waitForTimeout(300);
 let p = await proj();
 ok(p.sound?.start === 'swell' && p.sound?.end === 'ring' && p.sound?.even === true, 'settings saved  ' + JSON.stringify(p.sound));
 await page.waitForFunction(() => /LUFS →/.test(document.querySelector('.page-side')?.textContent ?? ''), null, { timeout: 30000 });
 const meas = await page.locator('.page-side .help.mono').innerText();
-ok(/Recorded at -?\d+\.\d LUFS/.test(meas), 'loudness measured  ' + meas);
+ok(/Measured -?\d+\.\d LUFS/.test(meas), 'loudness measured  ' + meas);
 // the waveform shows the shaped sound (bright pixels) and the swell
 const px = await page.$eval('.sound-wave canvas', (c) => {
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
@@ -71,8 +73,28 @@ await page.keyboard.press('Control+z'); await page.waitForTimeout(300);
 p = await proj();
 ok(p.sound?.even !== true, 'undo  ' + JSON.stringify(p.sound));
 // the tab dot shows the sound is changed; Back to as recorded clears it
-await page.click('text=Back to the sound as recorded'); await page.waitForTimeout(300);
+await page.click('text=Reset all sound settings'); await page.waitForTimeout(300);
 ok(!(await proj()).sound, 'reset');
+
+// ---- the grand piano: pick it, it loads, it plays with the video; pedal, room and both ----
+await page.click('.page-side .choice >> text=Grand piano'); await page.waitForTimeout(300);
+p = await proj();
+ok(p.sound?.source === 'piano' && p.sound?.hall > 0.3, 'grand piano picked, in a room  ' + JSON.stringify(p.sound));
+await page.waitForFunction(() => !document.querySelector('.piano-load'), null, { timeout: 60000 });
+ok(await page.locator('.page-side .banner.bad, .sound-page .banner.bad').count() === 0, 'piano loaded without an error');
+await page.evaluate(() => { window.__pvPianoVoices = 0; });
+await page.click('.sound-card .play-round'); await page.waitForTimeout(2500);
+await page.click('.sound-card .play-round'); await page.waitForTimeout(300);
+const voices = await page.evaluate(() => window.__pvPianoVoices);
+ok(voices > 5, `the piano plays along with the video (${voices} notes)`);
+await page.click('.page-side .seg button >> text=Off'); await page.waitForTimeout(200);
+await page.click('.page-side .choice >> text=Cathedral'); await page.waitForTimeout(200);
+p = await proj();
+ok(p.sound?.pedal === 'off' && p.sound?.room === 'cathedral', 'pedal off and a cathedral  ' + JSON.stringify(p.sound));
+await page.click('.page-side .choice >> text=Both'); await page.waitForTimeout(300);
+ok(await page.locator('button.val-edit[aria-label^="Piano level:"]').count() === 1, 'both: the mix can be set');
+ok(/Grand piano|Both/i.test(await page.locator('.stat-cards').innerText()), 'the summary says where the sound comes from');
+
 ok(errors.length === 0, 'no errors  ' + errors.join(' | '));
 console.log(fails ? `${fails} FAILED` : 'all passed');
 await b.close();

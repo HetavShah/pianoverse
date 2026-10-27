@@ -1,5 +1,5 @@
-// The sound of the video (Audio step → Sound): how it starts and ends, its volume and tone, a concert hall around
-// it, and evening out the loudness for social media. Nothing is changed in the video file: these are settings, and
+// The sound of the video (Audio step → Sound): where it comes from (the video, a grand piano playing your notes, or
+// both), how it starts and ends, its volume and tone, a room around it, and evening out the loudness for social media. Nothing is changed in the video file: these are settings, and
 // the preview and the export run them through the same chain of audio nodes (soundChain.ts).
 //
 // The start and end transitions are described by soundAt(): the level, the muffling filter and the reverb send at
@@ -7,6 +7,12 @@
 // what you hear in the preview is what you get in the file.
 
 export type SoundStart = 'none' | 'fade' | 'open' | 'swell';
+/** where the sound comes from: the video's own audio, a recorded grand piano playing your notes (piano.ts), or both */
+export type SoundSource = 'video' | 'piano' | 'both';
+/** the piano's sustain pedal: always down (every note rings on), as played (from the notes), or off */
+export type PedalMode = 'held' | 'played' | 'off';
+/** the room around the performance */
+export type Room = 'studio' | 'hall' | 'church' | 'cathedral' | 'plate';
 export type SoundEnd = 'cut' | 'fade' | 'muffle' | 'ring';
 
 export interface Sound {
@@ -24,7 +30,15 @@ export interface Sound {
   bass: number;
   /** dB, high shelf at 5 kHz */
   treble: number;
-  /** 0..1, a concert hall around the whole performance */
+  /** where the sound comes from */
+  source: SoundSource;
+  /** with both: how much of it is the piano, 0..1 (the rest is the video's sound) */
+  blend: number;
+  /** the piano's sustain pedal */
+  pedal: PedalMode;
+  /** the room around the performance */
+  room: Room;
+  /** 0..1, how much of the room you hear (0: none) */
   hall: number;
   /** bring the loudness to what Instagram, TikTok and YouTube play at (−14 LUFS) */
   even: boolean;
@@ -33,19 +47,42 @@ export interface Sound {
 export const DEFAULT_SOUND: Sound = {
   start: 'none', startLen: 2, end: 'cut', endLen: 3,
   volume: 0, bass: 0, treble: 0, hall: 0, even: false,
+  source: 'video', blend: 0.5, pedal: 'held', room: 'hall',
 };
 
+export const PEDAL_MODES: { id: PedalMode; label: string; hint: string }[] = [
+  { id: 'held', label: 'Always down', hint: 'Every note rings on until it fades or is played again' },
+  { id: 'played', label: 'As played', hint: 'Follows the pedal recorded in your notes' },
+  { id: 'off', label: 'Off', hint: 'Each note stops when its key is let go' },
+];
+
+export const SOUND_SOURCES: { id: SoundSource; label: string; hint: string }[] = [
+  { id: 'video', label: 'Your video', hint: 'The sound recorded with your video.' },
+  { id: 'piano', label: 'Grand piano', hint: 'A recorded concert grand plays your notes. Sounds best with notes from a MIDI file.' },
+  { id: 'both', label: 'Both', hint: 'The grand piano blended under your video\'s sound. Fuller, and it hides small note mistakes.' },
+];
+
+/** reverb length (s, to −60 dB), the brightness it starts with (Hz), how slowly it builds (s), and the gap before it (s) */
+export const ROOMS: { id: Room; label: string; hint: string; seconds: number; bright: number; bloom: number; predelay: number }[] = [
+  { id: 'studio', label: 'Studio', hint: 'A small, close room: clear, just less dry.', seconds: 0.9, bright: 11000, bloom: 0.003, predelay: 0.004 },
+  { id: 'hall', label: 'Concert hall', hint: 'A grand piano on a concert stage.', seconds: 2.6, bright: 9000, bloom: 0.004, predelay: 0.022 },
+  { id: 'church', label: 'Church', hint: 'Stone walls and a long, warm tail.', seconds: 4.2, bright: 6500, bloom: 0.02, predelay: 0.035 },
+  { id: 'cathedral', label: 'Cathedral', hint: 'Huge and dreamy: every note blooms into the next.', seconds: 7, bright: 4800, bloom: 0.05, predelay: 0.06 },
+  { id: 'plate', label: 'Plate', hint: 'The smooth, bright reverb of classic records.', seconds: 2, bright: 15000, bloom: 0.001, predelay: 0.008 },
+];
+export const roomOf = (id: Room) => ROOMS.find((r) => r.id === id) ?? ROOMS[1];
+
 export const SOUND_STARTS: { id: SoundStart; label: string; hint: string }[] = [
-  { id: 'none', label: 'Straight in', hint: 'Starts as recorded' },
-  { id: 'fade', label: 'Fade in', hint: 'Rises from silence' },
-  { id: 'open', label: 'Open up', hint: 'Starts muffled, as if behind a door, then opens up' },
-  { id: 'swell', label: 'Swell', hint: 'Your opening notes swell up out of silence, like an echo played backwards, and land on the first note. Plays just before the video starts' },
+  { id: 'none', label: 'Straight in', hint: 'Starts right away, as recorded.' },
+  { id: 'fade', label: 'Fade in', hint: 'Rises gently from silence.' },
+  { id: 'open', label: 'Open up', hint: 'Starts muffled, as if behind a door, then opens up.' },
+  { id: 'swell', label: 'Swell', hint: 'Your first notes swell up out of silence, like an echo played backwards, just before the video starts.' },
 ];
 export const SOUND_ENDS: { id: SoundEnd; label: string; hint: string }[] = [
-  { id: 'cut', label: 'Cut', hint: 'Stops at the end' },
-  { id: 'fade', label: 'Fade out', hint: 'Fades to silence' },
-  { id: 'muffle', label: 'Muffle out', hint: 'Sinks away as if a door closes' },
-  { id: 'ring', label: 'Ring out', hint: 'The last moment blooms into a big hall and rings on after the video ends; the picture holds its last frame' },
+  { id: 'cut', label: 'Cut', hint: 'Stops right at the end.' },
+  { id: 'fade', label: 'Fade out', hint: 'Fades gently to silence.' },
+  { id: 'muffle', label: 'Muffle out', hint: 'Sinks away, as if a door closes.' },
+  { id: 'ring', label: 'Ring out', hint: 'The last moment blooms into a big hall and rings on over the final frame.' },
 ];
 
 /** loudness that social media plays at */
@@ -61,7 +98,7 @@ export function resolveSound(s?: Partial<Sound> | null): Sound {
 
 /** true when the sound is changed at all (otherwise the export keeps the video's own audio untouched) */
 export function soundActive(s: Sound): boolean {
-  return s.start !== 'none' || s.end !== 'cut' || s.even || s.hall > 0.001
+  return s.source !== 'video' || s.start !== 'none' || s.end !== 'cut' || s.even || s.hall > 0.001
     || Math.abs(s.volume) > 0.01 || Math.abs(s.bass) > 0.01 || Math.abs(s.treble) > 0.01;
 }
 
@@ -80,6 +117,14 @@ export function evenGainDb(s: Sound, measuredLufs: number | null): number {
 export const masterGain = (s: Sound, measuredLufs: number | null) => dbToGain(s.volume + evenGainDb(s, measuredLufs));
 
 export const dbToGain = (db: number) => Math.pow(10, db / 20);
+
+/** how loud the video's sound and the piano are in the mix (equal power, so 'both' at the middle isn't louder) */
+export function sourceGains(s: Sound): { video: number; piano: number } {
+  if (s.source === 'video') return { video: 1, piano: 0 };
+  if (s.source === 'piano') return { video: 0, piano: 1 };
+  const b = Math.max(0, Math.min(1, s.blend));
+  return { video: Math.cos((b * Math.PI) / 2) * Math.SQRT2 * 0.85, piano: Math.sin((b * Math.PI) / 2) * Math.SQRT2 * 0.85 };
+}
 
 /** what the transitions do at one moment */
 export interface SoundState {

@@ -1,15 +1,16 @@
 // The chain of Web Audio nodes the sound runs through, built the same way for the live preview (an AudioContext
 // fed by the video element) and the export (an OfflineAudioContext fed by the decoded soundtrack):
 //
-//   in → bass → treble → muffle (low-pass) → level ─┬──────────────────────┬→ mix → master → limiter → out
-//                            │                      └→ hall send → hall reverb ┘ ↑
-//                            └→ ring send → ring-out reverb ────────────────────┤
-//                                             swell (made in synth.ts) ─────────┘
+//   video in ─┐
+//   piano in ─┴→ in → bass → treble → muffle (low-pass) → level ─┬───────────────────────────┬→ mix → master → limiter → out
+//                                      │                       └→ room send → room reverb ─┘ ↑
+//                                      └→ ring send → ring-out reverb ───────────────────────┤
+//                                                       swell (made in synth.ts) ─────────────┘
 //
 // Only the parts the settings use are built. What changes over time (level, muffle, ring send) comes from
 // soundAt(): the preview follows the playhead with follow(), the export schedules it all at once with schedule().
-import { dbToGain, masterGain, Sound, soundAt } from './sound';
-import { hallImpulse, ringImpulse, Stereo } from './synth';
+import { dbToGain, masterGain, roomOf, Sound, soundAt, sourceGains } from './sound';
+import { impulse, ringImpulse, Stereo } from './synth';
 
 /** reverb levels (the convolver normalises its impulse response; these set the wet level against the dry sound) */
 const HALL_WET = 0.55;
@@ -56,8 +57,10 @@ const made = new Map<string, Stereo>();
 const once = (key: string, make: () => Stereo) => { let v = made.get(key); if (!v) { v = make(); made.set(key, v); } return v; };
 
 export class SoundChain {
-  /** connect the performance here */
+  /** connect the video's sound here */
   readonly input: GainNode;
+  /** and the piano here (piano.ts) */
+  readonly pianoIn: GainNode;
   private readonly level: GainNode;
   private readonly muffle: BiquadFilterNode;
   private readonly ringSend: GainNode | null = null;
@@ -79,16 +82,26 @@ export class SoundChain {
     const reverb = (ir: Stereo) => { const c = keep(ctx.createConvolver()); c.buffer = toBuffer(ctx, ir); return c; };
     const rate = ctx.sampleRate;
 
-    this.input = gain(1);
+    const mixGains = sourceGains(s);
+    const into = gain(1);
+    this.input = gain(mixGains.video);
+    this.pianoIn = gain(mixGains.piano);
+    this.input.connect(into);
+    this.pianoIn.connect(into);
     const bass = filter('lowshelf', 150, s.bass);
     const treble = filter('highshelf', 5000, s.treble);
     this.muffle = filter('lowpass', 20000);
     this.level = gain(1);
     const mix = (this.mix = gain(1));
-    this.input.connect(bass).connect(treble).connect(this.muffle).connect(this.level).connect(mix);
+    into.connect(bass).connect(treble).connect(this.muffle).connect(this.level).connect(mix);
 
     if (s.hall > 0.001) {
-      this.level.connect(gain(s.hall * HALL_WET)).connect(reverb(once(`hall${rate}`, () => hallImpulse(rate)))).connect(mix);
+      // the room: a moment's gap (the first reflections take a while to come back from far walls), then its reverb
+      const r = roomOf(s.room);
+      const gap = keep(ctx.createDelay(0.2));
+      gap.delayTime.value = r.predelay;
+      this.level.connect(gain(s.hall * HALL_WET)).connect(gap)
+        .connect(reverb(once(`room${rate}|${r.id}`, () => impulse(rate, r.seconds, r.bright, 101, r.bloom)))).connect(mix);
     }
     if (s.end === 'ring') {
       this.ringSend = gain(0);

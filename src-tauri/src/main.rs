@@ -3,6 +3,7 @@
 
 mod export;
 mod media;
+mod piano;
 mod projects;
 mod textures;
 
@@ -59,6 +60,8 @@ fn main() {
             media::allow_media,
             media::converter_ready,
             media::convert_video,
+            media::extract_audio,
+            piano::piano_pack,
             export::export_encoders,
             export::export_start,
             export::export_audio,

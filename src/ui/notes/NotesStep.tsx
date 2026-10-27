@@ -71,6 +71,8 @@ export default function NotesStep({ ws, head }: { ws: WS; head: ReactNode }) {
           </div>
         ) : n.error ? (
           <div className="banner bad"><b>{n.error}</b></div>
+        ) : n.audioError ? (
+          <div className="banner bad"><b>{n.audioError}</b><button type="button" className="link inline" onClick={n.prepareAudio}>Try again</button></div>
         ) : !src ? (
           <div className="banner neutral">
             <b>No notes yet</b><span className="dim">Import the MIDI file recorded with this take, or detect the notes from the audio.</span>

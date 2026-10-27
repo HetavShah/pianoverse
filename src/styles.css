@@ -189,7 +189,7 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .page { display: grid; grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr) auto; gap: 0 40px; padding: 36px 48px 0; min-height: 0; }
 .page-main { overflow-y: auto; display: flex; flex-direction: column; gap: 22px; padding-bottom: 24px; min-height: 0; }
 .page-main.tight { gap: 14px; }
-.page-side { align-self: start; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; padding: 4px 0 24px 32px; border-left: 1px solid var(--rule); }
+.page-side { align-self: start; max-height: 100%; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 20px; padding: 4px 0 24px 32px; border-left: 1px solid var(--rule); }
 .page-side > h2 { font-family: var(--display); font-size: 16px; text-transform: uppercase; letter-spacing: 0.06em; }
 .page-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; padding: 14px 0 16px; border-top: 1px solid var(--rule); }
 .side-field { display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; }
@@ -621,7 +621,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .dial-ruler.dragging .dial-tape { transition: none; }
 .dial-tick-base { position: absolute; bottom: 0; width: 2px; height: 16px; margin-left: -1px; background: var(--stone); }
 .dial-mark { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--paper); pointer-events: none; }
-.dial-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; bottom: 0; left: 50%; }
+.dial-input { position: absolute; left: 0; bottom: 0; width: 100% !important; max-width: 100%; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
 .dial:focus-within .dial-ruler { outline: 2px solid var(--live); outline-offset: 2px; }
 
 .style-side > * { flex-shrink: 0; }
@@ -791,3 +791,11 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
    those frames as a blank screen.) */
 @keyframes pv-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
 .menu { animation: pv-pop 180ms var(--ease); transform-origin: top right; }
+
+/* Audio → Sound: the grand piano getting ready, and its credit */
+.piano-load { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--paper); }
+.piano-load .bar { height: 3px; background: var(--rule-2); }
+.help.credit { font-size: 11.5px; color: var(--dim); }
+.fold-section .fold-note { margin: -6px 0 2px; font-size: 12.5px; color: var(--stone); line-height: 1.45; }
+.fold-section .sub-label { font-size: 12px; font-weight: 600; color: var(--stone); margin-top: 4px; }
+.sound-wave-error { color: var(--warn); flex-direction: column; text-align: center; padding: 0 20px; }

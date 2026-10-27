@@ -1,5 +1,6 @@
 // The open project and its video: starting a new project, opening one (from the Projects page, a file or a drop),
 // finding its video again, converting a video the player can't read, and moving between the steps.
+import { registerVideoPath } from '../services/audio';
 import { useEffect, useRef, useState } from 'react';
 import { applyPreset, Preset } from '../../engine/look';
 import type { CalibratedProject } from '../../engine/calibration';
@@ -47,6 +48,7 @@ export function useSession(deps: SessionDeps) {
 
   const loadVideo = (v: PickedVideo, createProject: boolean) => {
     if (video?.url.startsWith('blob:') && video.url !== v.url) URL.revokeObjectURL(video.url);
+    registerVideoPath(v.url, v.path);
     setVideo(v);
     d.current.pause();
     setVideoIssue(null);

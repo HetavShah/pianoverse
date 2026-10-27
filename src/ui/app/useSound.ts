@@ -1,5 +1,6 @@
-// The live sound: while you watch, the video's own audio runs through the same chain of audio nodes the export uses
-// (engine/audio/soundChain.ts), so the Sound settings are heard as you change them.
+// The live sound: while you watch, the video's own audio (and the grand piano playing your notes, when picked) runs
+// through the same chain of audio nodes the export uses (engine/audio/soundChain.ts), so the Sound settings are heard
+// as you change them. The piano is played just ahead of the video by a PianoFollower (engine/audio/piano.ts).
 //
 // The audio graph is only made once the sound is changed: until then the video plays its sound directly, as a
 // browser would. (Once a video element is routed into Web Audio it can't be taken back out, so this is a one-way
@@ -8,12 +9,15 @@ import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import type { CalibratedProject } from '../../engine/calibration';
 import { trimRange } from '../../engine/project';
 import { resolveSound, soundActive, soundLead, soundTail } from '../../engine/audio/sound';
-import { reverseSwell, Stereo } from '../../engine/audio/synth';
-import { EXPORT_RATE } from '../../engine/audio/mixdown';
+import { Stereo } from '../../engine/audio/synth';
+import { EXPORT_RATE, PianoPart, renderSource, swellFor } from '../../engine/audio/mixdown';
+import { integratedLoudness } from '../../engine/audio/loudness';
 import { SoundChain } from '../../engine/audio/soundChain';
-import { loadSoundtrack, measureLoudness } from '../services/audio';
+import { PianoFollower, PianoPlayer } from '../../engine/audio/piano';
+import { loadSoundtrack, measureLoudness, PEAK_RATE, VideoAudio } from '../services/audio';
+import { PianoLoadProgress, pianoPartFor } from '../services/piano';
 
-interface Graph { ctx: AudioContext; src: MediaElementAudioSourceNode; chain: SoundChain | null }
+interface Graph { ctx: AudioContext; src: MediaElementAudioSourceNode; chain: SoundChain | null; piano: PianoFollower | null }
 
 export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, opts: {
   project: CalibratedProject | null; videoUrl: string | null; playing: boolean; duration: number;
@@ -25,27 +29,66 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
   const [a, b] = span ?? [0, 0];
   /** held "hear as recorded" */
   const [bypass, setBypass] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // the grand piano: its recordings for these notes, loaded (and the first time downloaded) when it's picked
+  const notes = project?.notes;
+  const usesPiano = sound.source !== 'video';
+  const pianoKey = usesPiano && notes?.length ? `${sound.pedal}|${notes.length}|${notes[0]?.s}|${notes[notes.length - 1]?.e}|${project?.noteSource?.offset}` : null;
+  const [piano, setPiano] = useState<{ key: string; part: PianoPart } | null>(null);
+  const [pianoLoad, setPianoLoad] = useState<PianoLoadProgress | null>(null);
+  useEffect(() => {
+    if (!pianoKey || !notes) return;
+    let gone = false;
+    setPianoLoad({ done: 0, total: 0, detail: 'Getting the piano ready' });
+    pianoPartFor(notes, sound, (p) => { if (!gone) setPianoLoad(p); })
+      .then((part) => { if (!gone && part) { setPiano({ key: pianoKey, part }); setPianoLoad(null); } })
+      .catch((e) => { if (!gone) { setError(String((e as Error).message ?? e)); setPianoLoad(null); } });
+    return () => { gone = true; };
+  }, [pianoKey, notes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pianoPart = piano?.key === pianoKey ? piano.part : null;
+  /** the sound isn't ready to hear yet (the piano is loading) */
+  const pianoWaiting = usesPiano && !!pianoKey && !pianoPart;
 
   // the loudness, measured when evening it out
-  const key = `${videoUrl}|${a}|${b}`;
+  // with the piano, the sound before the chain is rendered once (offline): its waveform is what the Sound tab draws,
+  // and its loudness is what evening out measures
+  const srcKey = usesPiano && pianoPart && videoUrl && duration ? `${videoUrl}|${sound.source}|${sound.blend}|${pianoKey}` : null;
+  const [srcRender, setSrcRender] = useState<{ key: string; buf: AudioBuffer; audio: VideoAudio } | null>(null);
+  useEffect(() => {
+    if (!srcKey || !videoUrl || !pianoPart) return;
+    let gone = false;
+    (sound.source === 'both' ? loadSoundtrack(videoUrl) : Promise.resolve(null))
+      .then((src) => renderSource(src, sound, pianoPart, 0, duration))
+      .then((buf) => { if (!gone) setSrcRender({ key: srcKey, buf, audio: peaksOf(buf) }); })
+      .catch((e) => { if (!gone) setError(String((e as Error).message ?? e)); });
+    return () => { gone = true; };
+  }, [srcKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rendered = srcRender?.key === srcKey ? srcRender : null;
+
+  const key = `${videoUrl}|${a}|${b}|${usesPiano ? srcKey : ''}`;
   const [lufs, setLufs] = useState<{ key: string; value: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!sound.even || !videoUrl || !span) return;
+    if (usesPiano) {
+      if (rendered) setLufs({ key, value: integratedLoudness([rendered.buf.getChannelData(0), rendered.buf.getChannelData(1)], rendered.buf.sampleRate, a, b) });
+      return;
+    }
     let gone = false;
     setError(null);
     measureLoudness(videoUrl, [a, b]).then((value) => { if (!gone) setLufs({ key, value }); }).catch((e) => { if (!gone) setError(String((e as Error).message ?? e)); });
     return () => { gone = true; };
-  }, [sound.even, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sound.even, key, rendered]); // eslint-disable-line react-hooks/exhaustive-deps
   const measuredLufs = lufs?.key === key ? lufs.value : null;
 
   // the swell is made from the opening notes: from the decoded soundtrack, once per start and length
-  const swellKey = sound.start === 'swell' && videoUrl && span ? `${key}|${sound.startLen}` : null;
+  const swellKey = sound.start === 'swell' && videoUrl && span && !pianoWaiting ? `${key}|${sound.startLen}` : null;
   const [swell, setSwell] = useState<{ key: string; data: Stereo } | null>(null);
   useEffect(() => {
     if (!swellKey || !videoUrl) return;
     let gone = false;
-    loadSoundtrack(videoUrl).then((buf) => reverseSwell(buf, a, sound.startLen, EXPORT_RATE))
+    (sound.source === 'piano' ? Promise.resolve(null) : loadSoundtrack(videoUrl))
+      .then((buf) => swellFor(buf, sound, pianoPart, a, sound.startLen))
       .then((data) => { if (!gone) setSwell({ key: swellKey, data }); })
       .catch((e) => { if (!gone) setError(String((e as Error).message ?? e)); });
     return () => { gone = true; };
@@ -62,22 +105,25 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
       if (!active) return;
       try {
         const ctx = new AudioContext();
-        graph.current = { ctx, src: ctx.createMediaElementSource(v), chain: null };
+        graph.current = { ctx, src: ctx.createMediaElementSource(v), chain: null, piano: null };
       } catch (e) { setError(`The sound can't be changed here: ${(e as Error).message}`); return; }
     }
     const g = graph.current;
     g.src.disconnect();
+    g.piano?.stop();
+    g.piano = null;
     g.chain?.dispose();
     g.chain = null;
     if (active && !bypass) {
       g.chain = new SoundChain(g.ctx, { sound, span: [a, b], measuredLufs, swell: swellData && { data: swellData, rate: EXPORT_RATE } }, g.ctx.destination);
       g.src.connect(g.chain.input);
+      if (pianoPart) g.piano = new PianoFollower(g.ctx, new PianoPlayer(g.ctx, pianoPart.pack, g.chain.pianoIn), pianoPart.voices, pianoPart.lifts);
       g.chain.follow(v.currentTime, !v.paused);
     } else {
       g.src.connect(g.ctx.destination);
     }
     setBuilt((n) => n + 1);
-  }, [sound, active, bypass, a, b, measuredLufs, videoUrl, swellData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sound, active, bypass, a, b, measuredLufs, videoUrl, swellData, pianoPart]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // follow the playhead while playing
   useEffect(() => {
@@ -85,11 +131,18 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
     if (!g || !v) return;
     if (playing && g.ctx.state === 'suspended') g.ctx.resume().catch(() => {});
     if (!g.chain) return;
-    if (!playing) { g.chain.follow(v.currentTime, false); return; }
+    if (!playing) { g.chain.follow(v.currentTime, false); g.piano?.update(v.currentTime, false); return; }
     let raf = 0;
-    const tick = () => { g.chain?.follow(v.currentTime, true); raf = requestAnimationFrame(tick); };
+    const tick = () => {
+      g.chain?.follow(v.currentTime, true);
+      // the piano only plays within the part in use, like the video's sound
+      g.piano?.update(v.currentTime, !v.paused && v.currentTime < b + 0.05, v.playbackRate || 1);
+      raf = requestAnimationFrame(tick);
+    };
     tick();
-    return () => cancelAnimationFrame(raf);
+    // a timer as well: a hidden window's frames stop, and the piano would fall silent
+    const t = window.setInterval(() => g.piano?.update(v.currentTime, !v.paused && v.currentTime < b + 0.05, v.playbackRate || 1), 100);
+    return () => { cancelAnimationFrame(raf); window.clearInterval(t); g.piano?.update(v.currentTime, false); };
   }, [playing, built]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { graph.current?.ctx.close().catch(() => {}); }, []);
@@ -116,5 +169,23 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
     lead: soundLead(sound),
     swellReady: !!swellData,
     hearSwell,
+    /** what to draw on the Sound tab when it isn't the video's own audio (the piano, or the mix): null until rendered */
+    sourceAudio: usesPiano ? rendered?.audio ?? null : undefined,
+    /** the piano's download or decoding, while it's being got ready */
+    pianoLoad,
+    pianoWaiting,
   };
+}
+
+/** a waveform overview of a rendered sound, in the shape the Sound tab draws (min/max per bin) */
+function peaksOf(buf: AudioBuffer): VideoAudio {
+  const l = buf.getChannelData(0), r = buf.getChannelData(buf.numberOfChannels > 1 ? 1 : 0);
+  const per = buf.sampleRate / PEAK_RATE, n = Math.ceil(buf.length / per);
+  const peaks = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) {
+    let lo = 0, hi = 0;
+    for (let j = Math.floor(i * per), e = Math.min(buf.length, Math.floor((i + 1) * per)); j < e; j++) { const x = (l[j] + r[j]) / 2; if (x < lo) lo = x; if (x > hi) hi = x; }
+    peaks[i * 2] = lo; peaks[i * 2 + 1] = hi;
+  }
+  return { mono: new Float32Array(0), rate: buf.sampleRate, envelope: new Float32Array(0), peaks, duration: buf.duration };
 }
