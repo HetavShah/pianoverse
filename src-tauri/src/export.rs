@@ -279,7 +279,7 @@ pub fn write_file_bytes(request: tauri::ipc::Request<'_>) -> Result<(), String> 
     std::fs::write(&path, bytes).map_err(|e| format!("Could not save {path}: {e}"))
 }
 
-fn urlencoding_decode(s: &str) -> String {
+pub fn urlencoding_decode(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;

@@ -51,7 +51,16 @@
         "installMode": "currentUser"
       }
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "fileAssociations": [
+      {
+        "ext": ["pianoverse"],
+        "name": "Pianoverse project",
+        "description": "Pianoverse project",
+        "role": "Editor",
+        "mimeType": "application/vnd.pianoverse.project+zip"
+      }
+    ]
   },
   "plugins": {
     "updater": {

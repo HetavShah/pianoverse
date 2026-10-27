@@ -6,6 +6,7 @@ import type { CalibratedProject } from '../../engine/calibration';
 import { calibrationFromTracking, newProject } from '../calibrate/useCalibration';
 import { convertVideo, inTauri, onNativeDrop, openFiles, openPaths, Picked, PickedMidi, PickedVideo, PickKind, pickNative } from '../services/media';
 import { fileExists, newId } from '../services/projectStore';
+import { unpackProject } from '../services/projectFile';
 import { toast, toastError } from '../components/toast';
 import type { Step, VideoIssue } from './workspace';
 
@@ -75,11 +76,10 @@ export function useSession(deps: SessionDeps) {
     setStep('import');
   };
 
-  const openProjectText = (text: string) => {
+  /** a project file: a .pianoverse container (its textures join the library) or an older JSON project */
+  const openProjectFile = async (bytes: Uint8Array) => {
     try {
-      const data = JSON.parse(text) as CalibratedProject;
-      if (data.format !== 'pianoverse-project') throw new Error('Not a Pianoverse project file.');
-      openProject(data);
+      await openProject(await unpackProject(bytes));
     } catch (e) {
       toast(`Could not open the project: ${(e as Error).message}`, { kind: 'error' });
     }
@@ -90,7 +90,7 @@ export function useSession(deps: SessionDeps) {
     const proj = items.find((i) => i.kind === 'project');
     const vid = items.find((i): i is PickedVideo => i.kind === 'video');
     const mid = items.find((i): i is PickedMidi => i.kind === 'midi');
-    if (proj) { openProjectText(proj.text); if (vid) setTimeout(() => loadVideo(vid, false), 0); return; }
+    if (proj) { openProjectFile(proj.data).then(() => { if (vid) loadVideo(vid, false); }); return; }
     if (vid) {
       const fresh = route === 'home' || !d.current.project;
       if (fresh) { d.current.setProjectState(null); setRoute('project'); setStep('import'); }
@@ -109,13 +109,22 @@ export function useSession(deps: SessionDeps) {
   const onFiles = (files: FileList | null | undefined) => { if (files?.length) openFiles(Array.from(files)).then(openItems); };
   const pick = (what: PickKind) => { pickNative(what).then(openItems).catch(toastError); };
 
-  // native drag and drop in the desktop app (gives file paths, so videos can be converted)
+  // in the desktop app: native drag and drop (gives file paths, so videos can be converted), and files Pianoverse
+  // is opened with (double-clicking a .pianoverse file), at start-up or while it is already open
   useEffect(() => {
     if (!inTauri()) return;
-    let un: (() => void) | undefined;
+    const offs: (() => void)[] = [];
     let gone = false;
-    onNativeDrop((items) => openItemsRef.current(items)).then((u) => { if (gone) u(); else un = u; });
-    return () => { gone = true; un?.(); };
+    const keep = (u: () => void) => { if (gone) u(); else offs.push(u); };
+    const open = (paths: string[]) => { if (paths.length) openPaths(paths).then((items) => openItemsRef.current(items)).catch(toastError); };
+    onNativeDrop((items) => openItemsRef.current(items)).then(keep);
+    (async () => {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const { listen } = await import('@tauri-apps/api/event');
+      keep(await listen<string[]>('open-files', (e) => open(e.payload)));
+      open(await invoke<string[]>('launch_files'));
+    })().catch(toastError);
+    return () => { gone = true; offs.forEach((u) => u()); };
   }, []);
 
   // a MIDI file dropped together with a new video is imported once the project exists

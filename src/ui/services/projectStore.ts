@@ -1,6 +1,6 @@
 // Recent projects: saved automatically. Desktop app: the app's data folder; browser: local storage.
 import type { CalibratedProject } from '../../engine/calibration';
-import { serializeProject } from './saveProject';
+import { serializeProject } from './projectFile';
 import { inTauri } from './media';
 
 export interface ProjectMeta {

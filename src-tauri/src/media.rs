@@ -53,8 +53,8 @@ pub fn allow_media(app: AppHandle, path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
     let meta = std::fs::metadata(&path).map_err(|e| format!("Could not open {path}: {e}"))?;
-    if meta.len() > 64 * 1024 * 1024 {
-        return Err(format!("{path} is too large to be a MIDI file"));
+    if meta.len() > 1024 * 1024 * 1024 {
+        return Err(format!("{path} is too large to open (over 1 GB)"));
     }
     std::fs::read(&path).map(tauri::ipc::Response::new).map_err(|e| format!("Could not read {path}: {e}"))
 }

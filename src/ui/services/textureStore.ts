@@ -82,6 +82,28 @@ export async function addBrowserTexture(file: Blob & { name?: string }): Promise
   return tex;
 }
 
+/**
+ * put a texture carried in a project file into the library under its own id (so the project's 'user:<id>'
+ * still points at it); nothing happens if the library already has it
+ */
+export async function restoreTexture(id: string, name: string, files: Maps): Promise<void> {
+  const have = (list.length ? list : await refreshTextures()).some((t) => t.id === id) || memory.has(id);
+  if (have) return;
+  if (inTauri()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    for (const [map, blob] of Object.entries(files) as [keyof Maps, Blob | undefined][]) {
+      if (!blob) continue;
+      const ext = Object.entries(MIME).find(([, m]) => m === blob.type)?.[0] ?? 'png';
+      await invoke('restore_texture_file', new Uint8Array(await blob.arrayBuffer()), { headers: { id, name: encodeURIComponent(name), file: `${map}.${ext}` } });
+    }
+  } else {
+    const svg = files.color?.type === 'image/svg+xml';
+    const urls = Object.fromEntries(Object.entries(files).filter(([, b]) => b).map(([k, b]) => [k, URL.createObjectURL(b as Blob)]));
+    memory.set(id, { tex: { id, name, files: urls, svg }, blobs: files });
+  }
+  await refreshTextures();
+}
+
 export async function deleteTexture(id: string) {
   if (inTauri()) {
     const { invoke } = await import('@tauri-apps/api/core');

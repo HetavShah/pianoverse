@@ -4,14 +4,15 @@
 export const inTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export interface PickedVideo { kind: 'video'; name: string; url: string; path?: string }
-export interface PickedProject { kind: 'project'; name: string; text: string }
+/** a project file's bytes: a .pianoverse container, or an older JSON project (see projectFile.ts) */
+export interface PickedProject { kind: 'project'; name: string; data: Uint8Array }
 export interface PickedMidi { kind: 'midi'; name: string; data: ArrayBuffer }
 export type Picked = PickedVideo | PickedProject | PickedMidi;
 
 const VIDEO_EXT = ['mp4', 'mov', 'm4v', 'webm', 'mkv'];
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 export const isVideoName = (n: string) => VIDEO_EXT.includes(n.toLowerCase().split('.').pop() ?? '');
-export const isProjectName = (n: string) => n.toLowerCase().endsWith('.json');
+export const isProjectName = (n: string) => /\.(pianoverse|json)$/i.test(n);
 export const isMidiName = (n: string) => /\.(mid|midi)$/i.test(n);
 
 async function videoFromPath(path: string): Promise<PickedVideo> {
@@ -28,7 +29,7 @@ async function midiFromPath(path: string): Promise<PickedMidi> {
 
 async function projectFromPath(path: string): Promise<PickedProject> {
   const { invoke } = await import('@tauri-apps/api/core');
-  return { kind: 'project', name: baseName(path), text: await invoke<string>('read_text_file', { path }) };
+  return { kind: 'project', name: baseName(path), data: new Uint8Array(await invoke<ArrayBuffer>('read_file_bytes', { path })) };
 }
 
 /** Turn file paths (from the dialog or a drop) into opened items. */
@@ -50,10 +51,10 @@ export async function pickNative(what: PickKind): Promise<Picked[]> {
   const filters = what === 'video'
     ? [{ name: 'Video', extensions: VIDEO_EXT }]
     : what === 'project'
-      ? [{ name: 'Pianoverse project', extensions: ['json'] }]
+      ? [{ name: 'Pianoverse project', extensions: ['pianoverse', 'json'] }]
       : what === 'midi'
         ? [{ name: 'MIDI file', extensions: ['mid', 'midi'] }]
-        : [{ name: 'Video, project or MIDI', extensions: [...VIDEO_EXT, 'json', 'mid', 'midi'] }];
+        : [{ name: 'Video, project or MIDI', extensions: [...VIDEO_EXT, 'pianoverse', 'json', 'mid', 'midi'] }];
   const res = await open({ multiple: what === 'any', directory: false, filters });
   if (!res) return [];
   return openPaths(Array.isArray(res) ? res : [res]);
@@ -63,7 +64,7 @@ export async function pickNative(what: PickKind): Promise<Picked[]> {
 export async function openFiles(files: File[]): Promise<Picked[]> {
   const out: Picked[] = [];
   for (const f of files) {
-    if (isProjectName(f.name)) out.push({ kind: 'project', name: f.name, text: await f.text() });
+    if (isProjectName(f.name)) out.push({ kind: 'project', name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
     else if (isMidiName(f.name)) out.push({ kind: 'midi', name: f.name, data: await f.arrayBuffer() });
     else if (f.type.startsWith('video/') || isVideoName(f.name)) out.push({ kind: 'video', name: f.name, url: URL.createObjectURL(f) });
   }

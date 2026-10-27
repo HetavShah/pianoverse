@@ -19,6 +19,7 @@
     "@tauri-apps/plugin-process": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.14.0",
     "@tonejs/midi": "^2.0.28",
+    "fflate": "^0.8.2",
     "onnxruntime-web": "^1.29.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"

@@ -120,6 +120,29 @@ pub fn import_texture(app: AppHandle, path: String) -> Result<UserTexture, Strin
     read_one(&d, &id).ok_or_else(|| "Could not import the texture".into())
 }
 
+/// Put one file of a texture carried in a project file into the library, under the texture's own id.
+/// Headers: id, name (url-encoded), file ("color.png", "video.mp4", …); body: the file's bytes.
+#[tauri::command]
+pub fn restore_texture_file(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let h = |k: &str| request.headers().get(k).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+    let id = h("id").ok_or("no id")?;
+    let file = h("file").ok_or("no file")?;
+    let name = h("name").map(|n| crate::export::urlencoding_decode(&n)).unwrap_or_else(|| id.clone());
+    // only plain names: a texture id and a map file name, nothing that could reach outside the library
+    let plain = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.') && !s.contains("..");
+    if !plain(&id) || !plain(&file) {
+        return Err("bad texture name".into());
+    }
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("expected raw bytes".into()) };
+    let d = dir(&app, &id)?;
+    std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+    std::fs::write(d.join(&file), bytes).map_err(|e| e.to_string())?;
+    if !d.join("name.txt").exists() {
+        std::fs::write(d.join("name.txt"), &name).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn list_textures(app: AppHandle) -> Result<Vec<UserTexture>, String> {
     let mut out = Vec::new();
