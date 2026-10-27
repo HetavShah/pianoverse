@@ -799,3 +799,10 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .fold-section .fold-note { margin: -6px 0 2px; font-size: 12.5px; color: var(--stone); line-height: 1.45; }
 .fold-section .sub-label { font-size: 12px; font-weight: 600; color: var(--stone); margin-top: 4px; }
 .sound-wave-error { color: var(--warn); flex-direction: column; text-align: center; padding: 0 20px; }
+.sound-wave-wait { background: repeating-linear-gradient(90deg, transparent 0 6px, color-mix(in srgb, var(--rule) 55%, transparent) 6px 7px); }
+.sound-wave-wait .wait-card { display: inline-flex; flex-direction: column; gap: 8px; min-width: 240px; padding: 10px 14px; background: var(--ground); border: 1px solid var(--rule-2); color: var(--paper); }
+.sound-wave-wait .wait-line { display: inline-flex; align-items: center; gap: 8px; }
+.sound-wave-wait .wait-bar { display: block; height: 3px; background: var(--rule-2); overflow: hidden; }
+.sound-wave-wait .wait-bar i { display: block; height: 100%; background: var(--live); transition: width 0.3s var(--ease); }
+.sound-wave-error { background: none; }
+.stat .stat-wait { font-family: var(--sans); font-size: 14px; color: var(--stone); text-transform: none; letter-spacing: 0; }

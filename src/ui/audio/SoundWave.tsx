@@ -8,8 +8,8 @@ import { PEAK_RATE, VideoAudio } from '../services/audio';
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const SWELL = '#9b8cff';
 
-export default function SoundWave({ audio, sound, span, tail, measuredLufs, time, onSeek, view, className, waitText = 'Reading the soundtrack…', error, onRetry }: {
-  audio: VideoAudio | null; waitText?: string; error?: string | null; onRetry?: () => void; sound: Sound; span: [number, number]; tail: number; measuredLufs: number | null;
+export default function SoundWave({ audio, sound, span, tail, measuredLufs, time, onSeek, view, className, waitText = 'Reading the soundtrack…', progress, error, onRetry }: {
+  audio: VideoAudio | null; waitText?: string; /** how far the wait has got, 0..1 (a bar), when known */ progress?: number; error?: string | null; onRetry?: () => void; sound: Sound; span: [number, number]; tail: number; measuredLufs: number | null;
   time: number; onSeek: (t: number) => void;
   /** the part shown, seconds (default: all of it, with the ring-out) */
   view?: [number, number];
@@ -29,6 +29,7 @@ export default function SoundWave({ audio, sound, span, tail, measuredLufs, time
     if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     const g = c.getContext('2d')!;
     g.clearRect(0, 0, W, H);
+    if (!audio) return;   // nothing to draw yet: the loading card says why
     const mid = H / 2, half = H * 0.44;
     const xOf = (t: number) => ((t - t0) / (t1 - t0)) * W;
     g.fillStyle = css('--rule');
@@ -106,15 +107,22 @@ export default function SoundWave({ audio, sound, span, tail, measuredLufs, time
       <canvas ref={ref} aria-label="The sound over time. Click to move the playhead"
         onPointerDown={(e) => { drag.current = true; e.currentTarget.setPointerCapture(e.pointerId); at(e); }}
         onPointerMove={(e) => { if (drag.current) at(e); }} onPointerUp={() => { drag.current = false; }} />
-      {!audio && !error && <div className="sound-wave-wait dim small-text"><span className="spinner" /> {waitText}</div>}
+      {!audio && !error && (
+        <div className="sound-wave-wait small-text" role="status">
+          <span className="wait-card">
+            <span className="wait-line"><span className="spinner" />{waitText}</span>
+            {progress !== undefined && <span className="wait-bar"><i style={{ width: `${Math.round(progress * 100)}%` }} /></span>}
+          </span>
+        </div>
+      )}
       {!audio && error && (
         <div className="sound-wave-wait sound-wave-error small-text" role="alert">
           <span>{error}</span>
           {onRetry && <button type="button" className="link inline" onClick={onRetry}>Try again</button>}
         </div>
       )}
-      {lead > 0 && a > t0 + (t1 - t0) * 0.25 && <span className="sound-wave-tag end" style={{ right: `${(1 - (a - t0) / (t1 - t0)) * 100}%` }}>Swell · video starts</span>}
-      {tail > 0 && b > t0 && b < t1 - (t1 - t0) * 0.25 && <span className="sound-wave-tag" style={{ left: `${((b - t0) / (t1 - t0)) * 100}%` }}>Video ends · rings on</span>}
+      {audio && lead > 0 && a > t0 + (t1 - t0) * 0.25 && <span className="sound-wave-tag end" style={{ right: `${(1 - (a - t0) / (t1 - t0)) * 100}%` }}>Swell · video starts</span>}
+      {audio && tail > 0 && b > t0 && b < t1 - (t1 - t0) * 0.25 && <span className="sound-wave-tag" style={{ left: `${((b - t0) / (t1 - t0)) * 100}%` }}>Video ends · rings on</span>}
     </div>
   );
 }

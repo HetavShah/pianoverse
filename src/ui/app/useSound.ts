@@ -10,7 +10,7 @@ import type { CalibratedProject } from '../../engine/calibration';
 import { trimRange } from '../../engine/project';
 import { resolveSound, soundActive, soundLead, soundTail } from '../../engine/audio/sound';
 import { Stereo } from '../../engine/audio/synth';
-import { EXPORT_RATE, PianoPart, renderSource, swellFor } from '../../engine/audio/mixdown';
+import { EXPORT_RATE, PianoPart, PREVIEW_RATE, renderSource, swellFor } from '../../engine/audio/mixdown';
 import { integratedLoudness } from '../../engine/audio/loudness';
 import { SoundChain } from '../../engine/audio/soundChain';
 import { PianoFollower, PianoPlayer } from '../../engine/audio/piano';
@@ -55,11 +55,13 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
   // and its loudness is what evening out measures
   const srcKey = usesPiano && pianoPart && videoUrl && duration ? `${videoUrl}|${sound.source}|${sound.blend}|${pianoKey}` : null;
   const [srcRender, setSrcRender] = useState<{ key: string; buf: AudioBuffer; audio: VideoAudio } | null>(null);
+  const [srcProgress, setSrcProgress] = useState(0);
   useEffect(() => {
     if (!srcKey || !videoUrl || !pianoPart) return;
     let gone = false;
+    setSrcProgress(0);
     (sound.source === 'both' ? loadSoundtrack(videoUrl) : Promise.resolve(null))
-      .then((src) => renderSource(src, sound, pianoPart, 0, duration))
+      .then((src) => renderSource(src, sound, pianoPart, 0, duration, PREVIEW_RATE, (d) => { if (!gone) setSrcProgress(d); }))
       .then((buf) => { if (!gone) setSrcRender({ key: srcKey, buf, audio: peaksOf(buf) }); })
       .catch((e) => { if (!gone) setError(String((e as Error).message ?? e)); });
     return () => { gone = true; };
@@ -171,6 +173,8 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
     hearSwell,
     /** what to draw on the Sound tab when it isn't the video's own audio (the piano, or the mix): null until rendered */
     sourceAudio: usesPiano ? rendered?.audio ?? null : undefined,
+    /** how far that render has got, 0..1 */
+    sourceProgress: srcProgress,
     /** the piano's download or decoding, while it's being got ready */
     pianoLoad,
     pianoWaiting,

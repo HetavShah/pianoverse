@@ -26,9 +26,10 @@ function playPiano(ctx: BaseAudioContext, piano: PianoPart, out: AudioNode, from
  * The sound before the chain, for [from, to] seconds of the video: the video's audio and the piano in their mix.
  * Used to measure its loudness and to make the swell when the piano plays.
  */
-export async function renderSource(src: AudioBuffer | null, sound: Sound, piano: PianoPart | null, from: number, to: number): Promise<AudioBuffer> {
+export async function renderSource(src: AudioBuffer | null, sound: Sound, piano: PianoPart | null, from: number, to: number,
+  rate = EXPORT_RATE, onProgress?: (done: number) => void): Promise<AudioBuffer> {
   const dur = Math.max(0.05, to - from);
-  const ctx = new OfflineAudioContext(2, Math.ceil(dur * EXPORT_RATE), EXPORT_RATE);
+  const ctx = new OfflineAudioContext(2, Math.ceil(dur * rate), rate);
   const g = sourceGains(sound);
   if (src && g.video > 0) {
     const node = ctx.createBufferSource(); node.buffer = src;
@@ -41,8 +42,18 @@ export async function renderSource(src: AudioBuffer | null, sound: Sound, piano:
     k.connect(ctx.destination);
     playPiano(ctx, piano, k, from, to, 0);
   }
+  if (onProgress) {
+    // the render pauses every twentieth of the way to say how far it has got
+    for (let i = 1; i < 20; i++) {
+      const t = (dur * i) / 20;
+      ctx.suspend(Math.floor((t * rate) / 128) * 128 / rate).then(() => { onProgress(i / 20); ctx.resume(); }).catch(() => {});
+    }
+  }
   return ctx.startRendering();
 }
+
+/** the rate the Sound tab's preview of the piano is rendered at (its waveform and loudness): half the export's */
+export const PREVIEW_RATE = 24000;
 
 export const EXPORT_RATE = 48000;
 

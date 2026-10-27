@@ -48,7 +48,8 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
   );
   const evenDb = evenGainDb(s, live.measuredLufs);
   // the two close-ups: a few seconds around each end
-  const wave = { audio: live.sourceAudio === undefined ? ws.notes.audio : live.sourceAudio, waitText: s.source === 'video' ? undefined : 'Playing your notes on the piano…',
+  const wave = { audio: live.sourceAudio === undefined ? ws.notes.audio : live.sourceAudio, waitText: s.source === 'video' ? undefined : live.pianoWaiting ? 'Getting the piano ready…' : `Playing your notes on the piano · ${Math.round(live.sourceProgress * 100)}%`,
+    progress: s.source === 'video' ? undefined : live.pianoWaiting ? (live.pianoLoad && live.pianoLoad.total > 0 ? live.pianoLoad.done / live.pianoLoad.total : undefined) : live.sourceProgress,
     error: s.source === 'video' ? ws.notes.audioError : live.error, onRetry: s.source === 'video' ? ws.notes.prepareAudio : undefined, sound: s, span, tail: live.tail, measuredLufs: live.measuredLufs, time: ws.time, onSeek: ws.seek };
   const startView: [number, number] = s.start === 'swell'
     ? [span[0] - live.lead - 0.2, Math.min(span[1], span[0] + 3)]
@@ -106,7 +107,7 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
 
         <div className="stat-cards">
           <div className="stat"><span>Source</span><b>{sourceInfo.label}</b></div>
-          <div className="stat"><span>Loudness</span><b>{s.even ? (live.measuredLufs === null ? '…' : `${TARGET_LUFS} LUFS`) : 'As recorded'}</b></div>
+          <div className="stat"><span>Loudness</span><b>{s.even ? (live.measuredLufs === null ? <span className="stat-wait">Measuring…</span> : `${TARGET_LUFS} LUFS`) : 'As recorded'}</b></div>
           <div className="stat"><span>Reverb</span><b>{s.hall ? room.label : 'Off'}</b></div>
           <div className="stat"><span>Export length</span><b>{fmtT(span[1] - span[0] + live.lead + live.tail)}</b></div>
         </div>
