@@ -1,5 +1,6 @@
-// Behind the Projects title: a real take rendered by Pianoverse (the sample, landscape, Follow camera), looping
-// silently and full-bleed, toned down so the title reads over it. A still frame under reduced motion.
+// Behind the Projects title: a real take rendered by Pianoverse (the sample in the Concert look, close on the keys
+// and hands), an 8-second seamless loop playing silently and full-bleed, toned down so the title reads over it.
+// A still frame under reduced motion.
 export default function HomeBackdrop() {
   const still = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   return (

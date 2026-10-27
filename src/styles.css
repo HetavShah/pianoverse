@@ -166,7 +166,7 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .home-hero > .title-row { position: relative; z-index: 1; }
 .home-hero .sub { color: var(--paper); opacity: 0.8; }
 .home-backdrop { position: absolute; inset: 0; pointer-events: none; overflow: hidden; background: var(--stage); }
-.home-backdrop video { width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: block; }
+.home-backdrop video { width: 100%; height: 100%; object-fit: cover; object-position: 70% 50%; display: block; }
 /* the footage sits behind the type: darker under the title on the left, and it settles into the ground at the foot */
 .home-backdrop .scrim { position: absolute; inset: 0; background:
   linear-gradient(90deg, rgba(22, 22, 21, 0.9) 0%, rgba(22, 22, 21, 0.6) 38%, rgba(22, 22, 21, 0.15) 75%, rgba(22, 22, 21, 0.1) 100%),
