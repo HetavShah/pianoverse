@@ -78,7 +78,7 @@ if (process.env.FIT === 'fit') await page.click('button:has-text("Fit inside")')
 if (process.env.CODEC === 'hevc') await page.selectOption('.ex-row3 select >> nth=0', 'hevc');
 if (process.env.FPS) await page.selectOption('.ex-row3 select >> nth=1', process.env.FPS);
 if (process.env.TRANSPARENT) await page.click('label:has-text("transparent background") input');
-await page.click('label:has-text("Export only the selected part") input');
+await page.click('label:has-text("Only the selected part") input');
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/screen-before.png` });
 const t0 = Date.now();

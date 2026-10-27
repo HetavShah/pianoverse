@@ -264,7 +264,6 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
       </aside>
 
       <div className="score">
-      <Transport ws={ws} />
       <StyleTimeline
         project={project}
         time={ws.time}
@@ -277,6 +276,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
         selectedScene={scene}
         onSelectScene={pickScene}
       />
+      <Transport ws={ws} />
       </div>
     </div>
   );

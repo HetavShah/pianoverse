@@ -103,8 +103,8 @@ export default function LightStep({ ws, attachPreview }: { ws: WS; attachPreview
       </aside>
 
       <div className="score">
-        <Transport ws={ws} />
         <div className="light-timeline"><ScrubBar time={ws.time} duration={duration} trim={project.edit?.trim ? trimRange(project, duration) : null} onSeek={ws.seek} /></div>
+      <Transport ws={ws} />
       </div>
     </div>
   );

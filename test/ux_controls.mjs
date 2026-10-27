@@ -93,6 +93,29 @@ const editLook = await page.evaluate(async () => {
 ok(editLook.before === editLook.after, 'typing keeps the same font, size and colour  ' + JSON.stringify(editLook));
 ok(editLook.line === 'solid' && editLook.gone, 'a line shows while typing and goes when you click away');
 
+// ---- the chosen preset stays readable when hovered ----
+await page.click('.stepper [title="Style"]'); await page.waitForTimeout(1200);
+await page.click('.layer-row >> text=Notes'); await page.waitForTimeout(500);
+const stop = page.locator('.dial-stops button.on').first();
+await stop.hover(); await page.waitForTimeout(250);
+const [fg, bg] = await stop.evaluate((e) => { const c = getComputedStyle(e); return [c.color, c.backgroundColor]; });
+ok(fg !== bg, `a chosen preset keeps its text on hover (${fg} on ${bg})`);
+
+// ---- changing step never shows a blank page (no fade from nothing) ----
+await page.click('.stepper [title="Light"]');
+const op = await page.evaluate(() => getComputedStyle(document.querySelector('.route > *')).opacity);
+ok(op === '1', 'a new step shows at once, not faded from nothing  opacity ' + op);
+
+// ---- the player sits under the timeline, its controls centred ----
+for (const st of ['Style', 'Light', 'Camera']) {
+  await page.click(`.stepper [title="${st}"]`); await page.waitForTimeout(900);
+  const g = await page.evaluate(() => {
+    const sc = document.querySelector('.score').getBoundingClientRect(), tr = document.querySelector('.score .transport'), p = tr.querySelector('.play-round').getBoundingClientRect();
+    return { below: tr === document.querySelector('.score').lastElementChild, off: Math.round(p.left + p.width / 2 - (sc.left + sc.width / 2)) };
+  });
+  ok(g.below && Math.abs(g.off) < 4, `${st}: play is under the timeline, centred (${g.off}px off)`);
+}
+
 // ---- the settings menu opens and its items can be used ----
 await page.click('[aria-label="Settings"]'); await page.waitForTimeout(300);
 const menu = await page.locator('.menu').boundingBox();

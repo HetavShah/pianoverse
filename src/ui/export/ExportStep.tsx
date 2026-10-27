@@ -78,7 +78,6 @@ export default function ExportStep({ ws }: { ws: WS }) {
   const sizeId = sizeList.find((z) => z.id === s.size)?.id ?? sizeList[0].id;
   const aspectDiffers = !cameraOn(project) && Math.abs(outW / outH - srcAspect) > 0.02;
   const encoder = enc ? (s.codec === 'hevc' ? enc.hevc[0] : enc.h264[0]) : null;
-  const gpu = ws.renderer?.adapterName ?? '';
   const hw = !!encoder && !encoder.startsWith('lib');
   // rough time: about 25 ms a frame for 1080p on a mid-range card, scaled by pixels
   const estSecs = est.frames * 0.025 * ((outW * outH) / (1080 * 1920)) * (hw ? 1 : 1.8) * (s.transparent ? 2 : 1);
@@ -136,13 +135,17 @@ export default function ExportStep({ ws }: { ws: WS }) {
 
   const showFile = async (f: string) => { if (inTauri()) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('show_in_folder', { path: f }); } };
 
+  const soundNote = [ws.sound.lead ? `swells in ${ws.sound.lead.toFixed(1)} s` : '', ws.sound.tail ? `rings on ${ws.sound.tail.toFixed(1)} s` : ''].filter(Boolean).join(' · ');
+
   return (
     <div className="page export-page">
       <div className="page-main">
-        <h1>Export video</h1>
-        <p className="sub">The export uses the same look as the preview, at full quality.</p>
+        <header>
+          <h1>Export video</h1>
+          <p className="sub">Same look as the preview, at full quality.</p>
+        </header>
 
-        <div className="ex-field">
+        <section className="ex-field">
           <span className="ex-label">Size</span>
           <div className="ex-sizes">
             {sizeList.map((z) => (
@@ -162,9 +165,9 @@ export default function ExportStep({ ws }: { ws: WS }) {
               </div>
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="ex-row3">
+        <section className="ex-row3">
           <label className="ex-field"><span className="ex-label">Format</span>
             <select value={s.codec} onChange={(e) => set({ codec: e.target.value as ExportSettings['codec'] })} disabled={running}>
               <option value="h264">MP4 · H.264</option>
@@ -184,48 +187,42 @@ export default function ExportStep({ ws }: { ws: WS }) {
               <option value="small">Small file</option>
             </select>
           </label>
-        </div>
+        </section>
 
-        <div className="ex-box">
-          <div className="row">
-            <span className="ex-enc">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="7" width="18" height="10" rx="2" /><path d="M7 7V5M12 7V5M17 7V5M7 19v-2M12 19v-2M17 19v-2" /></svg>
-              Encoder: {encoder ? encoderLabel(encoder, hw ? gpu : '') : encErr ? 'not available' : 'checking…'}
-            </span>
-            <span className={hw ? 'ok-text' : 'dim'}>{encoder ? (hw ? 'Detected' : 'No graphics-card encoder found') : ''}</span>
-          </div>
-          {encErr && <small className="danger-text">{encErr}</small>}
-          {ws.sound.active ? (
-            <div className="toggle-row">
-              <span>Sound with your settings<small>Rendered with your Sound settings (Audio step){ws.sound.lead ? `, swelling in ${ws.sound.lead.toFixed(1)} s before the video` : ''}{ws.sound.tail ? `, ringing on ${ws.sound.tail.toFixed(1)} s after it` : ''}, then encoded at high quality.</small></span>
-              <button type="button" className="link inline small-text" onClick={() => ws.goStep('audio')}>Change</button>
-            </div>
-          ) : (
-            <label className="toggle-row">
-              <span>Copy original audio without re-encoding<small>When the video's audio is AAC; otherwise it is converted at high quality.</small></span>
-              <input type="checkbox" checked={s.audioCopy} onChange={(e) => set({ audioCopy: e.target.checked })} disabled={running} />
-            </label>
-          )}
-          <label className="toggle-row">
-            <span>Also export effects on a transparent background<small>For editing in DaVinci Resolve or Premiere (ProRes 4444 .mov, saved next to the video)</small></span>
-            <input type="checkbox" checked={s.transparent} onChange={(e) => set({ transparent: e.target.checked })} disabled={running || (enc ? !enc.prores : false)} />
-          </label>
-        </div>
-
-        {sel && (
-          <label className="toggle-row ex-part">
-            <span>Export only the selected part <span className="mono dim">{fmtLen(sel[0])} – {fmtLen(sel[1])}</span><small>The part you picked on the Style timeline</small></span>
-            <input type="checkbox" checked={!!s.onlySelection} onChange={(e) => set({ onlySelection: e.target.checked })} disabled={running} />
-          </label>
-        )}
-
-        <div className="ex-field">
+        <section className="ex-field">
           <span className="ex-label">Save to</span>
           <div className="ex-save">
-            <input type="text" className="mono" value={s.out} onChange={(e) => set({ out: e.target.value })} disabled={running} spellCheck={false} />
-            <button type="button" className="btn" onClick={browse} disabled={running || !inTauri()}><Icon name="folder" />Browse</button>
+            <input type="text" className="mono" value={s.out} onChange={(e) => set({ out: e.target.value })} disabled={running} spellCheck={false} aria-label="Save to" />
+            <button type="button" className="btn ghost" onClick={browse} disabled={running || !inTauri()}><Icon name="folder" />Browse</button>
           </div>
-        </div>
+        </section>
+
+        <section className="ex-field">
+          <span className="ex-label">Options</span>
+          <div className="ex-opts">
+            {ws.sound.active ? (
+              <div className="ex-opt">
+                <span><b>Sound</b><small>Your Audio settings{soundNote ? ` · ${soundNote}` : ''}</small></span>
+                <button type="button" className="link inline small-text" onClick={() => ws.goStep('audio')}>Change</button>
+              </div>
+            ) : (
+              <label className="ex-opt">
+                <span><b>Keep the original sound as it is</b><small>No re-encoding when it's AAC</small></span>
+                <input type="checkbox" checked={s.audioCopy} onChange={(e) => set({ audioCopy: e.target.checked })} disabled={running} />
+              </label>
+            )}
+            <label className="ex-opt">
+              <span><b>Effects on a transparent background</b><small>An extra ProRes .mov for Premiere or DaVinci Resolve</small></span>
+              <input type="checkbox" checked={s.transparent} onChange={(e) => set({ transparent: e.target.checked })} disabled={running || (enc ? !enc.prores : false)} />
+            </label>
+            {sel && (
+              <label className="ex-opt ex-part">
+                <span><b>Only the selected part</b><small className="mono">{fmtLen(sel[0])} – {fmtLen(sel[1])}</small></span>
+                <input type="checkbox" checked={!!s.onlySelection} onChange={(e) => set({ onlySelection: e.target.checked })} disabled={running} />
+              </label>
+            )}
+          </div>
+        </section>
       </div>
 
       <aside className="page-side ex-side">
@@ -237,7 +234,9 @@ export default function ExportStep({ ws }: { ws: WS }) {
           <dt>Frames</dt><dd className="mono">{est.frames.toLocaleString('en-US')}{est.fps !== srcFps ? ` · ${est.fps} fps` : ''}</dd>
           <dt>Estimated size</dt><dd className="mono">about {est.mb < 10 ? est.mb.toFixed(1) : Math.round(est.mb)} MB{s.transparent ? ' + effects' : ''}</dd>
           <dt>Estimated time</dt><dd className="mono">about {fmtDur(estSecs)}</dd>
+          <dt>Encoder</dt><dd className={hw ? '' : 'dim'} title={hw ? 'On the graphics card' : encoder ? 'No graphics-card encoder found, so the processor does it' : undefined}>{encoder ? encoderLabel(encoder) : encErr ? 'Not available' : 'Checking…'}</dd>
         </dl>
+        {encErr && <small className="danger-text">{encErr}</small>}
 
         {run.kind === 'running' && (
           <div className="ex-progress">
@@ -261,7 +260,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
         {run.kind === 'error' && <div className="ex-error"><b>The export stopped</b><pre>{run.message}</pre></div>}
 
         <button type="button" className="btn primary big" onClick={start} disabled={running || !enc || !s.out}><Icon name="export" size={18} />{run.kind === 'done' ? 'Export again' : 'Export video'}</button>
-        <button type="button" className="btn" onClick={savePng} disabled={running}><Icon name="saveImage" />Save current frame as PNG</button>
+        <button type="button" className="btn ghost ex-png" onClick={savePng} disabled={running}><Icon name="saveImage" />Save this frame as PNG</button>
         {msg && <small className="dim">{msg}</small>}
       </aside>
 

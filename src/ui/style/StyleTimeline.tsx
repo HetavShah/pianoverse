@@ -10,7 +10,7 @@ import { sceneName } from './ShapeSections';
 import Icon from '../components/icons';
 
 const LABEL_W = 0; // labels live in HTML beside the canvas
-const RULER = 22, NOTES_H = 116, GAP = 12, TRACK_H = 6, GAP2 = 26, PART_H = 20;
+const RULER = 22, NOTES_H = 80, GAP = 12, TRACK_H = 6, GAP2 = 26, PART_H = 20;
 /** canvas height; the tracking lane only appears when there is tracking to show */
 const timelineH = (track: boolean) => RULER + NOTES_H + GAP + (track ? TRACK_H + GAP2 : 0) + PART_H + 12;
 

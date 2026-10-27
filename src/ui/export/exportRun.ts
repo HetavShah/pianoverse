@@ -72,13 +72,14 @@ export async function detectEncoders(): Promise<Encoders> {
   return invoke<Encoders>('export_encoders');
 }
 
-export const encoderLabel = (enc: string, gpu: string) => {
-  const g = gpu ? ` on ${gpu.replace(/^NVIDIA\s+|^AMD\s+|^Intel\(R\)\s+/i, '')}` : '';
-  if (enc.endsWith('_nvenc')) return `NVIDIA NVENC${g}`;
-  if (enc.endsWith('_amf')) return `AMD AMF${g}`;
-  if (enc.endsWith('_qsv')) return `Intel Quick Sync${g}`;
-  if (enc === 'libx265') return 'x265 on the processor';
-  return 'x264 on the processor';
+// The graphics card that encodes isn't always the one that draws (a laptop with Intel and NVIDIA), so the label names
+// the encoder only.
+export const encoderLabel = (enc: string) => {
+  if (enc.endsWith('_nvenc')) return 'NVIDIA NVENC';
+  if (enc.endsWith('_amf')) return 'AMD AMF';
+  if (enc.endsWith('_qsv')) return 'Intel Quick Sync';
+  if (enc === 'libx265') return 'x265 (processor)';
+  return 'x264 (processor)';
 };
 
 /** output size for a choice (the video's own size for 'source') */

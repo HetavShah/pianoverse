@@ -208,7 +208,6 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
       </aside>
 
       <div className="score">
-      <Transport ws={ws} loopHint="Loop" />
       {on ? (
         <CameraTimeline
           project={project} shots={shots} grid={grid} time={ws.time} duration={duration} zMax={zMax}
@@ -221,6 +220,7 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
           onRemoveJoin={removeJoin}
         />
       ) : <div className="style-timeline cam-timeline"><p className="help">Turn the camera on to edit shots and cuts on the beat.</p></div>}
+      <Transport ws={ws} loopHint="Loop" />
       </div>
     </div>
   );

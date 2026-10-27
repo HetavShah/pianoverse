@@ -325,15 +325,11 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .style-side .soon { margin-top: 8px; padding: 12px 0; border-top: 1px solid var(--rule); }
 
 /* the score band along the bottom of the studio */
-.score { grid-column: 1 / -1; display: grid; grid-template-columns: 240px minmax(0, 1fr); border-top: 1px solid var(--rule); background: var(--ground); min-height: 0; }
-.transport { display: flex; flex-direction: column; padding: 14px 20px 16px; border-right: 1px solid var(--rule); min-width: 0; }
-.timecode { font-family: var(--display); font-size: 34px; font-weight: 400; letter-spacing: 0; line-height: 1; white-space: nowrap; }
-.timecode-of { margin-top: 6px; font-size: 12.5px; color: var(--stone); font-variant-numeric: tabular-nums; }
-.transport .transport-row { display: flex; align-items: center; gap: 0; margin-top: 16px; flex-wrap: nowrap; }
-.transport .transport-row .btn.icon { width: 30px; }
-.transport .transport-row .play-round { margin: 0 4px; }
-.transport .transport-row .play { margin-right: 8px; }
-.loop-tag { margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--paper); font-variant-numeric: tabular-nums; }
+.score { grid-column: 1 / -1; display: flex; flex-direction: column; border-top: 1px solid var(--rule); background: var(--ground); min-height: 0; min-width: 0; }
+/* the player under the timeline: the time on the left, the controls in the middle, looping on the right */
+.transport { padding: 6px 20px 8px; border-top: 1px solid var(--rule); }
+.transport .mt-time b { font-family: var(--display); font-size: 17px; font-weight: 400; letter-spacing: 0; }
+.loop-tag { font-size: 12px; font-weight: 600; color: var(--paper); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .style-timeline { display: flex; flex-direction: column; gap: 4px; padding: 10px 20px 12px; min-width: 0; }
 .tl-head { display: flex; align-items: center; gap: 14px; font-size: 12.5px; min-height: 30px; flex-wrap: wrap; }
 .tl-head b { font-size: 13.5px; font-weight: 700; }
@@ -485,29 +481,35 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .shape-img { background: var(--stage); padding: 10%; box-sizing: border-box; }
 
 /* ---------- studio: Export ---------- */
-.ex-field { display: flex; flex-direction: column; gap: 10px; }
+/* Export: one column of settings in even steps (a label, then its control), the preview and the button on the right */
+.export-page { grid-template-columns: minmax(0, 760px) 340px; justify-content: center; column-gap: 72px; }
+.export-page .page-main { gap: 32px; }
+.export-page .page-main > header .sub { margin-top: 8px; }
+.ex-field { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .ex-label { font-size: 12px; font-weight: 600; color: var(--stone); }
-.ex-sizes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.ex-size { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px 0 0; border: 0; border-top: 2px solid var(--rule-2); background: none; color: var(--stone); font: inherit; cursor: pointer; text-align: left; }
+.ex-sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+.ex-size { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px 0 0; border: 0; border-top: 2px solid var(--rule-2); background: none; color: var(--stone); font: inherit; cursor: pointer; text-align: left; }
 .ex-size b { font-family: var(--display); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 .ex-size .mono { font-size: 12.5px; }
 .ex-size .radio { display: none; }
 .ex-size:hover:not(:disabled) { color: var(--paper); border-top-color: var(--dim); }
 .ex-size.on { color: var(--paper); border-top-color: var(--live); }
 .ex-fit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
-.ex-row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-.ex-box { display: flex; flex-direction: column; gap: 14px; padding: 16px 0 4px; border-top: 1px solid var(--rule); }
-.ex-enc { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
-.ex-enc svg { color: var(--stone); }
-.ok-text { color: var(--ok); font-size: 12.5px; }
-.ex-part { padding-top: 14px; border-top: 1px solid var(--rule); }
-.ex-save { display: flex; gap: 10px; align-items: flex-end; }
-.ex-save input { flex: 1; height: 36px; font-size: 13.5px; }
-.ex-side { gap: 16px; }
+.ex-row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.ex-save { display: flex; gap: 16px; align-items: flex-end; }
+.ex-save input { flex: 1; min-width: 0; font-size: 13.5px; }
+.ex-opts { display: flex; flex-direction: column; }
+.ex-opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding: 8px 0; border-bottom: 1px solid var(--rule); cursor: pointer; }
+.ex-opt:first-child { border-top: 1px solid var(--rule); }
+div.ex-opt { cursor: default; }
+.ex-opt > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ex-opt b { font-size: 13.5px; font-weight: 600; }
+.ex-opt small { color: var(--stone); font-size: 12px; }
+.ex-side { gap: 18px; }
 .ex-thumb { align-self: center; height: 300px; width: auto; max-width: 100%; overflow: hidden; background: var(--stage); display: flex; align-items: center; justify-content: center; }
 .ex-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.ex-stats { display: grid; grid-template-columns: 1fr auto; gap: 0; margin: 0; font-size: 13px; }
-.ex-stats dt, .ex-stats dd { padding: 7px 0; border-top: 1px solid var(--rule); }
+.ex-stats { display: grid; grid-template-columns: auto 1fr; gap: 0 16px; margin: 0; font-size: 13px; }
+.ex-stats dt, .ex-stats dd { padding: 6px 0; }
 .ex-stats dt { color: var(--stone); }
 .ex-stats dd { margin: 0; text-align: right; font-weight: 600; }
 .ex-progress { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 2px solid var(--live); font-size: 13px; }
@@ -519,6 +521,7 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .ex-error { padding-top: 12px; border-top: 2px solid var(--bad); font-size: 13px; color: var(--bad); }
 .ex-error pre { white-space: pre-wrap; font-family: Consolas, ui-monospace, monospace; font-size: 11px; color: var(--stone); max-height: 140px; overflow: auto; margin: 6px 0 0; }
 .ex-side .btn.big { height: 52px; font-size: 16px; }
+.ex-side .ex-png { align-self: center; }
 
 /* ---------- undo / redo, messages, shortcuts ---------- */
 .undo-redo { display: flex; gap: 0; }
@@ -598,8 +601,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 }
 @media (max-width: 1280px) {
   .style-page { grid-template-columns: 80px minmax(0, 1fr) 310px; }
-  .score { grid-template-columns: 210px minmax(0, 1fr); }
-  .timecode { font-size: 28px; }
 }
 
 /* ---------- the dial: a tape of ticks under a fixed centre line ---------- */
@@ -608,7 +609,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .dial-stops { display: flex; gap: 4px; }
 .dial-stops button { position: relative; flex: 1; height: 24px; padding: 0 4px; border: 1px solid var(--rule-2); background: none; color: var(--stone); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap; transition: color 0.12s, border-color 0.12s, background-color 0.12s; }
 .dial-stops button:hover:not(:disabled) { color: var(--paper); border-color: var(--dim); }
-.dial-stops button.on { background: var(--paper); border-color: var(--paper); color: var(--live-ink); font-weight: 700; }
+.dial-stops button.on, .dial-stops button.on:hover:not(:disabled) { background: var(--paper); border-color: var(--paper); color: var(--live-ink); font-weight: 700; }
 .dial-base { position: absolute; left: 50%; bottom: 3px; width: 3px; height: 3px; margin-left: -1px; background: currentColor; }
 .dial-ruler { position: relative; height: 24px; overflow: hidden; cursor: ew-resize; touch-action: none; background: var(--stage); -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); }
 .dial-ruler:hover .dial-tape { --tick: var(--stone); }
@@ -786,8 +787,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .btn:active:not(:disabled), .hear:active:not(:disabled), .choice:active { transform: scale(0.96); }
 .play-round:active { transform: scale(0.9); }
 
-/* a step's page comes in with a short fade and lift; menus ease open */
-@keyframes pv-enter { from { opacity: 0; transform: translateY(6px); } }
+/* menus ease open. (A step's page doesn't fade in: Style takes a few frames to build, and a fade from nothing showed
+   those frames as a blank screen.) */
 @keyframes pv-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
-.route > * { animation: pv-enter var(--t-ui) var(--ease); }
 .menu { animation: pv-pop 180ms var(--ease); transform-origin: top right; }
