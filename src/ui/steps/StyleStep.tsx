@@ -12,7 +12,7 @@ import { resolveTitles } from '../../engine/titles';
 import StyleTimeline from '../StyleTimeline';
 import type { WS } from '../workspace';
 import ShapeSections from '../ShapeSections';
-import type { ParticleScene } from '../../engine/project';
+import { sourceRect, type ParticleScene } from '../../engine/project';
 
 type Panel = { id: LayerId; label: string; kind: (l: Look) => string; toggle?: keyof Layers };
 const PANELS: Panel[] = [
@@ -40,11 +40,13 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
   const pan = useRef<{ x: number; y: number; v: { x: number; y: number; w: number; h: number } | null; moved: boolean } | null>(null);
   const inspectRef = useRef(ws.inspect);
   inspectRef.current = ws.inspect;
-  const W = project?.video.width ?? 1, Hh = project?.video.height ?? 1;
+  // the part of the frame in use (the crop on the Import step)
+  const R = project ? sourceRect(project) : { x: 0, y: 0, w: 1, h: 1 };
+  const W = R.w, Hh = R.h;
   /** keep a zoom window inside the video */
   const fitView = (x: number, y: number, w: number) => {
     const h = w * (Hh / W);
-    return { x: Math.min(W - w, Math.max(0, x)), y: Math.min(Hh - h, Math.max(0, y)), w, h };
+    return { x: Math.min(R.x + W - w, Math.max(R.x, x)), y: Math.min(R.y + Hh - h, Math.max(R.y, y)), w, h };
   };
 
   // scroll on the preview: zoom in and out round the pointer (the effects are redrawn sharp at every zoom)
@@ -55,7 +57,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
       e.preventDefault();
       const r = el.getBoundingClientRect();
       const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
-      const v = inspectRef.current ?? { x: 0, y: 0, w: W, h: Hh };
+      const v = inspectRef.current ?? { x: R.x, y: R.y, w: W, h: Hh };
       const z = Math.min(8, Math.max(1, (W / v.w) * Math.exp(-e.deltaY * 0.0016)));
       if (z <= 1.01) { ws.setInspect(null); return; }
       const w = W / z;
@@ -63,17 +65,17 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [W, Hh, ws.setInspect]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [W, Hh, R.x, R.y, ws.setInspect]); // eslint-disable-line react-hooks/exhaustive-deps
   const v = ws.videoEl.current;
 
   // "Original": the plain video frame, drawn on top of the effects canvas
   useEffect(() => {
     const cv = origRef.current;
     if (!original || !cv || !v || !v.videoWidth) return;
-    cv.width = v.videoWidth / 2; cv.height = v.videoHeight / 2;
-    const iv = ws.inspect;
-    if (iv) cv.getContext('2d')!.drawImage(v, iv.x, iv.y, iv.w, iv.h, 0, 0, cv.width, cv.height);
-    else cv.getContext('2d')!.drawImage(v, 0, 0, cv.width, cv.height);
+    const iv = ws.inspect ?? R;
+    const k = v.videoWidth / (project?.video.width || v.videoWidth);
+    cv.width = Math.round(R.w * k / 2); cv.height = Math.round(R.h * k / 2);
+    cv.getContext('2d')!.drawImage(v, iv.x * k, iv.y * k, iv.w * k, iv.h * k, 0, 0, cv.width, cv.height);
   }, [original, v, ws.time, ws.frameTick, ws.inspect]);
 
   // 1–8 pick a layer, in the order of the list
@@ -108,7 +110,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
   const setAngle = project.look?.noteAngle;
   const angle = typeof setAngle === 'number' ? setAngle : autoAngle;
   const setNoteAngle = (a: number | null) => setLook({ noteAngle: a });
-  const tall = project.video.height > project.video.width;
+  const tall = Hh > W;
   const scenes = project.particleScenes ?? [];
   const setScenes = (list: ParticleScene[]) => ws.setProject({ ...project, particleScenes: list });
   const pickScene = (id: string | null) => { setScene(id); if (id) setSel('particles'); };
@@ -176,7 +178,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
               pan.current = null;
               if (p && !p.moved) { setFlash({ n: flash.n + 1, play: !ws.playing }); ws.togglePlay(); }
             }}
-            style={{ aspectRatio: `${project.video.width} / ${project.video.height}`, cursor: ws.inspect ? (pan.current?.moved ? 'grabbing' : 'grab') : 'pointer' }}
+            style={{ aspectRatio: `${Math.round(W)} / ${Math.round(Hh)}`, cursor: ws.inspect ? (pan.current?.moved ? 'grabbing' : 'grab') : 'pointer' }}
             title={ws.inspect ? 'Drag to look around · scroll to zoom · click to play or pause' : 'Scroll to zoom in · click to play or pause'}
           >
             <canvas ref={attachPreview} className="preview-canvas" />
@@ -197,7 +199,7 @@ export default function StyleStep({ ws, attachPreview, fps, stats }: { ws: WS; a
             )}
             {ws.inspect && (
               <div className="zoom-chip" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
-                <span className="mono">{Math.round((project.video.width / ws.inspect.w) * 100)}%</span>
+                <span className="mono">{Math.round((W / ws.inspect.w) * 100)}%</span>
                 <button type="button" onClick={() => ws.setInspect(null)}>Fit</button>
               </div>
             )}

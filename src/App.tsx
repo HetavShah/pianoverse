@@ -19,6 +19,8 @@ import CalibrateStep from './ui/steps/CalibrateStep';
 import StyleStep from './ui/steps/StyleStep';
 import ExportStep from './ui/steps/ExportStep';
 import CameraStep from './ui/steps/CameraStep';
+import LightStep from './ui/steps/LightStep';
+import { trimRange } from './engine/project';
 import { cameraFrameAt } from './ui/exportRun';
 import { aspectInfo } from './engine/camera';
 import { RecordOpts, useHistory } from './ui/history';
@@ -55,6 +57,8 @@ export default function App() {
   const [shortcuts, setShortcuts] = useState(false);
   const [loop, setLoop] = useState<{ on: boolean; range: [number, number] | null }>({ on: false, range: null });
   const loopRef = useRef(loop);
+  /** the part of the video kept on the Import step (null: all of it) */
+  const trimRef = useRef<[number, number] | null>(null);
   loopRef.current = loop;
   const [homeKey, setHomeKey] = useState(0);
   const [presets, setPresets] = useState<Preset[]>(BUILT_IN_PRESETS);
@@ -114,9 +118,10 @@ export default function App() {
   }, [project, sweep, noNotes, duration]);
 
   const camStep = route === 'project' && step === 'camera';
-  const previewing = route === 'project' && (step === 'style' || camStep);
+  const previewing = route === 'project' && (step === 'style' || step === 'light' || camStep);
   // on the Camera step the preview looks through the camera; everywhere else it shows the whole video
   const camOn = camStep && !!project?.cameraTrack?.on;
+  trimRef.current = project?.edit?.trim && duration ? trimRange(project, duration) : null;
   const camRef = useRef<{ p: CalibratedProject; dur: number } | null>(null);
   // zoomed in on the Style preview to check detail: the part of the video shown (null = all of it)
   const [inspect, setInspect] = useState<View | null>(null);
@@ -181,8 +186,17 @@ export default function App() {
     if (v.requestVideoFrameCallback) {
       const tick = (_now: number, meta: { mediaTime: number }) => {
         if (stop) return;
-        // looping a selected section: jump back to its start at its end
+        // the part kept on the Import step: play inside it (loop round it, or stop at its end)
+        const tr = trimRef.current;
         const lp = loopRef.current;
+        if (tr && !(lp.on && lp.range)) {
+          if (meta.mediaTime >= tr[1] - 0.01) {
+            if (lp.on) { v.currentTime = tr[0]; v.requestVideoFrameCallback!(tick); return; }
+            v.pause(); v.currentTime = tr[1]; setPlaying(false); setTime(tr[1]); return;
+          }
+          if (meta.mediaTime < tr[0] - 0.25) { v.currentTime = tr[0]; v.requestVideoFrameCallback!(tick); return; }
+        }
+        // looping a selected section: jump back to its start at its end
         if (lp.on && lp.range && (meta.mediaTime >= lp.range[1] || meta.mediaTime < lp.range[0] - 0.25)) {
           v.currentTime = lp.range[0];
           v.requestVideoFrameCallback!(tick);
@@ -205,12 +219,14 @@ export default function App() {
     if (!v || !videoUrl || videoIssue) return;
     if (v.paused) {
       const lp = loopRef.current;
+      const tr = trimRef.current;
       if (lp.on && lp.range && (v.currentTime < lp.range[0] || v.currentTime >= lp.range[1] - 0.05)) v.currentTime = lp.range[0];
+      else if (tr && (v.currentTime < tr[0] - 0.01 || v.currentTime >= tr[1] - 0.05)) v.currentTime = tr[0];
       v.play(); setPlaying(true);
     } else { v.pause(); setPlaying(false); }
   }, [videoUrl, videoIssue]);
   // whole-video looping when no section is selected
-  useEffect(() => { const v = videoRef.current; if (v) v.loop = loop.on && !loop.range; }, [loop]);
+  useEffect(() => { const v = videoRef.current; if (v) v.loop = loop.on && !loop.range && !trimRef.current; }, [loop, project?.edit?.trim]);
   // looping belongs to one project
   useEffect(() => { setLoop({ on: false, range: null }); }, [project?.id]);
   const pause = () => { videoRef.current?.pause(); setPlaying(false); };
@@ -242,7 +258,7 @@ export default function App() {
         if (k === 'KeyZ' && !e.shiftKey) { e.preventDefault(); undo(); }
         else if (k === 'KeyY' || (k === 'KeyZ' && e.shiftKey)) { e.preventDefault(); redo(); }
         else if (k === 'KeyS') { e.preventDefault(); toast('Pianoverse saves your project as you go'); }
-        else if (/^Digit[1-5]$/.test(k)) {
+        else if (/^Digit[1-7]$/.test(k)) {
           e.preventDefault();
           const s = STEPS[Number(k.slice(5)) - 1].id;
           if (s === 'import' || readyRef.current) goStepRef.current(s);
@@ -438,7 +454,7 @@ export default function App() {
     time, duration, playing, togglePlay, seek, frameTick,
     calib, notes: notesApi, renderer: rendererRef.current, layers, setLayers, scale, setScale, sweep, setSweep,
     pick, onFiles, loop, setLoop, presets, defaultPresetId, refreshPresets, goStep, goHome,
-    brand, setBrand, inspect, setInspect,
+    brand, setBrand, inspect, setInspect, redraw: () => redraw(),
   };
 
   const ready = !!project && !!video && !videoIssue;
@@ -509,6 +525,9 @@ export default function App() {
         {route === 'project' && step === 'import' && <ImportStep ws={ws} />}
         {route === 'project' && step === 'notes' && ready && <NotesStep ws={ws} />}
         {route === 'project' && step === 'calibrate' && ready && <CalibrateStep ws={ws} />}
+        {route === 'project' && step === 'light' && ready && (gpuError
+          ? <div className="notice">This window can't use the graphics card: {gpuError}</div>
+          : <LightStep ws={ws} attachPreview={attachPreview} />)}
         {route === 'project' && step === 'camera' && ready && (gpuError
           ? <div className="notice">This window can't use the graphics card: {gpuError}</div>
           : <CameraStep ws={ws} attachPreview={attachPreview} />)}

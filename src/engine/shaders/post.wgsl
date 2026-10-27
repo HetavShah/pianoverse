@@ -71,6 +71,50 @@ struct BG {
 @group(1) @binding(8) var<uniform> BGU: BG;
 @group(1) @binding(9) var cardTex: texture_2d<f32>;   // opening title / end card, premultiplied
 
+// the video's own lighting (Light step, see lighting.ts)
+struct LT {
+  on: f32, exposure: f32, contrast: f32, highlights: f32,
+  shadows: f32, warmth: f32, saturation: f32, room: f32,
+  reach: f32, softness: f32, vignette: f32, whiteKeys: f32,
+  h0: f32, h1: f32, h2: f32, h3: f32, h4: f32, h5: f32, h6: f32, h7: f32, h8: f32,   // video pixels -> keyboard plane
+  fx0: f32, fk: f32, fsh: f32,                                                         // the key fit (project.ts KeyFit)
+  tracked: f32, q1: f32, q2: f32, q3: f32, q4: f32, q5: f32, q6: f32, q7: f32,
+};
+@group(1) @binding(10) var<uniform> LTU: LT;
+
+fn lightVideo(c0: vec3f, srcPx: vec2f, fuv: vec2f) -> vec3f {
+  let W3 = vec3f(0.2126, 0.7152, 0.0722);
+  var x = c0 * exp2(LTU.exposure);
+  // shadows: lift or deepen the dark end; highlights: lift or pull down the bright end
+  let dk = 1.0 - smoothstep(0.0, 0.5, dot(x, W3));
+  if (LTU.shadows > 0.0) { x = x + LTU.shadows * 0.35 * dk * max(vec3f(1.0) - x, vec3f(0.0)); } else { x = x * (1.0 + LTU.shadows * 0.6 * dk); }
+  let br = smoothstep(0.5, 1.0, dot(x, W3));
+  if (LTU.highlights < 0.0) { x = x * (1.0 + LTU.highlights * 0.5 * br); } else { x = x + LTU.highlights * 0.3 * br * max(vec3f(1.0) - x, vec3f(0.0)); }
+  x = clamp((x - vec3f(0.5)) * LTU.contrast + vec3f(0.5), vec3f(0.0), vec3f(1.0));
+  x = x * vec3f(1.0 + 0.12 * LTU.warmth, 1.0, 1.0 - 0.12 * LTU.warmth);
+  let l = dot(x, W3);
+  x = max(vec3f(l) + (x - vec3f(l)) * LTU.saturation, vec3f(0.0));
+  // the room: darker away from the keyboard (measured on the keyboard's plane, in white keys)
+  if (LTU.room < 0.999 && LTU.tracked > 0.5) {
+    let q = vec3f(LTU.h0 * srcPx.x + LTU.h1 * srcPx.y + LTU.h2, LTU.h3 * srcPx.x + LTU.h4 * srcPx.y + LTU.h5, LTU.h6 * srcPx.x + LTU.h7 * srcPx.y + LTU.h8);
+    var m = 0.0;
+    if (q.z > 1e-9) {
+      let X = q.x / q.z;
+      let Y = q.y / q.z;
+      let xs = (X - LTU.fx0 - LTU.fsh * Y) / (1.0 + LTU.fk);
+      let half = vec2f(LTU.whiteKeys * 0.5 + 0.5, 0.9);
+      let dd = length(max(abs(vec2f(xs - LTU.whiteKeys * 0.5, Y - 0.6)) - half, vec2f(0.0)));
+      m = 1.0 - smoothstep(0.5 * LTU.reach, (0.5 + 4.0 * LTU.softness) * LTU.reach + 0.5, dd);
+    }
+    x = x * (LTU.room + (1.0 - LTU.room) * m);
+  }
+  if (LTU.vignette > 0.0) {
+    let u = fuv - vec2f(0.5);
+    x = x * clamp(1.0 - LTU.vignette * (u.x * u.x * 1.6 + u.y * u.y * 1.2), 0.0, 1.0);
+  }
+  return x;
+}
+
 fn hueRot(c: vec3f, a: f32) -> vec3f {
   let k = vec3f(0.57735);
   let ca = cos(a);
@@ -122,6 +166,7 @@ fn fsComposite(i: VOut) -> @location(0) vec4f {
   let srcPx = F.view.xy + uv * F.view.zw;
   // footage: darker, contrasty, vignetted
   var src = textureSampleLevel(srcTex, samp, srcPx / F.srcSize, 0.0).rgb;
+  if (LTU.on > 0.5) { src = lightVideo(src, srcPx, i.uv); }
   if (BGU.on > 0.5) {
     src = src + BGU.fBright;
     if (BGU.fHue != 0.0) { src = hueRot(src, BGU.fHue); }

@@ -2,6 +2,7 @@
 // preview and encoded by FFmpeg on the graphics card when it can.
 import { useEffect, useRef, useState } from 'react';
 import type { WS } from '../workspace';
+import { sourceRect, trimRange } from '../../engine/project';
 import { inTauri } from '../media';
 import {
   detectEncoders, Encoders, encoderLabel, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
@@ -49,7 +50,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
       const cam = cameraOn(project);
       const o = outSize(s, project);
       if (cam) { r.setOutput([o.w, o.h]); r.setScale(Math.min(1, 480 / o.h)); const c = cameraFrameAt(project, ws.time, ws.duration || project.video.frames / (project.video.fps || 30)); r.setView(c.view, c.fade); }
-      else r.setScale(Math.min(1, 480 / project.video.height));
+      else r.setScale(Math.min(1, 480 / sourceRect(project).h));
       try {
         const img = await r.capture(videoFrame(v), ws.time);
         if (stop) return;
@@ -64,10 +65,13 @@ export default function ExportStep({ ws }: { ws: WS }) {
   if (!project) return null;
   const duration = ws.duration || project.video.frames / (project.video.fps || 30);
   const sel = ws.loop.range;
-  const part = s.onlySelection && sel ? sel : null;
-  const est = estimate(s, project, part ? part[1] - part[0] : duration);
+  const trim = trimRange(project, duration);
+  const part = s.onlySelection && sel ? [Math.max(trim[0], sel[0]), Math.min(trim[1], sel[1])] as [number, number] : null;
+  const length = part ? Math.max(0, part[1] - part[0]) : trim[1] - trim[0];
+  const est = estimate(s, project, length);
   const { w: outW, h: outH } = outSize(s, project);
-  const srcAspect = project.video.width / project.video.height;
+  const srcRect = sourceRect(project);
+  const srcAspect = srcRect.w / srcRect.h;
   const sizeList = sizesFor(project);
   const sizeId = sizeList.find((z) => z.id === s.size)?.id ?? sizeList[0].id;
   const aspectDiffers = !cameraOn(project) && Math.abs(outW / outH - srcAspect) > 0.02;
@@ -149,7 +153,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
           </div>
           {aspectDiffers && (
             <div className="ex-fit">
-              <span className="dim">Your video is {project.video.width}×{project.video.height}:</span>
+              <span className="dim">Your video is {Math.round(srcRect.w)}×{Math.round(srcRect.h)}:</span>
               <div className="seg">
                 <button type="button" className={s.fit === 'crop' ? 'on' : ''} onClick={() => set({ fit: 'crop' })} disabled={running}>Fill the frame (crop)</button>
                 <button type="button" className={s.fit === 'fit' ? 'on' : ''} onClick={() => set({ fit: 'fit' })} disabled={running}>Fit inside (black bars)</button>
@@ -220,7 +224,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
           {thumb && <img src={thumb} alt="" style={{ objectFit: s.fit === 'fit' ? 'contain' : 'cover' }} />}
         </div>
         <dl className="ex-stats">
-          <dt>Length</dt><dd className="mono">{fmtLen(part ? part[1] - part[0] : duration)}</dd>
+          <dt>Length</dt><dd className="mono">{fmtLen(length)}</dd>
           <dt>Frames</dt><dd className="mono">{est.frames.toLocaleString('en-US')}{est.fps !== srcFps ? ` · ${est.fps} fps` : ''}</dd>
           <dt>Estimated size</dt><dd className="mono">about {est.mb < 10 ? est.mb.toFixed(1) : Math.round(est.mb)} MB{s.transparent ? ' + effects' : ''}</dd>
           <dt>Estimated time</dt><dd className="mono">about {fmtDur(estSecs)}</dd>

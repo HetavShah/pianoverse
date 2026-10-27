@@ -11,6 +11,7 @@ import { cameraFrameAt, cameraPath } from '../exportRun';
 import CameraTimeline from '../CameraTimeline';
 import Transport from '../Transport';
 import { INK } from '../palette';
+import { sourceRect } from '../../engine/project';
 import type { WS } from '../workspace';
 
 const fmtT = (t: number) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`; };
@@ -53,20 +54,22 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
   const shot = shots[shotI];
   const on = !!track?.on;
   const aspect = track?.aspect ?? 'vertical';
-  const frameAspect = on ? ASPECTS.find((a) => a.id === aspect)!.size : [project.video.width, project.video.height];
-  const zMax = maxZoom(project.video.width, project.video.height, aspect);
+  const R = sourceRect(project);   // the part of the frame in use (the crop)
+  const frameAspect = on ? ASPECTS.find((a) => a.id === aspect)!.size : [Math.round(R.w), Math.round(R.h)];
+  const zMax = maxZoom(R.w, R.h, aspect);
 
   // the inset: your whole video with the camera's window on it
   useEffect(() => {
     const cv = insetRef.current, v = ws.videoEl.current;
     if (!cv || !v || !v.videoWidth || !track) return;
-    const k = 132 / Math.max(v.videoWidth, v.videoHeight);
-    cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
+    const vk = v.videoWidth / project.video.width;   // video element pixels per project pixel
+    const k = 132 / Math.max(R.w, R.h);
+    cv.width = Math.round(R.w * k); cv.height = Math.round(R.h * k);
     const g = cv.getContext('2d')!;
-    g.drawImage(v, 0, 0, cv.width, cv.height);
+    g.drawImage(v, R.x * vk, R.y * vk, R.w * vk, R.h * vk, 0, 0, cv.width, cv.height);
     if (!on) return;
     const f = cameraFrameAt(project, ws.time, duration);
-    const r = { x: f.view.x * k, y: f.view.y * k, w: f.view.w * k, h: f.view.h * k };
+    const r = { x: (f.view.x - R.x) * k, y: (f.view.y - R.y) * k, w: f.view.w * k, h: f.view.h * k };
     g.fillStyle = 'rgba(0,0,0,0.55)';
     g.fillRect(0, 0, cv.width, r.y); g.fillRect(0, r.y + r.h, cv.width, cv.height - r.y - r.h);
     g.fillRect(0, r.y, r.x, r.h); g.fillRect(r.x + r.w, r.y, cv.width - r.x - r.w, r.h);
@@ -128,7 +131,7 @@ export default function CameraStep({ ws, attachPreview }: { ws: WS; attachPrevie
   const boxTo = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!shot || shot.kind !== 'close') return;
     const r = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * project.video.width, y = ((e.clientY - r.top) / r.height) * project.video.height;
+    const x = R.x + ((e.clientX - r.left) / r.width) * R.w, y = R.y + ((e.clientY - r.top) / r.height) * R.h;
     setShot(shotI, { cx: x, cy: y });
   };
 

@@ -1,7 +1,7 @@
 // Gallery pictures: each look rendered on the user's own video, cropped to where the notes meet the keys.
 // They are drawn by a renderer of their own, so the main preview is never touched.
 import { applyPreset, Preset } from '../engine/look';
-import { keyboardOf, trackingMatrix, type ProjectFile } from '../engine/project';
+import { keyboardOf, sourceRect, trackingMatrix, type ProjectFile } from '../engine/project';
 import { Renderer } from '../engine/renderer';
 import type { UserFiles } from '../engine/noteTextures';
 
@@ -19,9 +19,10 @@ export function lookKey(p: Preset): string {
 
 /** the part of the video a card shows (video pixels): the keyboard's back edge, with room above for the notes */
 function cropRect(p: ProjectFile, t: number) {
-  const W = p.video.width, H = p.video.height;
+  const R = sourceRect(p);   // inside the crop
+  const W = R.w, H = R.h;
   const cw = Math.min(W, H / (THUMB_H / THUMB_W)), ch = cw * (THUMB_H / THUMB_W);
-  let cx = W / 2, ey = H * 0.6;
+  let cx = R.x + W / 2, ey = R.y + H * 0.6;
   if (p.tracking?.frames?.length) {
     const kb = keyboardOf(p);
     kb.H = trackingMatrix(p, Math.round(t * (p.video.fps || 30)));
@@ -29,8 +30,8 @@ function cropRect(p: ProjectFile, t: number) {
     const e = kb.P(mid, kb.edgeY(mid));
     if (Number.isFinite(e[0]) && Number.isFinite(e[1])) [cx, ey] = e;
   }
-  const x = Math.min(W - cw, Math.max(0, cx - cw / 2));
-  const y = Math.min(H - ch, Math.max(0, ey - ch * 0.72));
+  const x = Math.min(R.x + W - cw, Math.max(R.x, cx - cw / 2));
+  const y = Math.min(R.y + H - ch, Math.max(R.y, ey - ch * 0.72));
   return { x, y, w: cw, h: ch };
 }
 
@@ -79,8 +80,10 @@ export function renderLookThumbs(base: ProjectFile, frame: HTMLCanvasElement, pr
         const img = await r.capture(frame, t + f * ANIM_STEP);
         src.width = img.width; src.height = img.height;
         src.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data.buffer, img.data.byteOffset, img.data.byteLength), img.width, img.height), 0, 0);
-        const k = img.width / base.video.width;
-        g.drawImage(src, crop.x * k, crop.y * k, crop.w * k, crop.h * k, 0, 0, THUMB_W, THUMB_H);
+        // the rendered frame is the part of the video in use (its crop)
+        const R = sourceRect(base);
+        const k = img.width / R.w;
+        g.drawImage(src, (crop.x - R.x) * k, (crop.y - R.y) * k, crop.w * k, crop.h * k, 0, 0, THUMB_W, THUMB_H);
         urls.push(out.toDataURL('image/jpeg', 0.82));
       }
       onThumb(lookKey(p), urls);

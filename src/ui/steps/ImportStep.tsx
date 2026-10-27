@@ -5,6 +5,7 @@ import PickButton from '../PickButton';
 import { makeThumb, fmtDur } from '../projectStore';
 import { sourceOf } from '../useNotes';
 import type { WS } from '../workspace';
+import VideoEditor from '../VideoEditor';
 
 export default function ImportStep({ ws }: { ws: WS }) {
   const { project, video, videoIssue } = ws;
@@ -98,6 +99,8 @@ export default function ImportStep({ ws }: { ws: WS }) {
             <PickButton what="midi" className="btn small" onPick={ws.pick} onFiles={ws.onFiles} disabled={!ready}>{midi ? 'Replace' : 'Add MIDI'}</PickButton>
           </div>
         </div>
+
+        {ready && <VideoEditor ws={ws} />}
       </div>
 
       <aside className="page-side">

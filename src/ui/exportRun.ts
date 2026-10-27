@@ -5,6 +5,7 @@ import { loadTitleFonts } from '../engine/titles';
 import type { CalibratedProject } from '../engine/calibration';
 import { aspectInfo, cameraAt, CameraFrame, followPath, FollowPath } from '../engine/camera';
 import { inTauri } from './media';
+import { sourceRect, trimRange } from '../engine/project';
 
 export type SizeId = 'source' | 'shorts' | 'landscape' | 'square' | 'k4' | 'k4l';
 export const SIZES: { id: SizeId; label: string; w: number; h: number }[] = [
@@ -98,7 +99,7 @@ export function outSize(s: ExportSettings, p: CalibratedProject) {
     const z = list.find((x) => x.id === s.size) ?? list[0];
     return { w: z.w, h: z.h };
   }
-  if (s.size === 'source') return { w: p.video.width - (p.video.width % 2), h: p.video.height - (p.video.height % 2) };
+  if (s.size === 'source') { const R = sourceRect(p); const w = Math.round(R.w), h = Math.round(R.h); return { w: w - (w % 2), h: h - (h % 2) }; }
   const z = SIZES.find((x) => x.id === s.size)!;
   return { w: z.w, h: z.h };
 }
@@ -106,7 +107,8 @@ export function outSize(s: ExportSettings, p: CalibratedProject) {
 /** render scale so the rendered frame covers (crop) or fits inside (fit) the output, without wasting pixels */
 export function renderScale(s: ExportSettings, p: CalibratedProject) {
   const { w, h } = outSize(s, p);
-  const kx = w / p.video.width, ky = h / p.video.height;
+  const R = sourceRect(p);
+  const kx = w / R.w, ky = h / R.h;
   return s.fit === 'fit' ? Math.min(kx, ky) : Math.max(kx, ky);
 }
 
@@ -149,8 +151,10 @@ export async function runExport(args: {
 }): Promise<string[]> {
   const { renderer: r, video: v, project: p, settings: s, sink } = args;
   const { w: outW, h: outH } = outSize(s, p);
-  const from = args.range ? Math.max(0, args.range[0]) : 0;
-  const to = args.range ? Math.min(args.duration, args.range[1]) : args.duration;
+  // only the part kept on the Import step (trim), and of that the selection if one is asked for
+  const [t0, t1] = trimRange(p, args.duration);
+  const from = Math.max(t0, args.range ? args.range[0] : t0);
+  const to = Math.max(from + 1 / 30, Math.min(t1, args.range ? args.range[1] : t1));
   const { frames, fps } = estimate(s, p, to - from);
   const srcFps = p.video.fps || 30;
   const oldScale = r.scaleFactor;

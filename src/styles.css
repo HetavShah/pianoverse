@@ -643,3 +643,46 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 /* Notes: is the timing right? */
 .sync-state { font-size: 13px; font-weight: 600; color: var(--ok); }
 .sync-state.off { color: var(--bad); }
+
+/* ---------- Light step ---------- */
+.light-presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.light-presets .choice { min-height: 40px; }
+.ctl.off { opacity: 0.45; }
+.light-timeline { display: flex; align-items: center; padding: 14px 20px; min-width: 0; }
+.scrub { position: relative; flex: 1; height: 34px; cursor: pointer; touch-action: none; }
+.scrub-track { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; background: var(--rule-2); }
+.scrub-off { position: absolute; top: 8px; bottom: 8px; background: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.55) 0 4px, rgba(0, 0, 0, 0.25) 4px 8px); pointer-events: none; }
+.scrub-head { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px; background: var(--live, #d4ff3f); pointer-events: none; }
+
+/* ---------- Import: trim and crop ---------- */
+.video-edit { margin-top: 28px; border-top: 1px solid var(--rule); padding-top: 18px; display: grid; gap: 16px; }
+.ve-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.ve-head h2 { margin: 0; font-size: 18px; }
+.ve-body { display: grid; grid-template-columns: auto minmax(200px, 1fr); gap: 24px; align-items: start; }
+.ve-frame { position: relative; justify-self: start; line-height: 0; background: #000; outline: 1px solid var(--rule-2); }
+.ve-frame canvas { display: block; max-width: 100%; max-height: 420px; width: auto; height: auto; cursor: crosshair; touch-action: none; }
+.ve-frame canvas.crop { cursor: move; }
+.ve-box { position: absolute; outline: 2px solid var(--live); pointer-events: none; box-sizing: border-box; }
+.ve-box::before, .ve-box::after { content: ''; position: absolute; inset: 33.33% 0; border-top: 1px solid rgba(255, 255, 255, 0.25); border-bottom: 1px solid rgba(255, 255, 255, 0.25); }
+.ve-box::after { inset: 0 33.33%; border: 0; border-left: 1px solid rgba(255, 255, 255, 0.25); border-right: 1px solid rgba(255, 255, 255, 0.25); }
+.ve-corners { position: absolute; inset: 0; pointer-events: none; }
+.ve-box i, .ve-corners i { position: absolute; width: 14px; height: 14px; border: 3px solid var(--live); }
+.ve-corners i { border-color: var(--paper); opacity: 0.8; }
+.ve-box i.nw, .ve-corners i.nw { left: -2px; top: -2px; border-right: 0; border-bottom: 0; }
+.ve-box i.ne, .ve-corners i.ne { right: -2px; top: -2px; border-left: 0; border-bottom: 0; }
+.ve-box i.sw, .ve-corners i.sw { left: -2px; bottom: -2px; border-right: 0; border-top: 0; }
+.ve-box i.se, .ve-corners i.se { right: -2px; bottom: -2px; border-left: 0; border-top: 0; }
+.ve-side { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.ve-trim { display: grid; gap: 10px; }
+.ve-trim-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ve-trim .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ve-bar { position: relative; height: 54px; background: #000; cursor: pointer; touch-action: none; overflow: hidden; outline: 1px solid var(--rule-2); }
+.ve-strip { position: absolute; inset: 0; display: flex; }
+.ve-strip img { flex: 1 1 0; min-width: 0; height: 100%; object-fit: cover; }
+.ve-off { position: absolute; top: 0; bottom: 0; background: rgba(0, 0, 0, 0.72); pointer-events: none; }
+.ve-keep { position: absolute; top: 0; bottom: 0; border-top: 3px solid var(--live); border-bottom: 3px solid var(--live); box-sizing: border-box; pointer-events: none; }
+.ve-handle { position: absolute; top: 0; bottom: 0; width: 12px; background: var(--live); cursor: ew-resize; }
+.ve-handle.a { margin-left: -12px; border-radius: 4px 0 0 4px; }
+.ve-handle.b { border-radius: 0 4px 4px 0; }
+.ve-head-line { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--paper); pointer-events: none; }
+@media (max-width: 900px) { .ve-body { grid-template-columns: minmax(0, 1fr); } }

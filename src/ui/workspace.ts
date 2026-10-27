@@ -6,12 +6,13 @@ import type { ConvertProgress, PickedVideo, PickKind } from './media';
 import type { useCalibration } from './useCalibration';
 import type { useNotes } from './useNotes';
 
-export type Step = 'import' | 'notes' | 'calibrate' | 'style' | 'camera' | 'export';
+export type Step = 'import' | 'notes' | 'calibrate' | 'style' | 'light' | 'camera' | 'export';
 export const STEPS: { id: Step; label: string }[] = [
   { id: 'import', label: 'Import' },
   { id: 'notes', label: 'Notes and sync' },
   { id: 'calibrate', label: 'Calibrate' },
   { id: 'style', label: 'Style' },
+  { id: 'light', label: 'Light' },
   { id: 'camera', label: 'Camera' },
   { id: 'export', label: 'Export' },
 ];
@@ -60,4 +61,6 @@ export interface WS {
   inspect: import('../engine/renderer').View | null;
   setInspect: (v: import('../engine/renderer').View | null) => void;
   goHome: () => void;
+  /** draw the preview again (after changing something on the renderer directly) */
+  redraw: () => void;
 }

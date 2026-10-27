@@ -17,6 +17,8 @@ const QUIET_MS = 600;
 
 /** what an edit changed, in words, for the "Undone: …" message */
 export function describeChange(a: P, b: P): string {
+  if (a.lighting !== b.lighting) return 'lighting';
+  if (a.edit !== b.edit) return 'trim and crop';
   if (a.particleScenes !== b.particleScenes) return 'particle sections';
   if (a.look !== b.look || a.presetId !== b.presetId) return a.presetId !== b.presetId ? 'preset' : 'style';
   if (a.noteSource !== b.noteSource || a.notes !== b.notes) return 'notes and sync';

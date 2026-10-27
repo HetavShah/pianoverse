@@ -1,7 +1,7 @@
 // The virtual camera: a list of shots over the video, each a framing (Wide, Follow your hands, or a fixed Close-up),
 // joined by transitions (Cut, Glide, Punch, Dip to black, Dip to white). `cameraAt` gives the window of the video
 // to show at any moment; the renderer draws the frame through it.
-import { keyboardOf, ProjectFile, RawNote, trackingMatrix } from './project';
+import { keyboardOf, ProjectFile, RawNote, sourceRect, trackingMatrix, trimRange } from './project';
 import { BeatGrid, estimateBeats, nearestBeat } from './beats';
 
 export type Aspect = 'vertical' | 'landscape' | 'square';
@@ -129,7 +129,9 @@ export function maxZoom(srcW: number, srcH: number, aspect: Aspect): number {
 const ANCHOR: Record<Aspect, number> = { vertical: 0.64, landscape: 0.7, square: 0.66 };
 
 function shotFraming(proj: ProjectFile, path: FollowPath, shot: Shot, t: number, aspect: Aspect): Framing {
-  const W = proj.video.width, H = proj.video.height;
+  // the camera works inside the part of the frame in use (the crop)
+  const R = sourceRect(proj);
+  const W = R.w, H = R.h;
   const { w: bw, h: bh } = baseView(W, H, aspectInfo(aspect).ratio);
   const f = Math.min(path.cx.length - 1, Math.max(0, Math.round(t * path.fps)));
   const anchor = ANCHOR[aspect];
@@ -139,7 +141,7 @@ function shotFraming(proj: ProjectFile, path: FollowPath, shot: Shot, t: number,
   }
   if (shot.kind === 'wide') {
     // the whole width; in a frame shorter than the video it keeps your hands' height (slowly)
-    return { cx: W / 2, cy: bh < H - 1 ? path.slowY[f] : H * anchor, z: 1, anchor };
+    return { cx: R.x + W / 2, cy: bh < H - 1 ? path.slowY[f] : R.y + H * anchor, z: 1, anchor };
   }
   // follow: close enough to fill the frame with what you're playing, plus a few keys either side
   const need = path.spread[f] * 1.45 + path.unit[f] * 7;
@@ -148,10 +150,10 @@ function shotFraming(proj: ProjectFile, path: FollowPath, shot: Shot, t: number,
 }
 
 function toView(proj: ProjectFile, fr: Framing, aspect: Aspect): View {
-  const W = proj.video.width, H = proj.video.height;
-  const { w: bw, h: bh } = baseView(W, H, aspectInfo(aspect).ratio);
+  const R = sourceRect(proj);
+  const { w: bw, h: bh } = baseView(R.w, R.h, aspectInfo(aspect).ratio);
   const w = bw / fr.z, h = bh / fr.z;
-  return { x: clamp(fr.cx - w / 2, 0, W - w), y: clamp(fr.cy - fr.anchor * h, 0, H - h), w, h };
+  return { x: clamp(fr.cx - w / 2, R.x, R.x + R.w - w), y: clamp(fr.cy - fr.anchor * h, R.y, R.y + R.h - h), w, h };
 }
 
 const mixF = (a: Framing, b: Framing, k: number): Framing => ({
@@ -191,7 +193,9 @@ export function cameraAt(proj: ProjectFile, track: CameraTrack, path: FollowPath
   const nx = shots[i + 1];
   if (nx && (nx.in === 'dipBlack' || nx.in === 'dipWhite')) { const a = dip(nx, t - nx.start); if (a > fade) { fade = a; white = nx.in === 'dipWhite' ? 1 : 0; } }
   if (track.fadeEnds) {
-    const a = Math.max(clamp(1 - t / 1.2, 0, 1), clamp(1 - (duration - t) / 1.2, 0, 1));
+    // fade in and out at the ends of the part in use (the trim)
+    const [t0, t1] = trimRange(proj, duration);
+    const a = Math.max(clamp(1 - (t - t0) / 1.2, 0, 1), clamp(1 - (t1 - t) / 1.2, 0, 1));
     if (a > fade) { fade = a; white = 0; }
   }
   return { view: toView(proj, fr, track.aspect), fade: [ease(fade), white], shot: i, zoom: fr.z };
@@ -207,8 +211,9 @@ export function autoCamera(proj: ProjectFile, settings: AutoSettings, aspect: As
   const g = grid ?? estimateBeats(proj.notes, duration);
   const path = followPath(proj, settings.movement);
   const fps = path.fps;
-  const W = proj.video.width;
-  const { w: bw } = baseView(W, proj.video.height, aspectInfo(aspect).ratio);
+  const R = sourceRect(proj);
+  const W = R.w;
+  const { w: bw } = baseView(W, R.h, aspectInfo(aspect).ratio);
   // cut points: every few bars, never shorter than about 3 seconds
   const every = settings.cuts === 'often' ? 2 : 4;
   const cuts: number[] = [0];
@@ -246,7 +251,7 @@ export function autoCamera(proj: ProjectFile, settings: AutoSettings, aspect: As
     if (prev === 'close' && kind === 'follow') tr = 'glide';
     const mid = Math.min(path.cx.length - 1, Math.round(((p.s + p.e) / 2) * fps));
     shots.push({
-      id: shotId(), start: k === 0 ? 0 : p.s, kind, zoom: kind === 'close' ? Math.min(2, maxZoom(W, proj.video.height, aspect)) : 1,
+      id: shotId(), start: k === 0 ? 0 : p.s, kind, zoom: kind === 'close' ? Math.min(2, maxZoom(W, R.h, aspect)) : 1,
       ...(kind === 'close' ? { cx: path.cx[mid], cy: path.cy[mid] } : {}),
       in: tr, inDur: DEFAULT_DUR[tr],
     });
@@ -293,5 +298,6 @@ function chordHits(notes: RawNote[]): { t: number; w: number }[] {
 }
 
 export function newCameraTrack(proj: ProjectFile): CameraTrack {
-  return { on: true, aspect: naturalAspect(proj.video.width, proj.video.height), shots: [], fadeEnds: true, auto: { ...DEFAULT_AUTO } };
+  const R = sourceRect(proj);
+  return { on: true, aspect: naturalAspect(R.w, R.h), shots: [], fadeEnds: true, auto: { ...DEFAULT_AUTO } };
 }

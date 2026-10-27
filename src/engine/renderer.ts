@@ -13,8 +13,9 @@ import simSrc from './shaders/particles_sim.wgsl?raw';
 import partsSrc from './shaders/particles_draw.wgsl?raw';
 import postSrc from './shaders/post.wgsl?raw';
 import { Brand, DEFAULT_BRAND, drawTitles, resolveTitles, Titles } from './titles';
+import { DEFAULT_LIGHTING, Lighting, lightingActive, resolveLighting } from './lighting';
 import {
-  Keyboard, keyboardOf, Note, ProjectFile, RGB, gauss, lighten, mulberry32, prepareNotes, trackingMatrix,
+  Keyboard, keyboardOf, Note, ProjectFile, Rect, RGB, gauss, lighten, mulberry32, prepareNotes, sourceRect, trackingMatrix, trimRange,
 } from './project';
 
 export interface Layers {
@@ -178,6 +179,12 @@ export class Renderer {
   private blankTex!: GPUTexture;
   /** the stretch of the video the cards belong to (export of a section); null = the whole video */
   cardSpan: [number, number] | null = null;
+  /** show the video without its lighting (the Light step's compare) */
+  lightingOff = false;
+  private lighting: Lighting = DEFAULT_LIGHTING;
+  /** the part of the frame in use (Import step crop), or null for all of it */
+  private crop: Rect | null = null;
+  private ltUni!: GPUBuffer;
 
   static async create(canvas: HTMLCanvasElement): Promise<Renderer> {
     if (!navigator.gpu) throw new Error('WebGPU is not available in this window.');
@@ -209,6 +216,7 @@ export class Renderer {
     this.texUni = buf(48, U.UNIFORM | U.COPY_DST);
     this.noteUni = buf(144, U.UNIFORM | U.COPY_DST);
     this.bgUni = buf(128, U.UNIFORM | U.COPY_DST);
+    this.ltUni = buf(128, U.UNIFORM | U.COPY_DST);
     this.bgTex = d.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
     this.tex = placeholder(d);
     this.blankTex = d.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
@@ -313,6 +321,9 @@ export class Renderer {
     this.kb = keyboardOf(proj);
     this.look = resolveLook(proj.look);
     this.titles = resolveTitles(proj.titles);
+    this.lighting = resolveLighting(proj.lighting);
+    const cr = sourceRect(proj);
+    this.crop = cr.w < proj.video.width || cr.h < proj.video.height ? cr : null;
     this.scenes = (proj.particleScenes ?? []).filter((sc) => sc.end > sc.start).slice(0, SHAPE_SLOTS - 1);
     const ns = proj.noteSource;
     this.bars = ns?.bars ? ns.bars.map((b) => b + ns.offset) : [];
@@ -388,13 +399,14 @@ export class Renderer {
   /** the window used this frame: the camera's, or the whole video (covering the frame if its shape differs) */
   private frameView(): View {
     if (this.view) return this.view;
-    if (!this.outSize) return { x: 0, y: 0, w: this.srcW, h: this.srcH };
+    const R = this.crop ?? { x: 0, y: 0, w: this.srcW, h: this.srcH };
+    if (!this.outSize) return R;
     const a = this.outSize[0] / this.outSize[1];
-    const w = Math.min(this.srcW, this.srcH * a), h = w / a;
-    return { x: (this.srcW - w) / 2, y: (this.srcH - h) / 2, w, h };
+    const w = Math.min(R.w, R.h * a), h = w / a;
+    return { x: R.x + (R.w - w) / 2, y: R.y + (R.h - h) / 2, w, h };
   }
-  private get frameW() { return this.outSize ? this.outSize[0] : this.srcW; }
-  private get frameH() { return this.outSize ? this.outSize[1] : this.srcH; }
+  private get frameW() { return this.outSize ? this.outSize[0] : Math.round(this.crop?.w ?? this.srcW); }
+  private get frameH() { return this.outSize ? this.outSize[1] : Math.round(this.crop?.h ?? this.srcH); }
   get noteCount() { return this.notes.length; }
 
   /** the maker's name, handle and logo for the cards */
@@ -418,7 +430,7 @@ export class Renderer {
     const T = this.titles;
     if (!this.proj || (!T.intro.on && !T.outro.on)) return this.blankTex;
     const dur = this.proj.video.duration ?? this.proj.video.frames / (this.proj.video.fps || 30);
-    const span = this.cardSpan ?? [0, dur];
+    const span = this.cardSpan ?? trimRange(this.proj, dur);
     const w = this.rtW, h = this.rtH;
     const cv = (this.titleCanvas ??= document.createElement('canvas'));
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
@@ -772,6 +784,7 @@ export class Renderer {
     }
     q.writeBuffer(this.noteUni, 0, this.noteParams(lk));
     q.writeBuffer(this.bgUni, 0, this.bgParams(lk));
+    q.writeBuffer(this.ltUni, 0, this.lightParams());
     if (lk.bgImageOn && lk.bgImage) { this.wantBackground(lk.bgImage); if (this.bgVideo) { if (!offscreen && this.bgVideo.paused) this.bgVideo.play().catch(() => {}); this.refreshBgVideo(); } }
     q.writeBuffer(this.texUni, 0, new Float32Array([['tint', 'natural', 'glow'].indexOf(lk.texMode), lk.texScale, lk.texRelief, lk.texShine, lk.texSolid, this.tex.size, this.tex.lo, this.tex.hi, this.tex.metal, this.tex.tile, lk.texReflect ? 1 : 0, lk.texLive]));
     if (keys.length) q.writeBuffer(this.keysBuf, 0, new Float32Array(keys));
@@ -966,6 +979,7 @@ export class Renderer {
           { binding: 7, resource: this.bgTex.createView() },
           { binding: 8, resource: { buffer: this.bgUni } },
           { binding: 9, resource: card.createView() },
+          { binding: 10, resource: { buffer: this.ltUni } },
         ],
       })));
       cp.draw(3);
@@ -1020,6 +1034,27 @@ export class Renderer {
   }
 
   /** background and video placement settings the composite reads (BG in post.wgsl) */
+  /** the video's lighting, with what the room light needs: the keyboard's plane (inverse of this frame's tracking) */
+  private lightParams(): Float32Array {
+    const L = this.lighting;
+    const on = !this.lightingOff && lightingActive(L);
+    const H = this.kb.H;
+    const a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7], i = H[8];
+    const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+    const det = a * A + b * B + c * C;
+    const tracked = !!this.proj?.tracking.frames.length && Math.abs(det) > 1e-12;
+    const k = tracked ? 1 / det : 0;
+    const inv = [A * k, -(b * i - c * h) * k, (b * f - c * e) * k, B * k, (a * i - c * g) * k, -(a * f - c * d) * k, C * k, -(a * h - b * g) * k, (a * e - b * d) * k];
+    const fit = this.kb.fit;
+    return new Float32Array([
+      on ? 1 : 0, L.exposure, L.contrast, L.highlights,
+      L.shadows, L.warmth, L.saturation, L.room,
+      L.reach, L.softness, L.vignette, this.whiteKeys,
+      ...inv, fit.x0, fit.k, fit.sh,
+      tracked ? 1 : 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+  }
+
   private bgParams(lk: Look): Float32Array {
     const xform = lk.footScale !== 1 || lk.footX !== 0 || lk.footY !== 0 || lk.footRot !== 0 || lk.footCropT > 0 || lk.footCropB > 0 || lk.footCropL > 0 || lk.footCropR > 0;
     const img = lk.bgImageOn && !!lk.bgImage && this.bgKey === lk.bgImage;

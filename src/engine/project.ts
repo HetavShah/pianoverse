@@ -39,6 +39,35 @@ export interface ProjectFile {
   cameraTrack?: import('./camera').CameraTrack;
   /** opening title and end card */
   titles?: Partial<import('./titles').Titles>;
+  /** trim and crop chosen on the Import step (the video file itself is never changed) */
+  edit?: VideoEdit;
+  /** the video's own lighting (Light step) */
+  lighting?: Partial<import('./lighting').Lighting>;
+}
+
+export interface Rect { x: number; y: number; w: number; h: number }
+export interface VideoEdit {
+  /** the part of the video used, in seconds */
+  trim?: [number, number];
+  /** the part of the frame used, in video pixels */
+  crop?: Rect;
+}
+
+/** the part of the frame in use (the crop, or the whole video) */
+export function sourceRect(p: ProjectFile): Rect {
+  const W = p.video.width, H = p.video.height;
+  const c = p.edit?.crop;
+  if (!c || c.w < 16 || c.h < 16) return { x: 0, y: 0, w: W, h: H };
+  const x = Math.max(0, Math.min(W - 16, c.x)), y = Math.max(0, Math.min(H - 16, c.y));
+  return { x, y, w: Math.min(W - x, c.w), h: Math.min(H - y, c.h) };
+}
+
+/** the part of the timeline in use (the trim, or all of it), seconds */
+export function trimRange(p: ProjectFile, duration: number): [number, number] {
+  const t = p.edit?.trim;
+  if (!t || !(t[1] > t[0])) return [0, duration];
+  const a = Math.max(0, Math.min(duration, t[0])), b = Math.max(a, Math.min(duration, t[1]));
+  return b - a > 0.2 ? [a, b] : [0, duration];
 }
 
 export interface ParticleScene {
