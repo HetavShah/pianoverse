@@ -8,8 +8,8 @@ import { PEAK_RATE, VideoAudio } from '../services/audio';
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const SWELL = '#9b8cff';
 
-export default function SoundWave({ audio, sound, span, tail, measuredLufs, time, onSeek, view, className, waitText = 'Reading the soundtrack…', progress, error, onRetry }: {
-  audio: VideoAudio | null; waitText?: string; /** how far the wait has got, 0..1 (a bar), when known */ progress?: number; error?: string | null; onRetry?: () => void; sound: Sound; span: [number, number]; tail: number; measuredLufs: number | null;
+export default function SoundWave({ audio, sound, span, tail, measuredLufs, time, onSeek, view, className, waitText = 'Reading the soundtrack…', progress, updating = false, error, onRetry }: {
+  audio: VideoAudio | null; waitText?: string; /** how far the wait has got, 0..1 (a bar), when known */ progress?: number; /** what's drawn is the last version: a new one is being made */ updating?: boolean; error?: string | null; onRetry?: () => void; sound: Sound; span: [number, number]; tail: number; measuredLufs: number | null;
   time: number; onSeek: (t: number) => void;
   /** the part shown, seconds (default: all of it, with the ring-out) */
   view?: [number, number];
@@ -103,7 +103,7 @@ export default function SoundWave({ audio, sound, span, tail, measuredLufs, time
     onSeek(Math.max(a, Math.min(b, t0 + ((e.clientX - r.left) / r.width) * (t1 - t0))));
   };
   return (
-    <div className={'sound-wave' + (className ? ' ' + className : '')}>
+    <div className={'sound-wave' + (className ? ' ' + className : '') + (updating && audio ? ' updating' : '')}>
       <canvas ref={ref} aria-label="The sound over time. Click to move the playhead"
         onPointerDown={(e) => { drag.current = true; e.currentTarget.setPointerCapture(e.pointerId); at(e); }}
         onPointerMove={(e) => { if (drag.current) at(e); }} onPointerUp={() => { drag.current = false; }} />
@@ -115,6 +115,7 @@ export default function SoundWave({ audio, sound, span, tail, measuredLufs, time
           </span>
         </div>
       )}
+      {audio && updating && <span className="sound-wave-updating small-text" role="status" title="You already hear the change: only this picture of it is being redrawn"><span className="spinner" />Redrawing{progress !== undefined ? ` · ${Math.round(progress * 100)}%` : ''}</span>}
       {!audio && error && (
         <div className="sound-wave-wait sound-wave-error small-text" role="alert">
           <span>{error}</span>

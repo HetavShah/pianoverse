@@ -48,7 +48,8 @@ export default function SoundStep({ ws, head }: { ws: WS; head: ReactNode }) {
   );
   const evenDb = evenGainDb(s, live.measuredLufs);
   // the two close-ups: a few seconds around each end
-  const wave = { audio: live.sourceAudio === undefined ? ws.notes.audio : live.sourceAudio, waitText: s.source === 'video' ? undefined : live.pianoWaiting ? 'Getting the piano ready…' : `Playing your notes on the piano · ${Math.round(live.sourceProgress * 100)}%`,
+  const wave = { audio: live.sourceAudio === undefined ? ws.notes.audio : live.sourceAudio, waitText: s.source === 'video' ? undefined : live.pianoWaiting ? 'Getting the piano ready…' : `Drawing the piano's waveform · ${Math.round(live.sourceProgress * 100)}%`,
+    updating: live.sourceUpdating,
     progress: s.source === 'video' ? undefined : live.pianoWaiting ? (live.pianoLoad && live.pianoLoad.total > 0 ? live.pianoLoad.done / live.pianoLoad.total : undefined) : live.sourceProgress,
     error: s.source === 'video' ? ws.notes.audioError : live.error, onRetry: s.source === 'video' ? ws.notes.prepareAudio : undefined, sound: s, span, tail: live.tail, measuredLufs: live.measuredLufs, time: ws.time, onSeek: ws.seek };
   const startView: [number, number] = s.start === 'swell'

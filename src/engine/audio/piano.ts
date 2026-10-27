@@ -199,14 +199,7 @@ export class PianoPlayer {
       g.gain.setTargetAtTime(0, off, tau);
       p.end = Math.min(p.end, off + tau * 9);
       const thump = this.pack.rel.get(v.p);
-      if (thump) {
-        const r = ctx.createBufferSource();
-        r.buffer = thump;
-        const rg = ctx.createGain();
-        rg.gain.value = dbToGain(REL_DB) * (0.25 + 0.75 * (v.vel / 127)) * PIANO_GAIN * 4;
-        r.connect(rg).connect(this.out);
-        r.start(off);
-      }
+      if (thump) this.extra(thump, off, dbToGain(REL_DB) * (0.25 + 0.75 * (v.vel / 127)) * PIANO_GAIN * 4);
     }
     src.stop(p.end);
     this.playing.add(p);
@@ -218,22 +211,31 @@ export class PianoPlayer {
   /** the pedal coming up (a soft felt-and-wood sound) */
   pedalUp(when: number, i: number) {
     const b = this.pack.pedalUp[i % Math.max(1, this.pack.pedalUp.length)];
-    if (!b) return;
-    const s = this.ctx.createBufferSource();
-    s.buffer = b;
+    if (b) this.extra(b, Math.max(when, this.ctx.currentTime), dbToGain(PEDAL_DB) * PIANO_GAIN * 4);
+  }
+
+  /** a short sound of the instrument itself (a damper's thump, the pedal), stopped like the notes on a pause */
+  private extra(buf: AudioBuffer, at: number, level: number) {
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
     const g = this.ctx.createGain();
-    g.gain.value = dbToGain(PEDAL_DB) * PIANO_GAIN * 4;
-    s.connect(g).connect(this.out);
-    s.start(Math.max(when, this.ctx.currentTime));
+    g.gain.setValueAtTime(level, 0);
+    src.connect(g).connect(this.out);
+    src.start(at);
+    const p: Playing = { src, g, end: at + buf.duration };
+    this.playing.add(p);
+    src.onended = () => { src.disconnect(); g.disconnect(); this.playing.delete(p); };
   }
 
   /** stop everything quickly (a pause or a jump) */
   stopAll(fade = 0.04) {
     const now = this.ctx.currentTime;
     for (const p of this.playing) {
+      // silent from now on, whatever was scheduled (a note or thump still to come included)
       p.g.gain.cancelScheduledValues(now);
-      p.g.gain.setTargetAtTime(0, now, fade / 3);
-      try { p.src.stop(now + fade); } catch { /* already stopping */ }
+      p.g.gain.setValueAtTime(p.g.gain.value, now);
+      p.g.gain.linearRampToValueAtTime(0, now + fade);
+      try { p.src.stop(now + fade); } catch { /* already given a stop time: the gain has it silent */ }
     }
     this.playing.clear();
   }

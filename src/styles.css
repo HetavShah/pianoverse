@@ -806,3 +806,5 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .sound-wave-wait .wait-bar i { display: block; height: 100%; background: var(--live); transition: width 0.3s var(--ease); }
 .sound-wave-error { background: none; }
 .stat .stat-wait { font-family: var(--sans); font-size: 14px; color: var(--stone); text-transform: none; letter-spacing: 0; }
+.sound-wave.updating canvas { opacity: 0.45; transition: opacity 0.2s; }
+.sound-wave-updating { position: absolute; top: 6px; right: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; background: var(--ground); border: 1px solid var(--rule-2); color: var(--paper); pointer-events: none; }

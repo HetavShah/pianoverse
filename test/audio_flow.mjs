@@ -87,6 +87,13 @@ await page.click('.sound-card .play-round'); await page.waitForTimeout(2500);
 await page.click('.sound-card .play-round'); await page.waitForTimeout(300);
 const voices = await page.evaluate(() => window.__pvPianoVoices);
 ok(voices > 5, `the piano plays along with the video (${voices} notes)`);
+// changing the pedal keeps the waveform up while the new one is made; going back to one already heard is instant
+await page.waitForFunction(() => !document.querySelector('.sound-wave-wait'), null, { timeout: 180000 });
+await page.click('.page-side .seg button >> text=Off'); await page.waitForTimeout(300);
+ok(await page.locator('.sound-wave-wait').count() === 0, 'another pedal: the waveform stays up while it updates');
+await page.waitForFunction(() => !document.querySelector('.sound-wave.updating, .sound-wave-wait'), null, { timeout: 180000 });
+await page.click('.page-side .seg button >> text=Always down'); await page.waitForTimeout(600);
+ok(await page.locator('.sound-wave.updating, .sound-wave-wait').count() === 0, 'back to a pedal already heard: instant');
 await page.click('.page-side .seg button >> text=Off'); await page.waitForTimeout(200);
 await page.click('.page-side .choice >> text=Cathedral'); await page.waitForTimeout(200);
 p = await proj();

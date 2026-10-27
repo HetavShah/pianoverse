@@ -40,11 +40,13 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
   useEffect(() => {
     if (!pianoKey || !notes) return;
     let gone = false;
-    setPianoLoad({ done: 0, total: 0, detail: 'Getting the piano ready' });
+    // a quick change (another pedal: the recordings are already decoded) shouldn't flash a loading line
+    const slow = window.setTimeout(() => { if (!gone) setPianoLoad((p) => p ?? { done: 0, total: 0, detail: 'Getting the piano ready' }); }, 400);
     pianoPartFor(notes, sound, (p) => { if (!gone) setPianoLoad(p); })
       .then((part) => { if (!gone && part) { setPiano({ key: pianoKey, part }); setPianoLoad(null); } })
-      .catch((e) => { if (!gone) { setError(String((e as Error).message ?? e)); setPianoLoad(null); } });
-    return () => { gone = true; };
+      .catch((e) => { if (!gone) { setError(String((e as Error).message ?? e)); setPianoLoad(null); } })
+      .finally(() => window.clearTimeout(slow));
+    return () => { gone = true; window.clearTimeout(slow); setPianoLoad(null); };
   }, [pianoKey, notes]); // eslint-disable-line react-hooks/exhaustive-deps
   const pianoPart = piano?.key === pianoKey ? piano.part : null;
   /** the sound isn't ready to hear yet (the piano is loading) */
@@ -54,19 +56,31 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
   // with the piano, the sound before the chain is rendered once (offline): its waveform is what the Sound tab draws,
   // and its loudness is what evening out measures
   const srcKey = usesPiano && pianoPart && videoUrl && duration ? `${videoUrl}|${sound.source}|${sound.blend}|${pianoKey}` : null;
+  // renders are kept (the last few), so going back to a pedal or mix you've already heard is instant; while a new
+  // one renders, the last one stays on screen
+  const renders = useRef(new Map<string, { buf: AudioBuffer; audio: VideoAudio }>());
   const [srcRender, setSrcRender] = useState<{ key: string; buf: AudioBuffer; audio: VideoAudio } | null>(null);
   const [srcProgress, setSrcProgress] = useState(0);
   useEffect(() => {
     if (!srcKey || !videoUrl || !pianoPart) return;
+    const kept = renders.current.get(srcKey);
+    if (kept) { setSrcRender({ key: srcKey, ...kept }); return; }
     let gone = false;
     setSrcProgress(0);
     (sound.source === 'both' ? loadSoundtrack(videoUrl) : Promise.resolve(null))
       .then((src) => renderSource(src, sound, pianoPart, 0, duration, PREVIEW_RATE, (d) => { if (!gone) setSrcProgress(d); }))
-      .then((buf) => { if (!gone) setSrcRender({ key: srcKey, buf, audio: peaksOf(buf) }); })
+      .then((buf) => {
+        const r = { buf, audio: peaksOf(buf) };
+        renders.current.set(srcKey, r);
+        while (renders.current.size > 4) renders.current.delete(renders.current.keys().next().value!);
+        if (!gone) setSrcRender({ key: srcKey, ...r });
+      })
       .catch((e) => { if (!gone) setError(String((e as Error).message ?? e)); });
     return () => { gone = true; };
   }, [srcKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const rendered = srcRender?.key === srcKey ? srcRender : null;
+  /** the last render of this video with the piano, shown while the current one is made */
+  const shown = rendered ?? (usesPiano && srcRender?.key.startsWith(`${videoUrl}|`) ? srcRender : null);
 
   const key = `${videoUrl}|${a}|${b}|${usesPiano ? srcKey : ''}`;
   const [lufs, setLufs] = useState<{ key: string; value: number } | null>(null);
@@ -81,7 +95,8 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
     measureLoudness(videoUrl, [a, b]).then((value) => { if (!gone) setLufs({ key, value }); }).catch((e) => { if (!gone) setError(String((e as Error).message ?? e)); });
     return () => { gone = true; };
   }, [sound.even, key, rendered]); // eslint-disable-line react-hooks/exhaustive-deps
-  const measuredLufs = lufs?.key === key ? lufs.value : null;
+  // while the piano is re-rendered the last measurement stands (it changes little), rather than none
+  const measuredLufs = lufs?.key === key ? lufs.value : usesPiano && shown && !rendered && lufs ? lufs.value : null;
 
   // the swell is made from the opening notes: from the decoded soundtrack, once per start and length
   const swellKey = sound.start === 'swell' && videoUrl && span && !pianoWaiting ? `${key}|${sound.startLen}` : null;
@@ -172,7 +187,9 @@ export function useSound(videoRef: MutableRefObject<HTMLVideoElement | null>, op
     swellReady: !!swellData,
     hearSwell,
     /** what to draw on the Sound tab when it isn't the video's own audio (the piano, or the mix): null until rendered */
-    sourceAudio: usesPiano ? rendered?.audio ?? null : undefined,
+    sourceAudio: usesPiano ? shown?.audio ?? null : undefined,
+    /** the waveform shown is the last one: the current one is being made */
+    sourceUpdating: usesPiano && !!shown && !rendered,
     /** how far that render has got, 0..1 */
     sourceProgress: srcProgress,
     /** the piano's download or decoding, while it's being got ready */

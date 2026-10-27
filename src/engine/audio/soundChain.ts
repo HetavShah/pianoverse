@@ -67,6 +67,9 @@ export class SoundChain {
   private readonly swellBuf: AudioBuffer | null = null;
   private readonly mix: GainNode;
   private swellSrc: AudioBufferSourceNode | null = null;
+  /** the preview's pause: everything (the room's tail too) fades out quickly when the video stops */
+  private readonly gate: GainNode;
+  private wasPlaying = false;
   private readonly nodes: AudioNode[] = [];
   private readonly s: Sound;
   private readonly span: [number, number];
@@ -123,13 +126,20 @@ export class SoundChain {
     const range = gain(1 / CLIP_RANGE);
     const clip = keep(ctx.createWaveShaper());
     clip.curve = softClipCurve();
-    mix.connect(master).connect(lim).connect(range).connect(clip).connect(gain(CLIP_RANGE)).connect(out);
+    this.gate = gain(1);
+    mix.connect(master).connect(lim).connect(range).connect(clip).connect(gain(CLIP_RANGE)).connect(this.gate).connect(out);
   }
 
   /** the preview: set everything for the playhead at t (call every frame while playing, and on a pause) */
-  follow(t: number, _playing: boolean) {
+  follow(t: number, playing: boolean) {
     const st = soundAt(this.s, this.span, t);
     const now = this.ctx.currentTime;
+    if (playing !== this.wasPlaying) {
+      // paused: fade everything out in a moment (a reverb would ring on for seconds); playing: open again
+      this.gate.gain.cancelScheduledValues(now);
+      this.gate.gain.setTargetAtTime(playing ? 1 : 0, now, playing ? 0.005 : 0.04);
+      this.wasPlaying = playing;
+    }
     this.level.gain.setTargetAtTime(st.gain, now, FOLLOW);
     this.muffle.frequency.setTargetAtTime(st.cutoff, now, FOLLOW);
     this.ringSend?.gain.setTargetAtTime(st.ring, now, FOLLOW);
@@ -139,6 +149,10 @@ export class SoundChain {
   playSwell(): number {
     if (!this.swellBuf) return 0;
     this.stopSwell();
+    // the swell plays while the video waits at its start: open, and don't count that wait as a pause
+    this.gate.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.gate.gain.setValueAtTime(1, this.ctx.currentTime);
+    this.wasPlaying = false;
     const node = (this.swellSrc = this.ctx.createBufferSource());
     node.buffer = this.swellBuf;
     node.connect(this.mix);
