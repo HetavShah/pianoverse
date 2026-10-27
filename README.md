@@ -131,7 +131,7 @@ flowchart LR
       direction TB
       G1[Notes + textures] --> L[Light layer]
       G2[Saber] --> L
-      G3[Key glow + impact flashes] --> L
+      G3[Impact flashes + star flares] --> L
       G4[Particle simulation<br/>compute shader] --> L
       L --> B[Bloom]
       B --> C[Composite<br/>grade · relight · soft knee]
@@ -204,45 +204,22 @@ Every push to `main` builds a signed Windows installer on GitHub Actions and pub
 
 ```
 src/
-  App.tsx                    app window: steps, transport, autosave
+  App.tsx          the shell: wires the session, playback, preview, autosave and shortcuts together
+  engine/          everything that works without a screen
+    render/        the WebGPU renderer (scene, particles, light layers, bloom, composite)
+    ml/            note finders: Transkun (piano) and Basic Pitch (any instrument)
+    audio/ vision/ FFT, sync and beats; keyboard tracking and key fit
+    look/          look settings, colours and presets
+    shaders/       WGSL
   ui/
-    steps/                   Import, Notes and sync, Calibrate, Style, Export screens
-    LookControls.tsx         the style panels (colour wheel, palettes, textures, sliders)
-    StyleTimeline.tsx        timeline with notes, tracking quality, loop and shape sections
-    ShapePicker.tsx, ShapeSections.tsx   particle shapes and timeline sections
-    exportRun.ts             renders every frame and hands it to the encoder
-    CalibrateCanvas.tsx, trackRun.ts     calibration editor and tracking runner
-    WaveSync.tsx             waveform and note alignment strip
-  engine/
-    geometry.ts              homographies
-    tracker.ts               keyboard tracker (pyramidal Lucas-Kanade + RANSAC)
-    calibration.ts           presets, smoothing, fixes, per-frame keyboard pose
-    notes.ts                 MIDI import, sustain, tracks and channels
-    sync.ts                  automatic alignment (onset envelope + overlap-normalised correlation)
-    detect.ts                note detection from audio (basic-pitch, loaded on demand)
-    look.ts                  every style setting, presets, palettes
-    noteTextures.ts          note textures (images and moving video textures)
-    shapePoints.ts           SVG shapes to particle paths
-    renderer.ts              per-frame scene building, GPU passes, offscreen capture
-    shaders/
-      glass.wgsl             note bars and textures
-      saber.wgsl             the five saber styles
-      keys.wgsl              key glow
-      sprites.wgsl           impact flashes and streaks
-      labels.wgsl            note names and bar lines
-      particles_sim.wgsl     stateless particle simulation (compute)
-      particles_draw.wgsl    glitter points and star glints
-      post.wgsl              background, bloom, final composite, transparent export
-src-tauri/src/
-  main.rs                    Windows app shell (Tauri 2), updater
-  media.rs                   FFmpeg download, video conversion
-  export.rs                  export encoder: GPU detection, FFmpeg arguments, frame pipe
-  projects.rs, textures.rs   project and texture library on disk
-samples/                     sample project data
-test/                        headless render, tracker, calibration and export checks
-docs/images/                 README images
+    app/           the shell's hooks, undo history, top bar
+    import/ notes/ calibrate/ style/ light/ camera/ export/ home/   one folder per screen
+    components/    shared widgets      services/   storage, files, audio decoding
+src-tauri/         files, FFmpeg conversion and export, updates (Rust)
+test/              browser tests, including pixel-exact golden frames
 ```
 
+How it fits together, the design patterns used and how to extend each part: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 </details>
 
 <details>
