@@ -1,4 +1,4 @@
-// Export choices saved with a project: the output size, how the video fits it, frame rate, codec and quality.
+// Export choices saved with a project: the output size, how the video fits it, frame rate, codec, quality and encoder.
 export type SizeId = 'source' | 'shorts' | 'landscape' | 'square' | 'k4' | 'k4l';
 export const SIZES: { id: SizeId; label: string; w: number; h: number }[] = [
   { id: 'shorts', label: 'Shorts 9:16', w: 1080, h: 1920 },
@@ -19,4 +19,6 @@ export interface ExportSettings {
   out: string;
   /** export only the selected part of the timeline */
   onlySelection?: boolean;
+  /** which encoder: 'auto' (the best one that works on this computer) or an FFmpeg encoder ("h264_nvenc", "libx264") */
+  encoder?: string;
 }

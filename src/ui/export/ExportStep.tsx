@@ -6,7 +6,7 @@ import { sourceRect, trimRange } from '../../engine/project';
 import Icon from '../components/icons';
 import { inTauri } from '../services/media';
 import {
-  detectEncoders, Encoders, encoderLabel, encoderNote, lastExportLog, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
+  detectEncoders, Encoders, encoderLabel, encoderNote, estimateSeconds, lastExportLog, pickEncoder, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
   sizesFor, cameraOn, cameraFrameAt, tauriSink, testSink, videoFrame,
 } from './exportRun';
 
@@ -77,10 +77,14 @@ export default function ExportStep({ ws }: { ws: WS }) {
   const sizeList = sizesFor(project);
   const sizeId = sizeList.find((z) => z.id === s.size)?.id ?? sizeList[0].id;
   const aspectDiffers = !cameraOn(project) && Math.abs(outW / outH - srcAspect) > 0.02;
-  const encoder = enc ? (s.codec === 'hevc' ? enc.hevc[0] : enc.h264[0]) : null;
+  const encoder = enc ? pickEncoder(enc, s) : null;
+  const encList = enc ? (s.codec === 'hevc' ? enc.hevc : enc.h264) : [];
+  // graphics-card encoders this computer has but that failed their test: listed, not choosable, with why
+  // (AMD only on a computer that draws with AMD: every other one fails that test for want of the card)
+  const encFailed = Object.entries(enc?.failed ?? {}).filter(([k]) => k.startsWith(s.codec === 'hevc' ? 'hevc_' : 'h264_') && (!k.endsWith('_amf') || /amd|radeon/i.test(ws.renderer?.adapterName ?? '')));
   const hw = !!encoder && !encoder.startsWith('lib');
   // rough time: about 25 ms a frame for 1080p on a mid-range card, scaled by pixels
-  const estSecs = est.frames * 0.025 * ((outW * outH) / (1080 * 1920)) * (hw ? 1 : 1.8) * (s.transparent ? 2 : 1);
+  const estSecs = encoder ? estimateSeconds(encoder, est.frames, outW, outH, s.transparent) : 0;
   const running = run.kind === 'running';
   const srcFps = project.video.fps || 30;
 
@@ -186,6 +190,13 @@ export default function ExportStep({ ws }: { ws: WS }) {
               {[24, 30, 60].filter((f) => Math.abs(f - srcFps) > 0.5).map((f) => <option key={f} value={f}>{f} fps{f === 60 ? ' (smoother effects)' : ''}</option>)}
             </select>
           </label>
+          <label className="ex-field"><span className="ex-label">Encoder</span>
+            <select value={s.encoder && encList.includes(s.encoder) ? s.encoder : 'auto'} onChange={(e) => set({ encoder: e.target.value })} disabled={running || !enc} aria-label="Encoder">
+              <option value="auto">Automatic{encList[0] ? ` · ${encoderLabel(encList[0])}` : ''}</option>
+              {encList.map((e) => <option key={e} value={e}>{encoderLabel(e)}{e.startsWith('lib') ? '' : ' (graphics card)'}</option>)}
+              {encFailed.map(([e]) => <option key={e} value={e} disabled>{encoderLabel(e)} · not available</option>)}
+            </select>
+          </label>
           <label className="ex-field"><span className="ex-label">Quality</span>
             <select value={s.quality} onChange={(e) => set({ quality: e.target.value as ExportSettings['quality'] })} disabled={running}>
               <option value="high">High</option>
@@ -240,7 +251,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
           <dt>Frames</dt><dd className="mono">{est.frames.toLocaleString('en-US')}{est.fps !== srcFps ? ` · ${est.fps} fps` : ''}</dd>
           <dt>Estimated size</dt><dd className="mono">about {est.mb < 10 ? est.mb.toFixed(1) : Math.round(est.mb)} MB{s.transparent ? ' + effects' : ''}</dd>
           <dt>Estimated time</dt><dd className="mono">about {fmtDur(estSecs)}</dd>
-          <dt>Encoder</dt><dd className={hw ? '' : 'dim'} title={hw ? 'On the graphics card' : encoder ? 'No graphics-card encoder found, so the processor does it' : undefined}>{encoder ? encoderLabel(encoder) : encErr ? 'Not available' : 'Checking…'}</dd>
+          <dt>Encoder</dt><dd className={hw ? '' : 'dim'} title={hw ? 'On the graphics card' : encoder ? 'On the processor' : undefined}>{encoder ? encoderLabel(encoder) : encErr ? 'Not available' : 'Checking…'}</dd>
         </dl>
         {encErr && <small className="danger-text">{encErr}</small>}
         {encoderNote(enc, ws.renderer?.adapterName ?? '', s.codec === 'hevc' ? 'hevc' : 'h264') && <small className="ex-note">{encoderNote(enc, ws.renderer?.adapterName ?? '', s.codec === 'hevc' ? 'hevc' : 'h264')}</small>}

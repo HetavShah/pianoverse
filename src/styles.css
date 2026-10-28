@@ -495,7 +495,7 @@ input[type=range].hue-track::-webkit-slider-thumb, input[type=range].tint-track:
 .ex-size:hover:not(:disabled) { color: var(--paper); border-top-color: var(--dim); }
 .ex-size.on { color: var(--paper); border-top-color: var(--live); }
 .ex-fit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
-.ex-row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.ex-row3 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
 .ex-save { display: flex; gap: 16px; align-items: flex-end; }
 .ex-save input { flex: 1; min-width: 0; font-size: 13.5px; }
 .ex-opts { display: flex; flex-direction: column; }

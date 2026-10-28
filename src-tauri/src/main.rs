@@ -73,6 +73,7 @@ fn main() {
             export::write_file_bytes,
             export::show_in_folder,
             export::export_last_log,
+            export::export_note,
             textures::import_texture,
             textures::list_textures,
             textures::delete_texture,

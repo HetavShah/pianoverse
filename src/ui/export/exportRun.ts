@@ -54,6 +54,8 @@ export interface Sink {
   start(o: SinkOpts): Promise<void>;
   frame(rgba: Uint8Array): Promise<void>;
   finish(): Promise<string>;
+  /** a line for the export's log (timings) */
+  note?(line: string): Promise<void>;
   /** keepSound: the soundtrack stays for another try */
   cancel(keepSound?: boolean, reason?: string): Promise<void>;
   /** hand over the export's soundtrack (a WAV file); returns where the encoder can read it */
@@ -65,6 +67,7 @@ export const tauriSink: Sink = {
   async start(opts) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_start', { opts }); },
   async frame(rgba) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_frame', rgba); },
   async finish() { const { invoke } = await import('@tauri-apps/api/core'); return invoke<string>('export_finish'); },
+  async note(line) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_note', { line }); },
   async cancel(keepSound = false, reason?: string) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_cancel', { keepSound, reason: reason ?? null }); },
   async audio(wav) { const { invoke } = await import('@tauri-apps/api/core'); return invoke<string>('export_audio', wav); },
 };
@@ -87,6 +90,32 @@ export async function detectEncoders(): Promise<Encoders> {
   // best encoder is tried every time and a failure only changes that one export)
   try { localStorage.removeItem('pv.badEncoders'); } catch { /* nothing kept */ }
   return { ...e, failed: e.failed ?? {} };
+}
+
+/** the encoder an export uses: the one picked, if this computer has it, otherwise the best one that works */
+export function pickEncoder(e: Encoders, s: ExportSettings): string {
+  const list = s.codec === 'hevc' ? e.hevc : e.h264;
+  const fallback = s.codec === 'hevc' ? 'libx265' : 'libx264';
+  return s.encoder && s.encoder !== 'auto' && list.includes(s.encoder) ? s.encoder : list[0] ?? fallback;
+}
+
+// ---- how long an export takes: learnt from this computer's exports ----
+// seconds per frame per megapixel, for each encoder (drawing, reading back and encoding together), starting from
+// rough figures for a laptop and then following what the last exports here took
+const SPEED_KEY = 'pv.encoderSpeed';
+const SPEED_START = (enc: string) => (enc === 'libx265' ? 0.25 : enc === 'libx264' ? 0.12 : 0.013);
+function speeds(): Record<string, number> { try { return JSON.parse(localStorage.getItem(SPEED_KEY) ?? '{}'); } catch { return {}; } }
+/** how many seconds an export of `frames` frames of w x h will take with this encoder */
+export function estimateSeconds(enc: string, frames: number, w: number, h: number, transparent = false): number {
+  const mp = (w * h) / 1e6;
+  return frames * mp * (speeds()[enc] ?? SPEED_START(enc)) * (transparent ? 2 : 1) + 2;
+}
+function learnSpeed(enc: string, frames: number, w: number, h: number, secs: number) {
+  if (frames < 30 || secs <= 0) return;
+  const v = secs / (frames * (w * h) / 1e6);
+  const all = speeds();
+  all[enc] = all[enc] ? all[enc] * 0.5 + v * 0.5 : v;
+  try { localStorage.setItem(SPEED_KEY, JSON.stringify(all)); } catch { /* not kept */ }
 }
 
 /**
@@ -232,7 +261,7 @@ export async function runExport(args: {
       await r.texturesReady?.();
       const { width, height } = r.size;
       const out = phase === 'effects' ? s.out.replace(/\.[a-z0-9]+$/i, '') + ' (effects).mov' : s.out;
-      let enc = phase === 'effects' ? 'prores_ks' : (s.codec === 'hevc' ? args.encoders.hevc[0] : args.encoders.h264[0]) ?? 'libx264';
+      let enc = phase === 'effects' ? 'prores_ks' : pickEncoder(args.encoders, s);
       let note: string | undefined;
       // a graphics-card encoder that gets stuck or stops: the pass starts again on the processor
       for (;;) {
@@ -251,7 +280,17 @@ export async function runExport(args: {
       let lastSrc = -1;
       // what the frame is doing now: shown when it takes more than a few seconds
       let step = '', stepSince = performance.now(), done = 0;
-      const doing = (what: string) => { step = what; stepSince = performance.now(); };
+      // where each frame's time goes, written to the export's log every 100 frames
+      const spent: Record<string, number> = {};
+      const doing = (what: string) => {
+        const now = performance.now();
+        if (step) spent[step] = (spent[step] ?? 0) + now - stepSince;
+        step = what; stepSince = now;
+      };
+      const report = (n: number) => {
+        const per = Object.entries(spent).map(([k, ms]) => `${k} ${(ms / n).toFixed(1)} ms`).join(', ');
+        sink.note?.(`frames ${n}: per frame ${per}; ${(n / ((performance.now() - t0) / 1000)).toFixed(1)} frames/s`).catch(() => {});
+      };
       const watch = setInterval(() => {
         if (step && performance.now() - stepSince > 3000) {
           const el = (performance.now() - t0) / 1000;
@@ -270,14 +309,17 @@ export async function runExport(args: {
         const dark = fadeTail && t > to ? smoothFade((t - to) / tail) : fadeLead && t < from ? 1 - smoothFade((t - (from - lead)) / lead) : 0;
         if (cam) { const c = cameraFrameAt(p, Math.max(from, Math.min(t, to)), args.duration); r.setView(c.view, [Math.max(c.fade[0], dark), dark > c.fade[0] ? 0 : c.fade[1]]); }
         else if (tail > 0 || lead > 0) r.setView(null, [dark, 0]);
+        doing('the video frame');
+        const frameImg = videoFrame(v);
         doing('the graphics card');
-        const img = await within(r.capture(videoFrame(v), t), 30, 'The graphics card');
+        const img = await within(r.capture(frameImg, t), 30, 'The graphics card');
         doing('the encoder');
         if (pending) await pending;
         // the encoder side gives up on its own after 20 s; this is the last line of defence
         pending = within(sink.frame(img.data), 60, 'The encoder');
         done = i + 1;
         doing('');
+        if (done % 100 === 0) report(done);
         if (i % 6 === 0 || i === frames - 1) {
           const el = (performance.now() - t0) / 1000;
           let preview: string | undefined;
@@ -287,9 +329,11 @@ export async function runExport(args: {
       }
       doing('the encoder');
       if (pending) await pending;
+      report(frames);
       doing('the encoder to finish');
       saved.push(await within(sink.finish(), 180, 'The encoder'));
       doing('');
+      if (phase === 'video') learnSpeed(enc, frames, outW, outH, (performance.now() - t0) / 1000);
       } finally { clearInterval(watch); }
       break;
       } catch (e) {

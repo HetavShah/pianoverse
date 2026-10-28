@@ -52,6 +52,12 @@ impl RunLog {
 static LAST_LOG: std::sync::OnceLock<Mutex<Option<PathBuf>>> = std::sync::OnceLock::new();
 fn set_last_log(p: &PathBuf) { if let Ok(mut l) = LAST_LOG.get_or_init(|| Mutex::new(None)).lock() { *l = Some(p.clone()); } }
 
+/// A line from the window for the running export's log (its timings).
+#[tauri::command]
+pub fn export_note(state: State<'_, ExportState>, line: String) {
+    if let Ok(g) = state.0.lock() { if let Some(job) = g.as_ref() { job.run.line(&line); } }
+}
+
 /// Where the latest export's log is (none yet: None).
 #[tauri::command]
 pub fn export_last_log() -> Option<String> {

@@ -7,6 +7,7 @@ import { chromium } from 'playwright';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'] });
 const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
 let fails = 0;
+page.on('console', (m) => { if (m.text().startsWith('[export log]')) console.log(m.text()); });
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 const starts = [];
 let framesIn = 0, finished = 0;
@@ -26,6 +27,7 @@ await page.addInitScript(() => {
     frame: () => window.pvFrame(),
     finish: () => window.pvFinish(),
     cancel: async () => {},
+    note: async (l) => console.log('[export log] ' + l),
   };
 });
 await page.goto('http://localhost:4173/'); await page.waitForTimeout(800);
