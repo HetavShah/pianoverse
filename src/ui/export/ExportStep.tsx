@@ -6,7 +6,7 @@ import { sourceRect, trimRange } from '../../engine/project';
 import Icon from '../components/icons';
 import { inTauri } from '../services/media';
 import {
-  detectEncoders, Encoders, encoderLabel, encoderNote, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
+  detectEncoders, Encoders, encoderLabel, encoderNote, lastExportLog, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
   sizesFor, cameraOn, cameraFrameAt, tauriSink, testSink, videoFrame,
 } from './exportRun';
 
@@ -136,6 +136,9 @@ export default function ExportStep({ ws }: { ws: WS }) {
     } catch (e) { setMsg(String((e as Error)?.message ?? e)); }
   };
 
+  // the latest export's log, shown in its folder (to send along when something went wrong)
+  const showLog = () => lastExportLog().then((f) => { if (f) return showFile(f); }).catch(() => {});
+  const logLink = inTauri() ? <button type="button" className="link inline small-text" onClick={showLog}>Show log</button> : null;
   const showFile = async (f: string) => { if (inTauri()) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('show_in_folder', { path: f }); } };
 
   const soundNote = [ws.sound.lead ? `swells in ${ws.sound.lead.toFixed(1)} s` : '', ws.sound.tail ? `rings on ${ws.sound.tail.toFixed(1)} s` : ''].filter(Boolean).join(' · ');
@@ -250,21 +253,21 @@ export default function ExportStep({ ws }: { ws: WS }) {
             </div>
             <div className="bar"><i style={{ width: `${run.p ? (100 * run.p.done) / run.p.total : 0}%` }} /></div>
             {run.p?.waiting && <small className="ex-wait"><span className="spinner" />Waiting for {run.p.waiting}…</small>}
-            {run.p?.note && <small className="ex-note">{run.p.note}</small>}
+            {run.p?.note && <small className="ex-note">{run.p.note} {logLink}</small>}
             <div className="row"><span /><button type="button" className="btn small" onClick={() => { cancel.current = true; }}><Icon name="cancel" />Cancel</button></div>
           </div>
         )}
         {run.kind === 'done' && (
           <div className="ex-done">
             <b>Saved in {fmtDur(run.secs)}</b>
-            {run.note && <small className="ex-note">{run.note}</small>}
+            {run.note && <small className="ex-note">{run.note} {logLink}</small>}
             {run.files.map((f) => (
               <div key={f} className="ex-file"><span className="mono" title={f}>{f.split(/[\\/]/).pop()}</span>
                 {inTauri() && <button type="button" className="link" onClick={() => showFile(f)}><Icon name="folder" />Show in folder</button>}</div>
             ))}
           </div>
         )}
-        {run.kind === 'error' && <div className="ex-error"><b>The export stopped</b><pre>{run.message}</pre></div>}
+        {run.kind === 'error' && <div className="ex-error"><b>The export stopped</b><pre>{run.message}</pre>{logLink}</div>}
 
         <button type="button" className="btn primary big" onClick={start} disabled={running || !enc || !s.out}><Icon name="export" size={18} />{run.kind === 'done' ? 'Export again' : 'Export video'}</button>
         <button type="button" className="btn ghost ex-png" onClick={savePng} disabled={running}><Icon name="saveImage" />Save this frame as PNG</button>

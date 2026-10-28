@@ -1,5 +1,5 @@
 // A graphics-card encoder that gets stuck part way (as Intel Quick Sync did on a laptop): the export starts again
-// on the processor and finishes, says so, and that encoder isn't offered again. The encoder is pretended: the page
+// on the processor and finishes, says so, and the next export tries that encoder again. The encoder is pretended: the page
 // is told the computer has h264_qsv, and the sink stops taking frames from it after three.
 // A slow moment in the encoder shows what the frame is waiting for.
 // usage: node test/export_fallback.mjs
@@ -44,10 +44,10 @@ ok(/Waiting for the encoder/.test(waitText), 'a slow step says what it waits for
 await page.waitForSelector('.ex-done, .ex-error', { timeout: 15 * 60 * 1000 });
 const done = await page.locator('.ex-done, .ex-error').innerText();
 ok(starts[0] === 'h264_qsv' && starts[1] === 'libx264' && finished === 1, 'stuck on the graphics card: started again on the processor  ' + JSON.stringify(starts));
-ok(/Saved/.test(done) && /stopped responding/.test(done) && /processor/.test(done), 'it finishes and says why  ' + JSON.stringify(done));
+ok(/Saved/.test(done) && /stopped responding/.test(done) && /processor/.test(done) && /tries Intel Quick Sync again/.test(done), 'it finishes and says why  ' + JSON.stringify(done));
 await page.click('.stepper [title="Camera"]'); await page.waitForTimeout(500);
 await page.click('.stepper [title="Export"]'); await page.waitForTimeout(2500);
-ok(/x264/.test(await page.locator('.ex-stats').innerText()), 'and Quick Sync isn\'t offered again');
+ok(/Intel Quick Sync/.test(await page.locator('.ex-stats').innerText()), 'and the next export tries Quick Sync again');
 console.log(fails ? `${fails} FAILED` : 'all passed');
 await b.close();
 process.exit(fails ? 1 : 0);

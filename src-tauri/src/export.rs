@@ -11,7 +11,52 @@ use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, State};
 
-use crate::media::{ensure_ffmpeg, hide_window};
+use crate::media::{data_dir, ensure_ffmpeg, hide_window};
+
+/// A log of one export (or of the encoder tests): FFmpeg's own output and the app's steps, with the seconds since it
+/// began, in the app's logs folder. Kept for the last few exports; the Export screen links to the latest.
+#[derive(Clone)]
+pub struct RunLog {
+    file: Arc<Mutex<Option<std::fs::File>>>,
+    start: std::time::Instant,
+    pub path: PathBuf,
+}
+
+impl RunLog {
+    pub fn new(app: &AppHandle, name: &str) -> RunLog {
+        let dir = data_dir(app).map(|d| d.join("logs")).unwrap_or_else(|_| std::env::temp_dir().join("pianoverse-logs"));
+        let _ = std::fs::create_dir_all(&dir);
+        // keep the last 10 of this kind
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            let mut old: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with(name))).collect();
+            old.sort();
+            while old.len() >= 10 { let _ = std::fs::remove_file(old.remove(0)); }
+        }
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let path = dir.join(format!("{name}-{stamp}.log"));
+        let file = std::fs::File::create(&path).ok();
+        let log = RunLog { file: Arc::new(Mutex::new(file)), start: std::time::Instant::now(), path };
+        log.line(&format!("Pianoverse {} on {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS));
+        log
+    }
+    pub fn line(&self, msg: &str) {
+        if let Ok(mut f) = self.file.lock() {
+            if let Some(f) = f.as_mut() {
+                let _ = writeln!(f, "[{:8.2}] {msg}", self.start.elapsed().as_secs_f64());
+            }
+        }
+    }
+}
+
+/// the latest export's log, for the Export screen's "Show log"
+static LAST_LOG: std::sync::OnceLock<Mutex<Option<PathBuf>>> = std::sync::OnceLock::new();
+fn set_last_log(p: &PathBuf) { if let Ok(mut l) = LAST_LOG.get_or_init(|| Mutex::new(None)).lock() { *l = Some(p.clone()); } }
+
+/// Where the latest export's log is (none yet: None).
+#[tauri::command]
+pub fn export_last_log() -> Option<String> {
+    LAST_LOG.get().and_then(|l| l.lock().ok()?.clone()).map(|p| p.to_string_lossy().into_owned())
+}
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -92,7 +137,7 @@ fn reason(text: &str) -> String {
 pub fn build_args(o: &ExportOpts, audio_codec: Option<&str>, part: &str) -> Vec<String> {
     let mut a: Vec<String> = Vec::new();
     let s = |v: &str| v.to_string();
-    a.extend(["-hide_banner", "-y", "-loglevel", "error"].map(s));
+    a.extend(["-hide_banner", "-y", "-nostats", "-loglevel", "info"].map(s));
     a.extend(["-f", "rawvideo", "-pix_fmt", "rgba"].map(s));
     a.extend([s("-s"), format!("{}x{}", o.width, o.height), s("-framerate"), format!("{}", o.fps), s("-i"), s("pipe:0")]);
     let with_audio = o.audio.is_some() && o.codec != "prores";
@@ -143,6 +188,9 @@ struct Job {
     part: PathBuf,
     out: PathBuf,
     log: Arc<Mutex<Vec<String>>>,
+    run: RunLog,
+    /// frames FFmpeg has taken so far (the writer thread counts them)
+    taken: Arc<std::sync::atomic::AtomicU64>,
     frames: u64,
     /// the rendered soundtrack, removed once the export is done
     temp_audio: Option<PathBuf>,
@@ -228,6 +276,7 @@ pub async fn export_encoders(app: AppHandle) -> Result<Encoders, String> {
     let exe = ensure_ffmpeg(&app).await?;
     tauri::async_runtime::spawn_blocking(move || {
         let failed = Mutex::new(std::collections::BTreeMap::<String, String>::new());
+        let run = RunLog::new(&app, "encoders");
         // one test encode with these settings: Ok, or FFmpeg's reason
         let attempt = |args: &[String]| -> Result<(), String> {
             let mut cmd = Command::new(&exe);
@@ -265,7 +314,9 @@ pub async fn export_encoders(app: AppHandle) -> Result<Encoders, String> {
         let works = |enc: &str| -> bool {
             let mut first_err: Option<String> = None;
             for (i, args) in encoder_variants(enc, "high").iter().enumerate() {
-                match attempt(args) {
+                let r = attempt(args);
+                run.line(&format!("{enc} way {}: {}  [{}]", i + 1, match &r { Ok(()) => "works".to_string(), Err(e) => format!("fails: {e}") }, args.join(" ")));
+                match r {
                     Ok(()) => {
                         if let Ok(mut m) = chosen().lock() { m.insert(enc.to_string(), i); }
                         return true;
@@ -318,6 +369,10 @@ pub async fn export_start(app: AppHandle, state: State<'_, ExportState>, opts: E
         tauri::async_runtime::spawn_blocking(move || audio.as_ref().and_then(|p| audio_codec(&exe, p))).await.map_err(|e| e.to_string())?
     };
     let args = build_args(&opts, codec.as_deref(), &part.to_string_lossy());
+    let run = RunLog::new(&app, "export");
+    set_last_log(&run.path);
+    run.line(&format!("Export to {} with {} ({}x{} frames -> {}x{}, {} fps, quality {})", opts.out, opts.encoder, opts.width, opts.height, opts.out_width, opts.out_height, opts.fps, opts.quality));
+    run.line(&format!("ffmpeg {}", args.join(" ")));
     let mut cmd = Command::new(&exe);
     cmd.args(&args).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped());
     // (the export's own FFmpeg reads frames from stdin)
@@ -327,8 +382,10 @@ pub async fn export_start(app: AppHandle, state: State<'_, ExportState>, opts: E
     let log = Arc::new(Mutex::new(Vec::<String>::new()));
     let stderr = child.stderr.take().unwrap();
     let log2 = log.clone();
+    let run2 = run.clone();
     std::thread::spawn(move || {
         for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            run2.line(&format!("ffmpeg: {line}"));
             if let Ok(mut l) = log2.lock() {
                 l.push(line);
                 if l.len() > 20 {
@@ -342,16 +399,22 @@ pub async fn export_start(app: AppHandle, state: State<'_, ExportState>, opts: E
     let (tx, rx) = sync_channel::<Vec<u8>>(2);
     let write_error = Arc::new(Mutex::new(None::<String>));
     let werr = write_error.clone();
+    let taken = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let (taken2, run3) = (taken.clone(), run.clone());
     let writer = std::thread::spawn(move || {
         for frame in rx {
             if let Err(e) = stdin.write_all(&frame) {
+                run3.line(&format!("FFmpeg stopped taking frames after {}: {e}", taken2.load(std::sync::atomic::Ordering::Relaxed)));
                 if let Ok(mut w) = werr.lock() { *w = Some(e.to_string()); }
                 return;
             }
+            let n = taken2.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            if n == 1 || n % 100 == 0 { run3.line(&format!("FFmpeg has taken {n} frames")); }
         }
+        run3.line(&format!("all {} frames sent; FFmpeg's input closed", taken2.load(std::sync::atomic::Ordering::Relaxed)));
         // all frames sent: closing FFmpeg's input lets it finish
     });
-    *state.0.lock().map_err(|e| e.to_string())? = Some(Job { child, frames_tx: Some(tx), write_error, writer: Some(writer), part, out, log, frames: 0, temp_audio });
+    *state.0.lock().map_err(|e| e.to_string())? = Some(Job { child, frames_tx: Some(tx), write_error, writer: Some(writer), part, out, log, run, taken, frames: 0, temp_audio });
     Ok(())
 }
 
@@ -366,16 +429,16 @@ pub async fn export_frame(state: State<'_, ExportState>, request: tauri::ipc::Re
         return Err("expected raw frame bytes".into());
     };
     let frame = bytes.to_vec();
-    let (tx, werr, log) = {
+    let (tx, werr, log, run, taken, sent_so_far) = {
         let guard = state.0.lock().map_err(|e| e.to_string())?;
         let job = guard.as_ref().ok_or("No export is running")?;
-        (job.frames_tx.clone().ok_or("The export has finished")?, job.write_error.clone(), job.log.clone())
+        (job.frames_tx.clone().ok_or("The export has finished")?, job.write_error.clone(), job.log.clone(), job.run.clone(), job.taken.clone(), job.frames)
     };
     let sent = tauri::async_runtime::spawn_blocking(move || {
         let stopped = |werr: &Arc<Mutex<Option<String>>>| -> Option<String> {
             let e = werr.lock().ok()?.clone()?;
-            let msg = tail(&log);
-            Some(if msg.is_empty() { format!("The encoder stopped: {e}") } else { format!("The encoder stopped:\n{msg}") })
+            let msg = reason(&tail(&log));
+            Some(if msg.is_empty() { format!("The encoder stopped: {e}") } else { format!("The encoder stopped: {msg}") })
         };
         let start = std::time::Instant::now();
         let mut f = frame;
@@ -384,7 +447,10 @@ pub async fn export_frame(state: State<'_, ExportState>, request: tauri::ipc::Re
                 Ok(()) => return Ok(()),
                 Err(TrySendError::Full(back)) => {
                     if let Some(e) = stopped(&werr) { return Err(e); }
-                    if start.elapsed() > STALL { return Err("stalled".to_string()); }
+                    if start.elapsed() > STALL {
+                        run.line(&format!("STALLED: FFmpeg took no frame for {} s (frames sent {}, taken {})", STALL.as_secs(), sent_so_far, taken.load(std::sync::atomic::Ordering::Relaxed)));
+                        return Err("stalled".to_string());
+                    }
                     f = back;
                     std::thread::sleep(std::time::Duration::from_millis(5));
                 }
@@ -416,7 +482,8 @@ pub async fn export_finish(state: State<'_, ExportState>) -> Result<String, Stri
     .map_err(|e| e.to_string())?;
     let (st, job) = status;
     remove_temp(&job.temp_audio);
-    let ok = st.map(|s| s.success()).unwrap_or(false);
+    let ok = st.as_ref().map(|s| s.success()).unwrap_or(false);
+    job.run.line(&format!("FFmpeg finished: {:?} after {} frames", st.as_ref().map(|s| s.code()), job.frames));
     if !ok {
         let _ = std::fs::remove_file(&job.part);
         return Err(format!("The video could not be encoded.\n{}", tail(&job.log)));
@@ -430,9 +497,10 @@ pub async fn export_finish(state: State<'_, ExportState>) -> Result<String, Stri
 /// graphics driver can take a long time to die, and nothing may wait on it). keep_sound: the rendered soundtrack
 /// stays for another try (the export starting again on another encoder).
 #[tauri::command]
-pub async fn export_cancel(state: State<'_, ExportState>, keep_sound: Option<bool>) -> Result<(), String> {
+pub async fn export_cancel(state: State<'_, ExportState>, keep_sound: Option<bool>, reason: Option<String>) -> Result<(), String> {
     let job = state.0.lock().map_err(|e| e.to_string())?.take();
     if let Some(mut job) = job {
+        job.run.line(&format!("stopped by the app after {} frames: {}", job.frames, reason.as_deref().unwrap_or("Cancel")));
         drop(job.frames_tx.take());
         let _ = job.child.kill();
         if !keep_sound.unwrap_or(false) {
@@ -440,7 +508,8 @@ pub async fn export_cancel(state: State<'_, ExportState>, keep_sound: Option<boo
         }
         std::thread::spawn(move || {
             // killing FFmpeg also frees a writer thread stuck in a write
-            let _ = job.child.wait();
+            let st = job.child.wait();
+            job.run.line(&format!("FFmpeg ended: {:?}", st.map(|s| s.code())));
             if let Some(w) = job.writer.take() { let _ = w.join(); }
             let _ = std::fs::remove_file(&job.part);
         });
@@ -519,6 +588,42 @@ mod tests {
         assert_eq!(reason(text), "[h264_nvenc @ 000002ce17bf6f00] InitializeEncoder failed: invalid param (8): Invalid Level.");
         // only generic lines: they're kept rather than nothing
         assert!(reason("[x] Task finished with error code: -22 (Invalid argument)").contains("Task finished"));
+    }
+
+    /// The export's FFmpeg, fed the way the app feeds it (raw frames through a pipe, a soundtrack file, -shortest),
+    /// takes every frame without stalling. Needs ffmpeg on PATH; run with: cargo test pipe_with_sound -- --ignored
+    #[test]
+    #[ignore]
+    fn pipe_with_sound_never_stalls() {
+        let dir = std::env::temp_dir().join("pv-pipe-test");
+        let _ = std::fs::create_dir_all(&dir);
+        let wav = dir.join("sound.wav");
+        assert!(Command::new("ffmpeg").args(["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=440:d=25", "-ac", "2", "-ar", "48000"]).arg(&wav).status().unwrap().success());
+        let n = 600u64;
+        let o = ExportOpts {
+            out: dir.join("out.mp4").to_string_lossy().into_owned(), width: 1080, height: 1920, fps: 30.0, out_width: 1080, out_height: 1920, fit: "crop".into(),
+            codec: "h264".into(), encoder: std::env::var("ENC").unwrap_or("libx264".into()), quality: "high".into(),
+            audio: Some(wav.to_string_lossy().into_owned()), audio_copy: false, start: 0.0, duration: n as f64 / 30.0,
+        };
+        let part = dir.join("out.part.mp4");
+        let args = build_args(&o, Some("pcm_s16le"), &part.to_string_lossy());
+        let mut child = Command::new("ffmpeg").args(&args).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped()).spawn().unwrap();
+        let stderr = child.stderr.take().unwrap();
+        std::thread::spawn(move || { for _ in BufReader::new(stderr).lines() {} });
+        let mut stdin = child.stdin.take().unwrap();
+        let mut frame = vec![0u8; 1080 * 1920 * 4];
+        let start = std::time::Instant::now();
+        let mut slowest = 0.0f64;
+        for i in 0..n {
+            for (k, b) in frame.iter_mut().enumerate().step_by(97) { *b = ((k as u64 + i * 7) % 251) as u8; }
+            let t = std::time::Instant::now();
+            stdin.write_all(&frame).unwrap();
+            slowest = slowest.max(t.elapsed().as_secs_f64());
+            assert!(t.elapsed() < std::time::Duration::from_secs(20), "frame {i} took {:?}", t.elapsed());
+        }
+        drop(stdin);
+        assert!(child.wait().unwrap().success());
+        eprintln!("{n} frames in {:.1} s, slowest write {:.2} s", start.elapsed().as_secs_f64(), slowest);
     }
 
     #[test]

@@ -55,7 +55,7 @@ export interface Sink {
   frame(rgba: Uint8Array): Promise<void>;
   finish(): Promise<string>;
   /** keepSound: the soundtrack stays for another try */
-  cancel(keepSound?: boolean): Promise<void>;
+  cancel(keepSound?: boolean, reason?: string): Promise<void>;
   /** hand over the export's soundtrack (a WAV file); returns where the encoder can read it */
   audio?(wav: Uint8Array): Promise<string>;
 }
@@ -65,32 +65,30 @@ export const tauriSink: Sink = {
   async start(opts) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_start', { opts }); },
   async frame(rgba) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_frame', rgba); },
   async finish() { const { invoke } = await import('@tauri-apps/api/core'); return invoke<string>('export_finish'); },
-  async cancel(keepSound = false) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_cancel', { keepSound }); },
+  async cancel(keepSound = false, reason?: string) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_cancel', { keepSound, reason: reason ?? null }); },
   async audio(wav) { const { invoke } = await import('@tauri-apps/api/core'); return invoke<string>('export_audio', wav); },
 };
 
 /** tests in a plain browser can provide their own encoder */
+/** the latest export's log file (desktop app), for "Show log" */
+export async function lastExportLog(): Promise<string | null> {
+  if (!inTauri()) return null;
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<string | null>('export_last_log');
+}
+
 export const testSink = (): Sink | null => (window as unknown as { __pvExportSink?: Sink }).__pvExportSink ?? null;
 
 export async function detectEncoders(): Promise<Encoders> {
   const forTests = (window as unknown as { __pvEncoders?: Encoders }).__pvEncoders;
   if (!inTauri() && !forTests) return { h264: ['libx264'], hevc: ['libx265'], prores: true, failed: {} };
   const e = forTests ?? await (await import('@tauri-apps/api/core')).invoke<Encoders>('export_encoders');
-  // an encoder that got stuck in an export on this computer isn't offered again
-  const bad = badEncoders();
-  const keep = (l: string[], cpu: string) => { const k = l.filter((x) => !bad.includes(x)); return k.length ? k : [cpu]; };
-  const failed = { ...(e.failed ?? {}) };
-  for (const x of bad) failed[x] ??= 'It stopped responding during an export on this computer.';
-  return { ...e, h264: keep(e.h264, 'libx264'), hevc: keep(e.hevc, 'libx265'), failed };
+  // (an earlier version kept a list of encoders that once failed, and never offered them again: forgotten now, the
+  // best encoder is tried every time and a failure only changes that one export)
+  try { localStorage.removeItem('pv.badEncoders'); } catch { /* nothing kept */ }
+  return { ...e, failed: e.failed ?? {} };
 }
 
-const BAD_KEY = 'pv.badEncoders';
-function badEncoders(): string[] {
-  try { return JSON.parse(localStorage.getItem(BAD_KEY) ?? '[]'); } catch { return []; }
-}
-function markBadEncoder(enc: string) {
-  try { localStorage.setItem(BAD_KEY, JSON.stringify([...new Set([...badEncoders(), enc])])); } catch { /* not kept */ }
-}
 /**
  * Why the graphics card that draws the preview isn't the one encoding, in plain words (null when it is, or no
  * reason is known). gpu: the drawing card's name ("nvidia", "NVIDIA GeForce RTX 3050 Laptop GPU", …).
@@ -297,11 +295,11 @@ export async function runExport(args: {
       } catch (e) {
         const m = String((e as Error)?.message ?? e);
         if (m === 'cancelled' || !isHardware(enc)) throw e;
-        await within(sink.cancel(true), 10, 'Stopping the encoder').catch(() => {});
-        markBadEncoder(enc);
+        const why = m === 'stalled' ? 'stopped responding' : `stopped (${m.replace(/^The encoder stopped:?\s*/, '').slice(0, 160)})`;
+        await within(sink.cancel(true, `${encoderLabel(enc)} ${why}; starting again on the processor`), 10, 'Stopping the encoder').catch(() => {});
         const was = encoderLabel(enc);
         enc = s.codec === 'hevc' ? 'libx265' : 'libx264';
-        note = `${was} ${m === 'stalled' ? 'stopped responding' : 'stopped'}, so this export is made on the processor (a little slower). It won't be used again on this computer.`;
+        note = `${was} ${why}, so this export is being made on the processor (a little slower). Next export tries ${was} again.`;
         args.onProgress({ phase, done: 0, total: frames, elapsed: 0, eta: 0, note });
       }
       }
