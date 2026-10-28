@@ -1,180 +1,168 @@
 <p align="center">
-  <img src="docs/images/hero.png" alt="Pianoverse: a frame from a piano video before and after, with notes falling onto the keys" width="100%">
+  <img src="docs/images/hero.jpg" alt="Pianoverse: the same take as filmed on the left, and with Pianoverse on the right: notes falling onto the keys, the keys lit, sparks rising, the room dark" width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/HetavShah/pianoverse/actions/workflows/build.yml"><img src="https://github.com/HetavShah/pianoverse/actions/workflows/build.yml/badge.svg" alt="Windows build"></a>
-  <a href="https://github.com/HetavShah/pianoverse/releases/latest"><img src="https://img.shields.io/github/v/release/HetavShah/pianoverse?style=flat&color=2FD3B5&label=download" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0B0D10?style=flat&logo=windows&logoColor=2FD3B5" alt="Windows 10 and 11">
-  <img src="https://img.shields.io/badge/GPU-WebGPU%20%2B%20WGSL-0B0D10?style=flat&logoColor=2FD3B5" alt="WebGPU">
-  <img src="https://img.shields.io/badge/shell-Tauri%202-0B0D10?style=flat&logo=tauri&logoColor=2FD3B5" alt="Tauri 2">
-  <img src="https://img.shields.io/badge/status-Milestone%205%20done-2FD3B5?style=flat" alt="Milestone 5 done">
+  <a href="https://github.com/HetavShah/pianoverse/releases/latest"><img src="https://img.shields.io/github/v/release/HetavShah/pianoverse?style=flat-square&color=e9542d&labelColor=161615&label=download" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/price-free-f2efe8?style=flat-square&labelColor=161615" alt="Free">
+  <img src="https://img.shields.io/badge/sign--up-none-f2efe8?style=flat-square&labelColor=161615" alt="No sign-up">
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-f2efe8?style=flat-square&labelColor=161615" alt="Windows 10 and 11">
+  <a href="https://github.com/HetavShah/pianoverse/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/HetavShah/pianoverse/build.yml?style=flat-square&labelColor=161615&label=build" alt="Windows build"></a>
 </p>
 
-<h3 align="center">Falling notes on your real keys.</h3>
+<h1 align="center">You played it.<br>Now let them see it.</h1>
 
 <p align="center">
-  Add your piano video and its MIDI. Pianoverse drops every note onto the key you pressed,<br>
-  lights up your keys and sends sparks flying, then exports it for Shorts, Reels or YouTube. For Windows.
+  <b>The video editor made for pianists.</b><br>
+  Drop in the video you filmed on your phone. Pianoverse finds every note you played and lights it up<br>
+  on your own keys, with sparks, camera moves and a grand piano sound to match.
 </p>
 
 <p align="center">
-  <a href="https://github.com/HetavShah/pianoverse/releases/latest"><b>Download for Windows</b></a>
+  <a href="https://github.com/HetavShah/pianoverse/releases/latest"><b>Download for Windows</b></a> · <a href="https://pianoverse.in"><b>pianoverse.in</b></a>
 </p>
 
 ---
 
-## See it move
+## Why it exists
 
-<table>
-  <tr>
-    <td width="40%" align="center"><img src="docs/images/demo.gif" alt="Animated clip rendered by Pianoverse: notes landing on the saber and glitter plumes rising" width="100%"></td>
-    <td width="60%" valign="top">
-
-### What happens on screen
-
-**Notes** — glass, gem, round, solid, outline or soft-glow bars, with real textures inside if you like. Their length is how long you held the key; the sustain pedal can stretch them.
-
-**Saber** — a glowing line along the back edge of your keyboard, where the notes land. It brightens at each key you play, in that note's colour. Plasma, straight, electric, soft beam or flame.
-
-**Particles** — each note sends small sparks up from its key. They can rise in plumes, arc like a fountain, spray from held notes, spiral in a vortex, or trace a shape such as a heart.
-
-**Lighting** — each note lights its key and casts its colour onto your fingers. Louder notes are brighter, held keys stay lit, and bass notes briefly brighten the whole frame.
-
-**Keyboard tracking** — Pianoverse finds the keyboard in every frame, so the notes stay on the right keys even if the phone moves.
-
-  </td>
-  </tr>
-</table>
-
----
-
-## One take, six looks
-
-<p align="center">
-  <img src="docs/images/looks.jpg" alt="The same frame rendered with six looks: Interstellar Teal, Neon with an electric saber, Ember with a flame saber, twelve colours with note names, gold foil texture, and Aurora with gem notes" width="100%">
-</p>
-
-<p align="center"><sub>The same moment, rendered by Pianoverse: Interstellar Teal · Neon (electric saber, vortex) · Ember (flame saber, fountain) · Twelve colours (solid notes, note names) · Gold foil texture · Aurora (gem notes, held-note spray)</sub></p>
-
-Every look is made in the **Style** step, where each layer has its own panel:
-
-| Layer | What you can change |
-| --- | --- |
-| **Colours** | 1 colour, 12 colours (one per note name), gradient across the keyboard (by pitch, loudness or time), MIDI tracks, MIDI channels, a split for left and right hand, or random. Twelve palettes plus a colour wheel. |
-| **Notes** | Style (Glass, Gem, Round, Solid, Outline, Soft glow), size, rounding, rim, glow, opacity, lighting. Textures: Ice, Onyx, Marble, Gold foil, a moving Crystal flow, or your own image or video. Note names and bar lines. |
-| **Saber** | Plasma, Straight, Electric, Soft beam or Flame; brightness, thickness, flicker, how much it reacts, height on the keys, its own colour. |
-| **Impact** | Flash size and brightness, streak length, how long the flash lasts. |
-| **Particles** | Presets (Explode, Fast playing, High count, High turbulence, Twirl …) and motions: Plumes, Fountain, Held-note spray, Vortex, Shape. Turbulence, gravity, wind, lifetime, size, twinkle, haze. |
-| **Lighting** | Key glow, glow before a note lands, coloured light on hands and keys, bass pulse. |
-| **Background** | Your footage (darken, contrast, saturation, vignette), a plain colour, or an image of your own with its own position and colour controls. |
-| **Glow and film** | Bloom, wide bloom, colour fringe and film grain. |
-
-Save a look as a preset and reuse it on the next video.
-
-<table>
-  <tr>
-    <td width="30%" align="center"><img src="docs/images/shape-heart.jpg" alt="A frame from a shape section: sparks trace a heart above the keyboard" width="100%"></td>
-    <td width="70%" valign="middle">
-
-### Shape sections
-
-Pick a stretch of the timeline and the sparks from the notes played there trace a shape: they leave the keys, travel round the outline clockwise or anticlockwise, and fade as they close it. The rest of the video keeps its normal particles, and you can keep the normal particles inside the section too. Built-in shapes or your own SVG.
-
-  </td>
-  </tr>
-</table>
-
----
-
-## From video to visualizer
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/images/screen-import.png" alt="Import screen with the video and project settings"><br><b>1 · Import and Video</b> — drop in the performance video, pick the camera setup and keyboard size, then trim and crop it.</td>
-    <td width="50%"><img src="docs/images/screen-sync.png" alt="Notes and sync screen with the waveform and the notes lined up"><br><b>2 · Audio</b> — the MIDI lines itself up with the audio; check it by ear and nudge it to the millisecond. No MIDI? Detect the notes from the audio. On <b>Sound</b>: play your notes on a recorded concert grand (with the sustain pedal) instead of, or under, your video's sound; an intro and outro (fade, open up, swell; fade, muffle, ring out); reverb rooms from a studio to a cathedral; EQ; and loudness matched to social media.</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/images/screen-calibrate.png" alt="Calibrate screen with the keyboard corners and the saber line"><br><b>3 · Calibrate</b> — drag four corners onto the keys once; the keyboard is tracked through the whole clip.</td>
-    <td width="50%"><img src="docs/images/screen-style.png" alt="Style screen with the Colours panel, live preview and timeline"><br><b>4 · Style</b> — every layer has its own panel, the preview plays live while you tweak, and the timeline holds shape sections and loop ranges.</td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="docs/images/screen-export.png" alt="Export screen with sizes, format, encoder and preview"><br><b>5 · Export</b> — Shorts, landscape, square or 4K vertical, encoded on your graphics card.</td>
-  </tr>
-</table>
-
-### Export
+You nailed the take, but the video doesn't show it. A pianist has three options today, and none of them was made for pianists:
 
 | | |
 | --- | --- |
-| **Sizes** | Shorts 1080×1920 · Landscape 1920×1080 · Square 1080×1080 · 4K vertical 2160×3840 — crop to fill or fit inside |
-| **Encoder** | NVIDIA NVENC, AMD AMF or Intel Quick Sync, detected automatically; x264 / x265 on the processor otherwise |
-| **Format** | MP4 in H.264, or H.265 for smaller files; quality High, Medium or Small file |
-| **Frame rate** | Same as the video, or 24, 30 or 60 fps |
-| **Sound** | The original audio, copied without re-encoding when it is AAC, otherwise converted at high quality; with Sound settings (or the grand piano), rendered and encoded at high quality |
+| **Post it as filmed** | Honest, but it looks like every other phone on a stand, and the phone microphone flattens the piano. |
+| **Learn a video editor** | It can look amazing, after weeks of learning and hours per video, because the editor has no idea which note you played when. Every spark is placed by hand. |
+| **Use a MIDI visualizer** | Beautiful falling notes, built around the MIDI file. Your footage, your room and your sound come second. |
+
+Pianoverse starts from your video and reads your music. **A video editor sees frames. Pianoverse hears notes.** Once it knows what you played, when and how hard, every effect, every camera move and the sound can follow the music on their own.
+
+<table>
+  <tr>
+    <td width="42%"><img src="docs/images/demo.gif" alt="A clip rendered by Pianoverse: notes falling onto the lit keys and sparks rising" width="100%"></td>
+    <td width="58%" valign="top">
+
+**Notes** fall onto the key you pressed. Their length is how long you held it.
+
+**Saber**: a glowing line along the keys, where the notes land.
+
+**Particles**: every note throws sparks from its key; harder notes throw more.
+
+**Light**: the keys you play light up and the room falls into shadow.
+
+**Keyboard tracking**: the keyboard is followed frame by frame, so the notes stay on the right keys even if the phone moved.
+
+  </td>
+  </tr>
+</table>
+
+---
+
+## Eleven looks to start. Yours to finish.
+
+<p align="center">
+  <img src="docs/images/looks.jpg" alt="The same moment of one take in all eleven looks: Lagoon, Concert, Ember, Neon Night, Aurora, Swan, Gold Leaf, Ink, Synthwave, Ocean Gem and Crystal" width="100%">
+</p>
+
+Pick a look and the whole video changes at once. Then tune any of its nine layers and save it as your own preset, so every video on your channel looks like yours.
+
+| Layer | What you can change |
+| --- | --- |
+| **Colours** | 1 colour, 12 colours (one per note name), a gradient by pitch, loudness or time, MIDI tracks or channels, left and right hand, or random. Palettes plus a colour wheel. |
+| **Notes** | Glass, Gem, Round, Solid, Outline or Soft glow; size, rounding, rim, glow; textures (Ice, Onyx, Marble, Gold foil, a moving Crystal flow, or your own image or video); note names and bar lines. |
+| **Saber** | Plasma, Straight, Electric, Soft beam or Flame; brightness, thickness, flicker, its own colour. |
+| **Impact** | The flash and ripple on every key press. |
+| **Particles** | Presets (Explode, Fast playing, High count, High turbulence, Long streaklets, Fountain, Held-note spray, Vortex, Twirl…), sparks, smoke, glitter or stars, turbulence, gravity, wind, size and lifetime. |
+| **Lighting** | Key glow, a glow before a note lands, coloured light on hands and keys, a pulse on bass notes. |
+| **Background** | Your video (darkened, tinted, vignetted), a plain colour, or an image of your own. |
+| **Glow and film** | Bloom, colour fringe and film grain. |
+| **Titles** | An opening title and an end card. |
+
+<table>
+  <tr>
+    <td width="34%"><img src="docs/images/shape-heart.jpg" alt="Sparks rising from the keys and tracing a heart" width="100%"></td>
+    <td width="66%" valign="middle">
+
+### Draw with sparks
+
+Pick a stretch of the music on the timeline and the sparks from the notes played there gather into a shape: a heart for the chorus, a star for the last chord, your channel's logo for the outro. They leave the keys, trace the outline clockwise or anticlockwise, then fall away. Heart, star and music note are built in, or use your own image.
+
+  </td>
+  </tr>
+</table>
+
+---
+
+## Your room becomes a stage
+
+<p align="center"><img src="docs/images/screen-light.jpg" alt="The Light step: the preview with the room dark and the keys lit, and the light presets and controls" width="100%"></p>
+
+Most piano videos are filmed at home under a ceiling lamp. Pianoverse lights the keys you play and lets the room fall into shadow; the notes and sparks stay bright on top. Start from **As filmed**, **Moody room**, **Warm stage** or **Night**, then adjust exposure, contrast, highlights, shadows, warmth and saturation for the whole video.
+
+## One phone on a stand. Shot like a concert.
+
+<p align="center"><img src="docs/images/screen-camera.jpg" alt="The Camera step: the framed preview, the auto camera settings and the shots lane on the timeline" width="100%"></p>
+
+You filmed one wide shot. **Auto camera** turns it into a cut: it cuts on the bar, punches in on loud chords, follows your hands up the keyboard and pulls back for the ending. Shots are **Wide**, **Follow your hands** or **Close-up**, joined by **Cut**, **Glide**, **Punch**, **Dip to black** or **Dip to white**, all snapped to the beat. Frame it **vertical 9:16**, **landscape 16:9** or **square**. Turn auto off and place every shot yourself, if you like. The effects stay sharp when the camera zooms in.
+
+## Sound as good as it looks
+
+<p align="center"><img src="docs/images/screen-sound.jpg" alt="The Sound step: the waveform before and after, and the source, intro, outro and reverb settings" width="100%"></p>
+
+A phone microphone makes a grand sound like an upright in a cupboard. Keep your own recording and give it a room, or let Pianoverse play your notes back on a sampled **concert grand**, or blend the two.
+
+| | |
+| --- | --- |
+| **Sound from** | Your video · Grand piano · Both (with the piano's level) |
+| **Sustain pedal** | Always down · As played · Off |
+| **Intro** | Straight in · Fade in · Open up · Swell |
+| **Outro** | Cut · Fade out · Muffle out · Ring out |
+| **Reverb** | Studio · Concert hall · Church · Cathedral · Plate |
+| **Tone and level** | Bass and treble, and loudness matched to social media (−14 LUFS) |
+
+---
+
+## One take, one sitting
+
+| | | |
+| --- | --- | --- |
+| <img src="docs/images/screen-import.jpg" alt="Import: the video and the project settings"><br>**1 · Import**: drop in the video from your phone and pick the keyboard. Then **Video**: trim and crop. | <img src="docs/images/screen-sync.jpg" alt="Audio: the waveform with every note lined up"><br>**2 · Audio**: add the MIDI from your piano, or let Pianoverse find the notes in the audio. They line themselves up with the video; check by ear. | <img src="docs/images/screen-calibrate.jpg" alt="Calibrate: the four corners on the keyboard"><br>**3 · Calibrate**: mark the corners of the keys once. The keyboard is tracked through the whole clip. |
+| <img src="docs/images/screen-style.jpg" alt="Style: the layers, the live preview and the timeline"><br>**4 · Style**: a look, then any layer, with the preview playing live. Then **Light** and **Camera**. | <img src="docs/images/screen-particles.jpg" alt="Style, particles: the presets and controls"><br>Every layer has its own panel; the timeline holds shape sections and loop ranges. | <img src="docs/images/screen-export.jpg" alt="Export: sizes, format, encoder and the estimate"><br>**5 · Export**: pick where it's going and Pianoverse sets the size, frame rate and sound level. |
+
+### Ready for every feed
+
+| | |
+| --- | --- |
+| **Sizes** | Shorts and Reels 1080×1920 · Landscape 1920×1080 · Square 1080×1080 · 4K vertical 2160×3840 |
+| **Encoder** | NVIDIA NVENC, AMD AMF or Intel Quick Sync, tested in the background; x264 / x265 on the processor if the card can't |
+| **Format** | MP4 in H.264, or H.265 for smaller files; quality High, Medium or Small file; frame rate as filmed, 24, 30 or 60 |
+| **Sound** | Your original audio copied untouched, or the Sound settings and the grand piano rendered at high quality |
 | **For editors** | The effects alone on a transparent background, as ProRes 4444 `.mov`, for DaVinci Resolve or Premiere |
-| **Extras** | Export only the part picked on the timeline · save the current frame as a PNG · show the file in its folder |
+| **Extras** | Export only the part picked on the timeline · save the current frame as a PNG |
 
 ---
 
-## How it works
+## Made for pianists, not for editors
 
-```mermaid
-flowchart LR
-    V[Performance video] --> D[Decode frame]
-    M[MIDI or detected notes] --> N[Notes timeline]
-    V --> T[Keyboard tracking<br/>one homography per frame]
-    D --> G
-    N --> G
-    T --> G
-    subgraph G[GPU renderer · WGSL]
-      direction TB
-      G1[Notes + textures] --> L[Light layer]
-      G2[Saber] --> L
-      G3[Impact flashes + star flares] --> L
-      G4[Particle simulation<br/>compute shader] --> L
-      L --> B[Bloom]
-      B --> C[Composite<br/>grade · relight · soft knee]
-    end
-    C --> P[Live preview]
-    C --> R[Read back frames] --> F[FFmpeg<br/>NVENC · AMF · QSV · x264]
-    F --> E[MP4 / ProRes]
-```
+| | **Pianoverse** | General video editors<br><sub>Premiere Pro, After Effects, CapCut</sub> | Piano visualizers<br><sub>SeeMusic, Keysight</sub> |
+| --- | --- | --- | --- |
+| Starts from your own video | Yes, your take is the picture | Yes | SeeMusic: yes, over your footage. Keysight: its own 3D scene |
+| Knows which note you played | Yes, from MIDI or from the audio | No, every effect is placed by hand | Yes, from MIDI. SeeMusic can also turn audio into MIDI |
+| Camera moves on the music | Cuts on the bar, punches in on loud chords | By hand, with keyframes | Camera moves in their 3D piano scenes |
+| Piano sound | Sampled grand, sustain pedal, reverb, loudness for social | General audio tools, no piano | Keysight makes no sound of its own |
+| Price | **Free** | Premiere and After Effects: subscription. CapCut: free, Pro paid | SeeMusic: free, Pro from $8.99 a month. Keysight: $29.99 |
+| Account needed | **None. No login, no sign-up** | Adobe account for Premiere and After Effects | SeeMusic: App Store. Keysight: Steam |
+| Runs on | Windows 10 and 11 | Windows and Mac | SeeMusic: Mac. Keysight: Windows and Mac |
 
-A few ideas that make it work:
-
-- **Keyboard-space geometry.** Every key, the saber line and every landing point are defined on the keyboard plane and projected into the frame with that frame's tracked homography, so effects stay glued to the keys even when the camera drifts.
-- **Stateless particles.** A particle's position at time *t* is recomputed from the moment its note was hit, inside a compute shader. Any frame can be drawn on its own, which makes scrubbing instant and export identical every time.
-- **Soft blending.** Effects are drawn in an HDR light layer with bloom, then blended in with a soft knee so bright moments do not turn your hands white.
-- **One engine everywhere.** The same WGSL shaders drive the live preview and the export. Export renders each frame offscreen at the output size, reads it back and pipes the raw pixels to FFmpeg, which encodes on the graphics card when it can.
-
----
-
-## Roadmap
-
-- [x] **Milestone 1 — Engine prototype.** GPU renderer reproduces the approved look on the sample video, live.
-- [x] **Milestone 2 — Calibration and tracking.** Mark four corners on any frame, built-in keyboard tracker (drift-free, sub-pixel), manual fixes that blend into neighbouring frames, any keyboard size from 25 to 88 keys.
-- [x] **Milestone 3 — Notes and sync.** MIDI import (tempo maps, velocities, sustain pedal), automatic alignment to the video's audio within a few milliseconds, sync strip with nudging, note detection from audio with Spotify's basic-pitch for videos without MIDI.
-- [x] **Milestone 4 — Style panels and presets.** Eight layers with live controls, note styles and textures, colour modes and palettes, five saber styles, particle motions and shape sections, presets.
-- [x] **Milestone 5 — Export.** Full-quality render with NVENC / AMF / Quick Sync encoding, four sizes, H.264 and H.265, original audio, transparent ProRes effects, selected part only, PNG frames.
-- [ ] **Milestone 6 — Polish.** Signed installer, auto-update, autosave, undo and redo, and keyboard shortcuts (press <kbd>?</kbd> in the app) are in; speed tuning is next.
-- [x] **Milestone 7 — Camera.** A virtual camera over your video: Wide, Follow your hands and Close-up shots, Cut, Glide, Punch, Dip to black and Dip to white transitions on the beat, Auto camera, and vertical, landscape or square frames. Effects stay sharp when zoomed.
-
-**Later:** notes that pass behind your hands · picture shapes and a drawing canvas for particle paths · live mode for streaming · driving a real LED strip on the keyboard · automatic Shorts cuts.
+<sub>Product names belong to their owners. Checked against each product's own store page in October 2026; prices and features change.</sub>
 
 ---
 
 ## Try it
 
-1. Download the latest **`Pianoverse_…_x64-setup.exe`** from [Releases](https://github.com/HetavShah/pianoverse/releases/latest) and install it. From then on Pianoverse updates itself: when a new build is out, click **Install and restart** in the top bar.
-2. Click **New project** and choose your performance video (phone videos in HEVC are converted once, on the graphics card).
-3. **Video**: trim it to the part you want and crop the frame, if you like.
-4. **Audio**: add the MIDI file recorded with the take; it lines itself up with the video's sound (check it by ear with **Play click on each note**). No MIDI? **Detect from audio**. On the **Sound** page, choose how the sound starts and ends and how it sounds.
-5. **Calibrate**: drag the four handles onto the corners of the keys, set the saber line, and track the clip if the camera moved.
-6. **Style**: play it back with every effect and shape each layer. Drag across the timeline to loop a section or add a shape section.
-7. **Export**: pick a size and click **Export video**. Videos are saved in `Videos\Pianoverse` unless you choose another place.
-
-Projects save themselves and appear on the Projects screen.
+1. Download the latest **`Pianoverse_…_x64-setup.exe`** from [Releases](https://github.com/HetavShah/pianoverse/releases/latest) and install it. It's free, with no login and no sign-up. From then on Pianoverse updates itself: when a new build is out, click **Install and restart** in the top bar.
+2. Click **New project** and choose your performance video. iPhone videos in HEVC are converted once, on the graphics card.
+3. Go through the steps along the top: **Import**, **Video**, **Audio**, **Calibrate**, **Style**, **Light**, **Camera**, **Export**. Projects save themselves and appear on the Projects screen.
+4. Videos are saved in `Videos\Pianoverse` unless you pick another place.
 
 To try the sample: start a new project with `samples/interstellar-take1.mp4`, or open `samples/interstellar-take1.pvproj.json` with **Open project file…** and choose the video when asked.
 
@@ -182,11 +170,63 @@ To try the sample: start a new project with `samples/interstellar-take1.mp4`, or
 | --- | --- |
 | `Space` | Play / pause |
 | `←` `→` | Step one frame (hold `Shift` for one second) |
-| `P` | Show render stats |
-| Arrow keys (Calibrate, handle selected) | Nudge the handle 1 px (`Shift` = 5 px) |
-| Scroll / drag / double-click (Calibrate) | Zoom / pan / fit |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
+| `?` | All shortcuts |
 
-Needs Windows 10 or 11 with a DirectX 12 graphics card (developed on an NVIDIA GTX 1650).
+**You need** Windows 10 or 11 (64-bit) and a graphics card that supports DirectX 12; 8 GB of memory or more is best. Developed on an NVIDIA GTX 1650.
+
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+    V[Your video] --> D[Decode frame<br/>FFmpeg]
+    M[MIDI or notes found in the audio] --> N[Notes timeline]
+    V --> T[Keyboard tracking<br/>one homography per frame]
+    N --> CAM[Auto camera<br/>shots on the bars]
+    D --> G
+    N --> G
+    T --> G
+    CAM --> G
+    subgraph G[GPU renderer · WGSL]
+      direction TB
+      G1[Notes + textures] --> L[Light layer]
+      G2[Saber] --> L
+      G3[Impact flashes] --> L
+      G4[Particles and shapes<br/>compute shader] --> L
+      L --> B[Bloom]
+      B --> C[Composite<br/>relight · grade · camera]
+    end
+    N --> S[Sound<br/>grand piano · reverb · loudness]
+    C --> P[Live preview]
+    C --> F[FFmpeg<br/>NVENC · AMF · QSV · x264]
+    S --> F
+    F --> E[MP4 / ProRes]
+```
+
+- **Keyboard-space geometry.** Every key, the saber line and every landing point live on the keyboard plane and are projected into the frame with that frame's tracked homography, so effects stay glued to the keys even when the camera drifts.
+- **Stateless particles.** A particle's position at time *t* is worked out from the moment its note was hit, inside a compute shader, so any frame can be drawn on its own. Scrubbing is instant and an export looks the same every time.
+- **Soft blending.** Effects are drawn in an HDR light layer with bloom, then blended in with a soft knee, so bright moments don't turn your hands white.
+- **One engine everywhere.** The same shaders drive the live preview and the export. Export decodes the video with FFmpeg, renders each frame offscreen at the output size and pipes the pixels back to FFmpeg, which encodes on the graphics card when it can.
+
+---
+
+## Roadmap
+
+- [x] **Engine.** The GPU renderer, live on the sample video.
+- [x] **Calibration and tracking.** Four corners on any frame, a drift-free sub-pixel tracker, manual fixes, 25 to 88 keys.
+- [x] **Notes and sync.** MIDI import (tempo maps, velocities, sustain pedal), automatic alignment to the video's audio, note detection from audio when there's no MIDI.
+- [x] **Style.** Nine layers with live controls, eleven looks, presets, shape sections.
+- [x] **Export.** Graphics-card encoding, four sizes, H.264 and H.265, transparent ProRes, PNG frames.
+- [x] **Camera.** Auto camera on the beat, shots, transitions, vertical, landscape or square.
+- [x] **Light.** Presets and whole-video grading; the room falls dark, the keys stay lit.
+- [x] **Sound.** Sampled grand piano with the sustain pedal, intros and outros, reverb rooms, loudness for social.
+- [ ] **Polish.** Signed installer, auto-update, autosave, undo and redo, shortcuts and the export lock are in; speed tuning is next.
+
+**Later:** notes that pass behind your hands · live mode for streaming · driving a real LED strip on the keyboard · automatic Shorts cuts · a Mac version.
+
+---
 
 ## Build from source
 
@@ -198,29 +238,31 @@ npm run tauri dev     # desktop app with hot reload
 npm run build         # type-check + production web build
 ```
 
-Every push to `main` builds a signed Windows installer on GitHub Actions and publishes it as a release; installed copies of Pianoverse pick it up through the built-in updater.
+Every push to `main` builds a signed Windows installer on GitHub Actions and publishes it as a release; installed copies pick it up through the built-in updater. Changes to `README.md`, `docs/` or `website/` don't.
 
 <details>
 <summary><b>Project layout</b></summary>
 
 ```
 src/
-  App.tsx          the shell: wires the session, playback, preview, autosave and shortcuts together
+  App.tsx          the shell: session, playback, preview, autosave and shortcuts
   engine/          everything that works without a screen
     render/        the WebGPU renderer (scene, particles, light layers, bloom, composite)
+    audio/         sound chain, grand piano, reverb, mixdown, loudness
     ml/            note finders: Transkun (piano) and Basic Pitch (any instrument)
-    audio/ vision/ FFT, sync and beats; keyboard tracking and key fit
+    vision/        keyboard tracking and key fit
     look/          look settings, colours and presets
     shaders/       WGSL
   ui/
     app/           the shell's hooks, undo history, top bar
-    import/ notes/ calibrate/ style/ light/ camera/ export/ home/   one folder per screen
+    import/ notes/ audio/ calibrate/ style/ light/ camera/ export/ home/   one folder per step
     components/    shared widgets      services/   storage, files, audio decoding
-src-tauri/         files, FFmpeg conversion and export, updates (Rust)
+src-tauri/         files, FFmpeg decoding, conversion and export, updates (Rust)
+website/           pianoverse.in: the page, and the tools that render its media from the app
 test/              browser tests, including pixel-exact golden frames
 ```
 
-How it fits together, the design patterns used and how to extend each part: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+How it fits together, the design patterns used and how to extend each part: **[ARCHITECTURE.md](ARCHITECTURE.md)**. The look and feel: **[DESIGN.md](DESIGN.md)**.
 </details>
 
 <details>
@@ -231,18 +273,17 @@ How it fits together, the design patterns used and how to extend each part: **[A
 | App shell | Tauri 2 (Rust), signed installer and auto-update |
 | Interface | React + TypeScript, Vite |
 | Renderer | WebGPU with WGSL shaders |
-| Tracking | Built-in: pyramidal Lucas-Kanade against the marked frame + RANSAC homography, in a Web Worker |
-| Notes | MIDI via @tonejs/midi, or detected from audio with Spotify basic-pitch (TensorFlow.js) |
-| Export | FFmpeg with NVENC, AMF, Quick Sync or x264/x265; ProRes 4444 for transparent effects |
-
-Note textures use CC0 materials from [ambientCG](https://ambientcg.com).
+| Tracking | Pyramidal Lucas-Kanade against the marked frame + RANSAC homography, in a Web Worker |
+| Notes | MIDI via @tonejs/midi, or detected from audio (Transkun, Spotify Basic Pitch) |
+| Sound | Web Audio: sampled grand piano, convolution reverb, loudness in LUFS |
+| Video | FFmpeg: decoding, HEVC conversion, NVENC, AMF, Quick Sync or x264/x265; ProRes 4444 for transparent effects |
 
 </details>
 
 ---
 
-<p align="center"><sub>Made by Hetav Shah</sub></p>
-
 ## Credits
 
-The grand piano is **Salamander Grand Piano V3** by Alexander Holm, licensed under [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) (see `assets/piano/README.md`).
+The grand piano is **Salamander Grand Piano V3** by Alexander Holm, licensed under [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) (see `assets/piano/README.md`). Note textures use CC0 materials from [ambientCG](https://ambientcg.com). Video work by [FFmpeg](https://ffmpeg.org).
+
+<p align="center"><sub>Made by Hetav Shah · <a href="https://pianoverse.in">pianoverse.in</a></sub></p>
