@@ -26,7 +26,13 @@ export type VideoIssue =
   | { kind: 'error'; message: string }
   | { kind: 'missing' };
 
+/** an export in progress: the workspace is locked meanwhile (ui/export/ExportStep.tsx) */
+export interface Exporting { done: number; total: number }
+
 export interface WS {
+  /** an export is running: nothing else may change the project, the video or the renderer */
+  exporting: Exporting | null;
+  setExporting: (e: Exporting | null) => void;
   project: CalibratedProject | null;
   setProject: (p: CalibratedProject, opts?: import('./history').RecordOpts) => void;
   video: PickedVideo | null;

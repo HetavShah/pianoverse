@@ -38,6 +38,10 @@ export default function App() {
   const [project, setProjectState] = useState<CalibratedProject | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
+  // an export in progress locks the workspace: the export owns the video, the renderer and the project meanwhile
+  const [exporting, setExporting] = useState<{ done: number; total: number } | null>(null);
+  const exportingRef = useRef(exporting);
+  exportingRef.current = exporting;
   const library = useLibrary();
   // the orange underline that slides to the chosen step or choice, everywhere in the app
   useEffect(() => installSlidingInk(), []);
@@ -60,6 +64,7 @@ export default function App() {
     resetPlayback: () => late.current.resetPlayback(),
     setDuration: (d) => late.current.setDuration(d),
     forgetThumb: () => late.current.forgetThumb(),
+    busy: () => (exportingRef.current ? 'An export is running. Finish or cancel it first.' : null),
   });
   const { route, step, video, videoIssue } = session;
   const videoUrl = video?.url ?? null;
@@ -84,7 +89,7 @@ export default function App() {
   importMidi.current = notes.importMidi;
 
   useShortcuts(videoRef, {
-    active: inProject, fps: project?.video.fps ?? 30, canLeaveImport: ready,
+    active: inProject && !exporting, fps: project?.video.fps ?? 30, canLeaveImport: ready,
     undo, redo, goStep: session.goStep, togglePlay: playback.togglePlay, seek: playback.seek,
     trim: project && playback.duration ? trimRange(project, playback.duration) : null,
     loop: playback.loop, setLoop: playback.setLoop,
@@ -105,7 +110,24 @@ export default function App() {
     presets: library.presets, defaultPresetId: library.defaultPresetId, refreshPresets: library.refreshPresets,
     goStep: session.goStep, goHome: session.goHome, brand: library.brand, setBrand: library.setBrand,
     inspect: preview.inspect, setInspect: preview.setInspect, redraw: () => preview.redraw(), sound,
+    exporting, setExporting,
   };
+
+  // closing the window during an export asks first
+  useEffect(() => {
+    if (!exporting || !('__TAURI_INTERNALS__' in window)) return;
+    let off: (() => void) | null = null, gone = false;
+    (async () => {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const { ask } = await import('@tauri-apps/plugin-dialog');
+      const un = await getCurrentWindow().onCloseRequested(async (e) => {
+        const stop = await ask('An export is running. Stop it and close Pianoverse?', { title: 'Pianoverse', kind: 'warning', okLabel: 'Stop and close', cancelLabel: 'Keep exporting' });
+        if (!stop) e.preventDefault();
+      });
+      if (gone) un(); else off = un;
+    })().catch(() => {});
+    return () => { gone = true; off?.(); };
+  }, [!!exporting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the steps that draw with the graphics card need it
   const gpu = (el: JSX.Element) => (preview.gpuError ? <div className="notice">This window can't use the graphics card: {preview.gpuError}</div> : el);
@@ -116,6 +138,7 @@ export default function App() {
         inProject={inProject} project={project} step={step} ready={ready} goStep={session.goStep} goHome={session.goHome}
         canUndo={history.canUndo} canRedo={history.canRedo} undo={undo} redo={redo} saveText={autosave.text}
         gpuName={preview.gpuName} gpuError={preview.gpuError}
+        exporting={exporting}
         onShortcuts={() => setShortcuts(true)} onSaveFile={() => project && saveProject(project, project.video.file).catch(toastError)}
       />
 

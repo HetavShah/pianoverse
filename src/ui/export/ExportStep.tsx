@@ -39,11 +39,13 @@ export default function ExportStep({ ws }: { ws: WS }) {
     })().catch(() => {});
   }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // a preview of the current frame
+  // the thumbnail borrows the renderer (its size and view) for a moment: an export waits for it to give it back
+  const thumbJob = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     const r = ws.renderer, v = ws.videoEl.current;
-    if (!r || !v || !project || run.kind === 'running') return;
+    if (!r || !v || !project || run.kind === 'running' || ws.exporting) return;
     let stop = false;
-    (async () => {
+    const job = (async () => {
       r.setProject(project);
       await r.texturesReady?.();
       const old = r.scaleFactor;
@@ -60,6 +62,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
         setThumb(c.toDataURL('image/jpeg', 0.85));
       } finally { if (cam) { r.setView(null); r.setOutput(oldOut); } r.setScale(old); }
     })().catch(() => {});
+    thumbJob.current = job;
     return () => { stop = true; };
   }, [ws.renderer, project?.id, ws.time]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -95,6 +98,9 @@ export default function ExportStep({ ws }: { ws: WS }) {
     if (!sink) { setRun({ kind: 'error', message: 'Exporting needs the Pianoverse desktop app.' }); return; }
     cancel.current = false;
     setRun({ kind: 'running', p: null });
+    // the workspace is locked from here to the end (steps, Projects, undo, shortcuts, opening files)
+    ws.setExporting({ done: 0, total: 0 });
+    await thumbJob.current;
     const t0 = performance.now();
     let note: string | undefined;
     try {
@@ -103,13 +109,15 @@ export default function ExportStep({ ws }: { ws: WS }) {
       const hold = <T,>(job: () => Promise<T>): Promise<T> => (navigator.locks ? navigator.locks.request('pianoverse-export', job) as Promise<T> : job());
       const files = await hold(() => runExport({
         renderer: r, video: v, project, duration, settings: s, encoders: enc, sink, range: part,
-        onProgress: (p) => { if (p.note) note = p.note; setRun({ kind: 'running', p }); if (p.preview) setThumb(p.preview); },
+        onProgress: (p) => { if (p.note) note = p.note; setRun({ kind: 'running', p }); if (p.preview) setThumb(p.preview); ws.setExporting({ done: p.done, total: p.total }); },
         cancelled: () => cancel.current,
       }));
       setRun({ kind: 'done', files, secs: (performance.now() - t0) / 1000, note });
     } catch (e) {
       const m = String((e as Error)?.message ?? e);
       setRun(m === 'cancelled' ? { kind: 'idle' } : { kind: 'error', message: m });
+    } finally {
+      ws.setExporting(null);
     }
   };
 
@@ -220,7 +228,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
             {ws.sound.active ? (
               <div className="ex-opt">
                 <span><b>Sound</b><small>Your Audio settings{soundNote ? ` · ${soundNote}` : ''}</small></span>
-                <button type="button" className="link inline small-text" onClick={() => ws.goStep('audio')}>Change</button>
+                <button type="button" className="link inline small-text" onClick={() => ws.goStep('audio')} disabled={running}>Change</button>
               </div>
             ) : (
               <label className="ex-opt">

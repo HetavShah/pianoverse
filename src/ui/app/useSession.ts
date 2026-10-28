@@ -25,6 +25,8 @@ export interface SessionDeps {
   defaultPreset: () => Preset;
   importMidi: (m: PickedMidi) => void;
   forgetThumb: () => void;
+  /** why the session can't change now (an export is running), or null */
+  busy?: () => string | null;
 }
 
 /** the step a reopened project continues from */
@@ -89,6 +91,8 @@ export function useSession(deps: SessionDeps) {
 
   /** files chosen or dropped: a project file, a video (with its MIDI), or a MIDI file for the open project */
   const openItems = (items: Picked[]) => {
+    const busy = d.current.busy?.();
+    if (busy) { toast(busy, { kind: 'error' }); return; }
     const proj = items.find((i) => i.kind === 'project');
     const vid = items.find((i): i is PickedVideo => i.kind === 'video');
     const mid = items.find((i): i is PickedMidi => i.kind === 'midi');
@@ -174,12 +178,14 @@ export function useSession(deps: SessionDeps) {
   };
 
   const goStep = (s: Step) => {
+    if (d.current.busy?.()) return;
     const { project: p, time, pause } = d.current;
     if (s === 'export' || s === 'calibrate') pause();
     if (s === 'calibrate' && p && !p.calibration) d.current.setProjectState({ ...p, calibration: calibrationFromTracking(p, time) });
     setStep(s);
   };
-  const goHome = () => { d.current.pause(); setRoute('home'); setHomeKey((k) => k + 1); };
+  const goHome = () => {
+    if (d.current.busy?.()) return; d.current.pause(); setRoute('home'); setHomeKey((k) => k + 1); };
   const startNewProject = () => {
     d.current.forgetThumb(); d.current.pause(); d.current.setProjectState(null);
     setVideo(null); setVideoIssue(null); d.current.resetPlayback(); setRoute('project'); setStep('import');

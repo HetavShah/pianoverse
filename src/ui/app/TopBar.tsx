@@ -25,8 +25,12 @@ export default function TopBar(props: {
   gpuError: string | null;
   onShortcuts: () => void;
   onSaveFile: () => void;
+  /** an export is running: the steps, Projects, undo and updates wait */
+  exporting?: { done: number; total: number } | null;
 }) {
-  const { inProject, project, step, ready } = props;
+  const { inProject, project, step } = props;
+  const locked = !!props.exporting;
+  const ready = props.ready && !locked;
   const [menu, setMenu] = useState(false);
   const updater = useUpdater();
   // the first steps are done in order; the rest are rooms visited in any order
@@ -35,14 +39,14 @@ export default function TopBar(props: {
 
   return (
     <header className="topbar">
-      <button type="button" className="brand" onClick={props.goHome} title="Projects">Pianoverse</button>
+      <button type="button" className="brand" onClick={props.goHome} disabled={locked} title={locked ? 'Finish or cancel the export first' : 'Projects'}>Pianoverse</button>
       {inProject && <span className="project-name" title={project?.name}>{project?.name ?? 'New project'}</span>}
       {inProject && (
         <nav className="stepper" aria-label="Steps">
           {/* icons only; the step you're on slides open to show its name (the orange line under it: slidingInk.ts) */}
           <span className="trail">
             {STEPS.slice(0, FLOW_STEPS).map((s) => (
-              <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done(s.id) ? ' done' : '')} disabled={s.id !== 'import' && !ready}
+              <button key={s.id} type="button" className={'step-btn' + (step === s.id ? ' on' : '') + (done(s.id) ? ' done' : '')} disabled={locked || (s.id !== 'import' && !ready)}
                 onClick={() => props.goStep(s.id)} aria-current={step === s.id ? 'step' : undefined} title={s.label} aria-label={s.label + (done(s.id) ? ' (done)' : '')}>
                 <Icon name={s.id} size={17} /><span className="lbl"><span>{s.label}</span></span>
               </button>
@@ -59,18 +63,19 @@ export default function TopBar(props: {
         </nav>
       )}
       <div className="top-right">
-        <UpdatePill phase={updater.phase} />
+        {!locked && <UpdatePill phase={updater.phase} />}
         {inProject && project && (
           <div className="undo-redo">
-            <button type="button" className="btn icon ghost" onClick={props.undo} disabled={!props.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
+            <button type="button" className="btn icon ghost" onClick={props.undo} disabled={locked || !props.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
             </button>
-            <button type="button" className="btn icon ghost" onClick={props.redo} disabled={!props.canRedo} aria-label="Redo" title="Redo (Ctrl+Y)">
+            <button type="button" className="btn icon ghost" onClick={props.redo} disabled={locked || !props.canRedo} aria-label="Redo" title="Redo (Ctrl+Y)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m15 14 5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></svg>
             </button>
           </div>
         )}
-        {inProject ? <span className="saved dim">{props.saveText}</span> : <span className="gpu">{props.gpuError ? 'WebGPU unavailable' : props.gpuName}</span>}
+        {props.exporting ? <span className="exporting-pill" role="status"><span className="spinner" />Exporting · {props.exporting.done.toLocaleString('en-US')} / {props.exporting.total.toLocaleString('en-US')}</span>
+          : inProject ? <span className="saved dim">{props.saveText}</span> : <span className="gpu">{props.gpuError ? 'WebGPU unavailable' : props.gpuName}</span>}
         <div className="menu-wrap">
           <button type="button" className="btn icon" onClick={() => setMenu(!menu)} aria-label="Settings" title="Settings">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
@@ -78,7 +83,7 @@ export default function TopBar(props: {
           {menu && (
             <div className="menu" onMouseLeave={() => setMenu(false)}>
               <div className="menu-head"><b>Pianoverse {updater.version && `v${updater.version}`}</b><small>{updateStatusText(updater.phase) || (inTauri() ? '' : 'Browser preview')}</small></div>
-              {inTauri() && <button type="button" onClick={() => updater.check()}><Icon name="update" />Check for updates</button>}
+              {inTauri() && <button type="button" disabled={locked} onClick={() => updater.check()}><Icon name="update" />Check for updates</button>}
               <button type="button" onClick={() => { setMenu(false); props.onShortcuts(); }}><Icon name="shortcuts" />Keyboard shortcuts <kbd>?</kbd></button>
               {project && <button type="button" onClick={() => { setMenu(false); props.onSaveFile(); }}><Icon name="save" />Save project file…</button>}
               <div className="menu-foot dim">{props.gpuError ? `Graphics: ${props.gpuError}` : `Graphics: ${props.gpuName || '…'}`}</div>
