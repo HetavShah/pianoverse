@@ -105,6 +105,7 @@ export function encoderNote(e: Encoders | null, gpu: string, codec: 'h264' | 'he
   const card = vendor === 'nvenc' ? 'NVIDIA NVENC' : 'AMD AMF';
   if (/driver does not support|minimum required|nvenc API version|driver version/i.test(why)) return `${card} can't be used: your graphics driver is too old for it. Updating the driver should make exports faster. (${why})`;
   if (/no capable devices|no nvenc capable|not supported|cannot load nvcuda|OpenEncodeSession.*failed/i.test(why)) return `${card} can't be used: this graphics card has no video encoder, or Windows isn't giving Pianoverse access to it. (${why})`;
+  if (/invalid param|invalid argument/i.test(why)) return `${card} can't be used: the card turned down every setting Pianoverse tried, even the simplest. Updating the graphics driver may help. (${why})`;
   return `${card} can't be used. (${why})`;
 }
 

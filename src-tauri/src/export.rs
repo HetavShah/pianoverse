@@ -38,19 +38,54 @@ pub struct ExportOpts {
     pub duration: f64,
 }
 
-/// The encoder and its quality settings, the same for an export and for the test at start-up.
-pub fn encoder_args(encoder: &str, quality: &str) -> Vec<String> {
+/// The ways to ask each encoder for the export's quality, best first. Graphics cards differ in what they accept (an
+/// older NVIDIA card refuses the newer tuning options with "Invalid argument"), so the start-up test tries them in
+/// order and the export uses the first one this computer's card took (CHOSEN).
+pub fn encoder_variants(encoder: &str, quality: &str) -> Vec<Vec<String>> {
     let s = |v: &str| v.to_string();
     let qi = match quality { "medium" => 1, "small" => 2, _ => 0 };
     let pick = |v: [i32; 3]| v[qi].to_string();
+    // a plain bit rate, for encoders that take no quality target: 1080x1920 at 30 fps
+    let rate = [s("-b:v"), s(["16M", "10M", "6M"][qi]), s("-maxrate"), s(["24M", "15M", "9M"][qi]), s("-bufsize"), s(["32M", "20M", "12M"][qi])];
+    let c = |extra: Vec<String>| { let mut v = vec![s("-c:v"), s(encoder)]; v.extend(extra); v };
     match encoder {
-        "h264_nvenc" | "hevc_nvenc" => vec![s("-c:v"), s(encoder), s("-preset"), s("p5"), s("-tune"), s("hq"), s("-rc"), s("vbr"), s("-cq"), pick([19, 23, 28]), s("-b:v"), s("0")],
-        "h264_amf" | "hevc_amf" => vec![s("-c:v"), s(encoder), s("-quality"), s("quality"), s("-rc"), s("cqp"), s("-qp_i"), pick([18, 22, 27]), s("-qp_p"), pick([20, 24, 29])],
-        "h264_qsv" | "hevc_qsv" => vec![s("-c:v"), s(encoder), s("-preset"), s("slower"), s("-global_quality"), pick([20, 24, 29])],
-        "libx265" => vec![s("-c:v"), s("libx265"), s("-preset"), s("medium"), s("-crf"), pick([20, 24, 29])],
-        "prores_ks" => vec![s("-c:v"), s("prores_ks"), s("-profile:v"), s("4444"), s("-vendor"), s("apl0")],
-        _ => vec![s("-c:v"), s("libx264"), s("-preset"), s("medium"), s("-crf"), pick([18, 22, 27])],
+        "h264_nvenc" | "hevc_nvenc" => vec![
+            c(vec![s("-preset"), s("p5"), s("-tune"), s("hq"), s("-rc"), s("vbr"), s("-cq"), pick([19, 23, 28]), s("-b:v"), s("0")]),
+            c(vec![s("-preset"), s("p4"), s("-rc"), s("vbr"), s("-cq"), pick([19, 23, 28]), s("-b:v"), s("0"), s("-bf"), s("0")]),
+            c(rate.to_vec()),
+        ],
+        "h264_amf" | "hevc_amf" => vec![
+            c(vec![s("-quality"), s("quality"), s("-rc"), s("cqp"), s("-qp_i"), pick([18, 22, 27]), s("-qp_p"), pick([20, 24, 29])]),
+            c(rate.to_vec()),
+        ],
+        "h264_qsv" | "hevc_qsv" => vec![
+            c(vec![s("-preset"), s("slower"), s("-global_quality"), pick([20, 24, 29])]),
+            c(vec![s("-preset"), s("medium"), s("-global_quality"), pick([20, 24, 29])]),
+            c(rate.to_vec()),
+        ],
+        "libx265" => vec![c(vec![s("-preset"), s("medium"), s("-crf"), pick([20, 24, 29])])],
+        "prores_ks" => vec![c(vec![s("-profile:v"), s("4444"), s("-vendor"), s("apl0")])],
+        _ => vec![vec![s("-c:v"), s("libx264"), s("-preset"), s("medium"), s("-crf"), pick([18, 22, 27])]],
     }
+}
+
+/// which of encoder_variants each encoder took in the start-up test (none tested yet: the first)
+static CHOSEN: std::sync::OnceLock<Mutex<std::collections::HashMap<String, usize>>> = std::sync::OnceLock::new();
+fn chosen() -> &'static Mutex<std::collections::HashMap<String, usize>> { CHOSEN.get_or_init(|| Mutex::new(Default::default())) }
+
+/// The encoder and its quality settings for an export: the way this computer's card took in the test.
+pub fn encoder_args(encoder: &str, quality: &str) -> Vec<String> {
+    let mut v = encoder_variants(encoder, quality);
+    let i = chosen().lock().ok().and_then(|m| m.get(encoder).copied()).unwrap_or(0).min(v.len() - 1);
+    v.swap_remove(i)
+}
+
+/// FFmpeg's reason in a failure, without its generic last lines ("Task finished…", "Nothing was written…")
+fn reason(text: &str) -> String {
+    let generic = ["Task finished", "Terminating thread", "Nothing was written", "Conversion failed", "Error while", "Could not open encoder before EOF", "Error sending frames"];
+    let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty() && !generic.iter().any(|g| l.contains(g))).collect();
+    let keep = if lines.is_empty() { text.lines().map(str::trim).filter(|l| !l.is_empty()).collect() } else { lines };
+    keep.iter().rev().take(3).rev().cloned().collect::<Vec<_>>().join(" ")
 }
 
 /// The FFmpeg arguments for an export (input frames on stdin).
@@ -178,14 +213,15 @@ pub async fn export_encoders(app: AppHandle) -> Result<Encoders, String> {
     let exe = ensure_ffmpeg(&app).await?;
     tauri::async_runtime::spawn_blocking(move || {
         let failed = Mutex::new(std::collections::BTreeMap::<String, String>::new());
-        let works = |enc: &str| -> bool {
+        // one test encode with these settings: Ok, or FFmpeg's reason
+        let attempt = |args: &[String]| -> Result<(), String> {
             let mut cmd = Command::new(&exe);
             cmd.args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=1080x1920:r=30:d=1", "-frames:v", "30", "-pix_fmt", "yuv420p"])
-                .args(encoder_args(enc, "high"))
+                .args(args)
                 .args(["-f", "null", "-"]);
             cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
             hide_window(&mut cmd);
-            let Ok(mut child) = cmd.spawn() else { return false };
+            let mut child = cmd.spawn().map_err(|e| e.to_string())?;
             // FFmpeg's reason, read as it comes (so it can't block on a full pipe)
             let stderr = child.stderr.take();
             let reader = std::thread::spawn(move || {
@@ -194,26 +230,39 @@ pub async fn export_encoders(app: AppHandle) -> Result<Encoders, String> {
                 text
             });
             let start = std::time::Instant::now();
-            let ok = loop {
+            loop {
                 match child.try_wait() {
-                    Ok(Some(st)) => break st.success(),
+                    Ok(Some(st)) => {
+                        let text = reader.join().unwrap_or_default();
+                        return if st.success() { Ok(()) } else { Err(reason(&text)) };
+                    }
                     Ok(None) if start.elapsed() > std::time::Duration::from_secs(12) => {
                         let _ = child.kill();
                         let _ = child.wait();
-                        if let Ok(mut f) = failed.lock() { f.insert(enc.to_string(), "It didn't finish a test encode within 12 seconds.".into()); }
-                        return false;
+                        return Err("It didn't finish a test encode within 12 seconds.".into());
                     }
                     Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
-                    Err(_) => break false,
+                    Err(e) => return Err(e.to_string()),
                 }
-            };
-            let text = reader.join().unwrap_or_default();
-            if !ok && !enc.starts_with("lib") && enc != "prores_ks" {
-                let why: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
-                let why = why.iter().rev().take(3).rev().cloned().collect::<Vec<_>>().join(" ");
-                if let Ok(mut f) = failed.lock() { f.insert(enc.to_string(), if why.is_empty() { "It failed a test encode.".into() } else { why }); }
             }
-            ok
+        };
+        // each way of asking the encoder in turn: the first one that works is the one exports use
+        let works = |enc: &str| -> bool {
+            let mut first_err: Option<String> = None;
+            for (i, args) in encoder_variants(enc, "high").iter().enumerate() {
+                match attempt(args) {
+                    Ok(()) => {
+                        if let Ok(mut m) = chosen().lock() { m.insert(enc.to_string(), i); }
+                        return true;
+                    }
+                    Err(e) => { first_err.get_or_insert(e); }
+                }
+            }
+            if !enc.starts_with("lib") && enc != "prores_ks" {
+                let why = first_err.filter(|e| !e.is_empty()).unwrap_or_else(|| "It failed a test encode.".into());
+                if let Ok(mut f) = failed.lock() { f.insert(enc.to_string(), why); }
+            }
+            false
         };
         let pick = |list: &[&str]| -> Vec<String> { list.iter().filter(|e| works(e)).map(|e| e.to_string()).collect() };
         let h264 = pick(&["h264_nvenc", "h264_amf", "h264_qsv", "libx264"]);
@@ -439,6 +488,28 @@ pub fn show_in_folder(path: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reason_keeps_the_encoders_own_words() {
+        // what an NVIDIA laptop printed: the useful line came first, the generic ones last
+        let text = "[h264_nvenc @ 000002ce17bf6f00] InitializeEncoder failed: invalid param (8): Invalid Level.\n\
+            [vost#0:0/h264_nvenc @ 000002ce17bf6f00] Task finished with error code: -22 (Invalid argument)\n\
+            [vost#0:0/h264_nvenc @ 000002ce17bf6f00] Terminating thread with return code -22 (Invalid argument)\n\
+            [out#0/null @ 000002ce17bf7980] Nothing was written into output file, because at least one of its streams received no packets.";
+        assert_eq!(reason(text), "[h264_nvenc @ 000002ce17bf6f00] InitializeEncoder failed: invalid param (8): Invalid Level.");
+        // only generic lines: they're kept rather than nothing
+        assert!(reason("[x] Task finished with error code: -22 (Invalid argument)").contains("Task finished"));
+    }
+
+    #[test]
+    fn every_hardware_encoder_has_a_plain_fallback() {
+        for e in ["h264_nvenc", "hevc_nvenc", "h264_amf", "h264_qsv", "hevc_qsv"] {
+            let v = encoder_variants(e, "high");
+            assert!(v.len() >= 2, "{e}");
+            assert!(v.last().unwrap().contains(&"-b:v".to_string()), "{e}: the last way is a plain bit rate");
+        }
+        assert_eq!(encoder_args("libx264", "high")[1], "libx264");
+    }
     #[test]
     fn print_args() {
         let o = ExportOpts {
