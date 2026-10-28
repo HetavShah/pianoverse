@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pianoverse · The video editor made for pianists</title>
+<meta name="description" content="Drop in the video you filmed on your phone. Pianoverse finds every note you played and lights it up on your own keys, with sparks, camera moves and a grand piano sound. Free for Windows, no sign-up.">
+<link rel="canonical" href="https://pianoverse.in/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#161615">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pianoverse.in/">
+<meta property="og:title" content="Pianoverse · The video editor made for pianists">
+<meta property="og:description" content="You played it. Now let them see it. Free for Windows, no sign-up.">
+<meta property="og:image" content="https://pianoverse.in/og.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://pianoverse.in/og.jpg">
+<link rel="preload" href="assets/fonts/syncopate-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+/* Pianoverse website. Set like the app: the Musica Viva poster.
+   Warm blacks, paper ink, 1px rules, square corners, one vermilion thing per region. */
+@font-face { font-family: 'Syncopate'; font-weight: 400; font-display: swap; src: url(assets/fonts/syncopate-400.woff2) format('woff2'); }
+@font-face { font-family: 'Syncopate'; font-weight: 700; font-display: swap; src: url(assets/fonts/syncopate-700.woff2) format('woff2'); }
+@font-face { font-family: 'Archivo'; font-weight: 100 900; font-display: swap; src: url(assets/fonts/archivo.woff2) format('woff2'); }
+
+:root {
+  --live: #e9542d; --live-hover: #f2683f;
+  --ink: #161615; --raise: #1f1e1c; --raise-2: #292825; --stage: #0c0c0b;
+  --paper: #f2efe8; --paper-2: #d8d4cb; --stone: #a29f98; --dim: #8a8781;
+  --rule: #2b2a27; --rule-2: #3a3834; --bone: #c9c4b8; --lane: #262523;
+  --note-hi: #4fd1b8; --note-lo: #4f7fd6;
+  --display: 'Syncopate', 'Archivo', sans-serif;
+  --body: 'Archivo', 'Segoe UI', system-ui, sans-serif;
+  --gut: 56px; --max: 1440px;
+}
+@media (max-width: 1100px) { :root { --gut: 32px; } }
+@media (max-width: 760px) { :root { --gut: 20px; } }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--ink); scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--ink); color: var(--paper); font: 400 16px/1.5 var(--body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+img, video, canvas { display: block; max-width: 100%; }
+img { height: auto; }
+a { color: inherit; }
+::selection { background: var(--live); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--live); outline-offset: 3px; }
+h1, h2, h3, p, dl, dd, ol, ul, figure { margin: 0; }
+ol, ul { padding: 0; list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 var(--gut); }
+.kicker { font: 700 13px/1 var(--display); letter-spacing: 0.08em; color: var(--stone); text-transform: uppercase; }
+.h2 { font: 700 clamp(26px, 3.6vw, 52px)/1.02 var(--display); letter-spacing: 0.02em; text-transform: uppercase; }
+.lede { font-size: 18px; line-height: 1.55; color: var(--stone); max-width: 640px; }
+.cap { font-size: 12.5px; line-height: 1.45; color: var(--stone); }
+.label { font-size: 12px; font-weight: 600; color: var(--stone); }
+.num { font: 400 18px/1.1 var(--display); font-feature-settings: 'tnum' 1; }
+section { border-top: 1px solid var(--rule); }
+section[id] { scroll-margin-top: 56px; }
+.sec { padding: 96px 0; }
+@media (max-width: 760px) {
+  .sec { padding: 56px 0; }
+  .kicker { font-size: 11px; }
+  .lede { font-size: 15.5px; }
+}
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 52px; padding: 0 24px; background: var(--live); color: var(--ink); font: 700 16px/1 var(--body); text-decoration: none; white-space: nowrap; transition: background .12s; }
+.btn:hover { background: var(--live-hover); }
+.btn.small { height: 36px; padding: 0 16px; font-size: 13.5px; }
+.textlink { display: inline-flex; align-items: center; gap: 10px; height: 44px; font-weight: 600; font-size: 15px; text-decoration: none; border-bottom: 1px solid var(--rule-2); }
+.textlink:hover { border-color: var(--paper); }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 20; background: var(--ink); border-bottom: 1px solid var(--rule); }
+.nav .wrap { height: 64px; display: flex; align-items: center; gap: 36px; }
+.wordmark { font: 800 14px/1 var(--body); letter-spacing: 0.12em; text-decoration: none; }
+.nav-links { display: flex; gap: 28px; font-size: 13.5px; font-weight: 600; }
+.nav-links a { color: var(--stone); text-decoration: none; padding: 8px 0; }
+.nav-links a:hover { color: var(--paper); }
+.nav .grow { flex-grow: 1; }
+.menu-btn { display: none; width: 44px; height: 44px; margin-right: -10px; align-items: center; justify-content: center; }
+.menu { display: none; }
+@media (max-width: 900px) {
+  .nav .wrap { height: 56px; }
+  .nav-links, .nav .btn { display: none; }
+  .menu-btn { display: flex; }
+  .menu { position: absolute; left: 0; right: 0; top: 100%; background: var(--ink); border-bottom: 1px solid var(--rule); padding: 8px var(--gut) 20px; }
+  .nav.open .menu { display: block; }
+  .menu a { display: block; padding: 14px 0; border-top: 1px solid var(--rule); font-weight: 600; text-decoration: none; }
+  .menu a:first-child { border-top: 0; }
+  .menu .btn { display: flex; margin-top: 12px; }
+}
+
+/* hero */
+.hero { border-top: 0; }
+.hero-head { padding: 56px 0 40px; display: flex; flex-direction: column; gap: 22px; }
+.hero h1 { font: 700 clamp(26px, 4.45vw, 64px)/0.98 var(--display); letter-spacing: 0.02em; text-transform: uppercase; }
+.hero-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 48px; margin-top: 4px; }
+.hero-row p { font-size: 19px; line-height: 1.5; color: var(--paper-2); max-width: 640px; }
+.hero-cta { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; flex: none; }
+.hero-cta .row { display: flex; align-items: center; gap: 28px; }
+.compare { position: relative; background: var(--stage); aspect-ratio: 16 / 9; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
+.compare canvas, .compare img.poster { position: absolute; inset: 0; width: 100%; height: 100%; }
+.compare video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.compare .split { position: absolute; top: 0; bottom: 0; left: calc(var(--split) * 100%); width: 2px; margin-left: -1px; background: var(--live); pointer-events: none; }
+.compare .grip { position: absolute; top: 50%; left: calc(var(--split) * 100%); width: 36px; height: 36px; margin: -18px 0 0 -18px; background: var(--live); color: var(--ink); display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.compare input[type=range] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; touch-action: pan-y; }
+.compare input[type=range]:focus-visible + .grip { outline: 2px solid var(--paper); outline-offset: 3px; }
+.tag { position: absolute; top: 16px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; padding: 5px 9px; pointer-events: none; }
+.tag.l { left: 16px; background: rgba(12, 12, 11, 0.72); color: var(--paper); }
+.tag.r { right: 16px; background: var(--paper); color: var(--ink); }
+.sound-toggle { position: absolute; right: 16px; bottom: 16px; z-index: 2; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 12px; background: var(--paper); color: var(--ink); font-size: 13.5px; font-weight: 700; }
+.sound-toggle[aria-pressed=true] { background: var(--live); }
+.timeline { display: flex; height: 72px; border: 1px solid var(--rule); border-top: 0; }
+.timeline .tc { width: 200px; flex: none; border-right: 1px solid var(--rule); display: flex; flex-direction: column; justify-content: center; padding-left: 20px; gap: 3px; }
+.timeline .tc b { font: 400 22px/1 var(--display); font-feature-settings: 'tnum' 1; }
+.band { position: relative; flex-grow: 1; overflow: hidden; }
+.band canvas { width: 100%; height: 100%; }
+.playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--live); will-change: transform; }
+@media (max-width: 900px) {
+  .hero-row { flex-direction: column; align-items: flex-start; gap: 24px; }
+  .hero-cta { align-items: flex-start; }
+}
+@media (max-width: 760px) {
+  .hero-head { padding: 36px 0 28px; gap: 14px; }
+  .hero-row p { font-size: 16px; }
+  .hero-cta, .timeline, .hero .kicker { display: none; }
+  .hero .wrap.media { padding: 0; }
+  .compare { aspect-ratio: 4 / 5; }
+  .tag { display: none; }
+  .hero-foot { display: flex !important; }
+}
+.hero-foot { display: none; padding: 20px var(--gut) 8px; justify-content: space-between; align-items: center; }
+
+/* problem */
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--rule); margin-top: 56px; }
+.three article { padding: 28px 40px 32px; display: flex; flex-direction: column; gap: 14px; border-left: 1px solid var(--rule); }
+.three article:first-child { padding-left: 0; border-left: 0; }
+.three article:last-child { padding-right: 0; }
+.three .n { font: 700 18px/1 var(--display); color: var(--dim); }
+.three h3 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+.three p { font-size: 15.5px; line-height: 1.6; color: var(--stone); }
+.verdict { margin-top: auto; font-size: 13px; font-weight: 600; padding-top: 12px; border-top: 2px solid var(--rule-2); align-self: flex-start; }
+.turn { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--rule); display: flex; align-items: center; gap: 24px; }
+.turn i { width: 40px; height: 3px; background: var(--live); flex: none; }
+.turn p { font: 700 clamp(15px, 1.6vw, 22px)/1.3 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+@media (max-width: 900px) {
+  .three { grid-template-columns: 1fr; margin-top: 32px; }
+  .three article { padding: 22px 0 24px; border-left: 0; border-top: 1px solid var(--rule); }
+  .three article:first-child { border-top: 0; }
+  .turn { flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 24px; padding-top: 24px; }
+}
+
+/* idea */
+/* heading across the full width; the lede below it on the left, a side note on the right */
+.split-head { display: grid; grid-template-columns: minmax(0, 1fr) 420px; column-gap: 64px; row-gap: 20px; align-items: end; }
+.split-head > div:first-child { display: contents; }
+.split-head .kicker, .split-head .h2 { grid-column: 1 / -1; }
+.split-head .lede { grid-column: 1; grid-row: 3; margin-top: 4px; }
+.split-head > :last-child { grid-column: 2; grid-row: 3; }
+.readouts { display: grid; grid-template-columns: minmax(0, 1fr) auto; border-top: 1px solid var(--rule); }
+.readouts dt, .readouts dd { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.readouts dt { font-size: 14px; color: var(--stone); }
+.readouts dd { font: 400 18px/1.2 var(--display); text-align: right; }
+.score { margin-top: 48px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 160px minmax(0, 1fr); }
+.score .names { border-right: 1px solid var(--rule); display: flex; flex-direction: column; }
+.score .names div { display: flex; flex-direction: column; justify-content: center; padding-left: 4px; }
+.score .names b { font-size: 13.5px; }
+.score .names span { font-size: 12px; color: var(--stone); }
+.score .lanes { position: relative; overflow: hidden; }
+.score canvas { width: 100%; height: 100%; display: block; }
+.score figcaption { grid-column: 1 / -1; }
+@media (max-width: 900px) {
+  .split-head { grid-template-columns: 1fr; }
+  .split-head .lede, .split-head > :last-child { grid-column: 1; grid-row: auto; }
+  .split-head > :last-child:not(.lede) { margin-top: 8px; }
+  .score { grid-template-columns: 1fr; margin-left: calc(var(--gut) * -1); margin-right: calc(var(--gut) * -1); }
+  .score .names { display: none; }
+  .lane-label { display: flex !important; }
+}
+.lane-label { display: none; position: absolute; left: var(--gut); gap: 8px; align-items: baseline; font-size: 12px; pointer-events: none; }
+.lane-label span { color: var(--stone); font-size: 11.5px; }
+
+/* looks */
+.looks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px 16px; margin-top: 48px; }
+.looks figure { display: flex; flex-direction: column; gap: 10px; }
+.looks img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--stage); }
+.looks figcaption { display: flex; justify-content: space-between; align-items: baseline; padding-top: 8px; border-top: 2px solid var(--rule-2); }
+.looks figure:first-child figcaption { border-top-color: var(--live); }
+.looks figcaption b { font-size: 14px; }
+.looks figcaption span { font-size: 11px; font-weight: 600; color: var(--dim); font-feature-settings: 'tnum' 1; }
+.looks .own { aspect-ratio: 16 / 9; background: var(--stage); border: 1px solid var(--rule); display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 24px; }
+.looks .own b { font: 700 16px/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
+.layers { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); border-top: 1px solid var(--rule); margin-top: 64px; }
+.layers li { padding: 16px 14px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.layers .n { font: 700 14px/1 var(--display); color: var(--dim); }
+.layers b { font-size: 14px; }
+.layers span { font-size: 12.5px; line-height: 1.45; color: var(--stone); }
+.layers li.on .n, .layers li.on b { color: var(--live); }
+@media (max-width: 1100px) { .looks { grid-template-columns: repeat(3, minmax(0, 1fr)); } .layers { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 20px; } }
+@media (max-width: 760px) {
+  .looks { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gut); gap: 12px; margin: 28px calc(var(--gut) * -1) 0; padding: 0 var(--gut) 8px; scrollbar-width: none; }
+  .looks::-webkit-scrollbar { display: none; }
+  .looks figure, .looks .own { flex: none; width: 78vw; scroll-snap-align: start; }
+  .layers { grid-template-columns: 1fr; margin-top: 36px; row-gap: 0; }
+  .layers li { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; column-gap: 0; row-gap: 2px; padding: 11px 0; border-top: 1px solid var(--rule); }
+  .layers li:first-child { border-top: 0; }
+  .layers .n { grid-row: 1 / 3; font-size: 12px; padding-top: 2px; }
+}
+.swipe-hint { display: none; }
+@media (max-width: 760px) { .swipe-hint { display: block; margin-top: 10px; } }
+
+/* two-column feature sections */
+.feature { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "copy well" "after well"; min-height: 760px; }
+.feature.media-left { grid-template-areas: "well copy" "well after"; }
+.feature .copy { grid-area: copy; padding: 96px var(--gut) 0; display: flex; flex-direction: column; gap: 28px; width: 100%; max-width: 720px; }
+.feature .after { grid-area: after; padding: 28px var(--gut) 80px; display: flex; flex-direction: column; gap: 28px; width: 100%; max-width: 720px; }
+.feature .well { grid-area: well; background: var(--stage); display: flex; align-items: center; justify-content: center; padding: 48px; }
+.feature.media-left .well { border-right: 1px solid var(--rule); }
+.feature.media-right .well { border-left: 1px solid var(--rule); }
+.feature.media-right .copy, .feature.media-right .after { justify-self: end; }
+@media (max-width: 900px) {
+  .feature, .feature.media-left { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: "copy" "well" "after"; min-height: 0; }
+  .feature .copy { padding: 56px var(--gut) 28px; gap: 20px; max-width: none; }
+  .feature .after { padding: 28px var(--gut) 56px; gap: 24px; max-width: none; }
+  .feature .well { border: 0 !important; padding: 0; }
+}
+.mob-only, .mob-wave { display: none; }
+@media (max-width: 760px) { .desk-only { display: none; } .mob-only { display: inline; } .sound-toggle { display: none !important; } }
+@media (max-width: 900px) { .desk-wave { display: none; } .mob-wave { display: block; } }
+.choice { display: flex; flex-direction: column; gap: 10px; }
+.choice ul { display: flex; flex-wrap: wrap; column-gap: 22px; row-gap: 10px; font-size: 14px; font-weight: 600; color: var(--stone); }
+.choice li { padding-bottom: 6px; }
+.choice li.on { color: var(--paper); font-weight: 700; border-bottom: 2px solid var(--live); }
+.choice li.set { color: var(--paper); font-weight: 700; border-bottom: 2px solid var(--bone); }
+.facts { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); border-top: 1px solid var(--rule); }
+.facts > div { padding: 16px 16px 0; border-left: 1px solid var(--rule); display: flex; flex-direction: column; gap: 6px; }
+.facts > div:first-child { padding-left: 0; border-left: 0; }
+.facts dt { font-size: 12px; font-weight: 600; color: var(--stone); }
+.facts dd { font-size: 14.5px; line-height: 1.5; }
+@media (max-width: 760px) {
+  .facts { grid-template-columns: 1fr; }
+  .facts > div { padding: 14px 0; border-left: 0; border-top: 1px solid var(--rule); }
+  .facts > div:first-child { border-top: 0; }
+}
+
+/* sparks */
+.heart { width: min(100%, 640px); aspect-ratio: 1; object-fit: cover; background: var(--stage); }
+.shapes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 600px; }
+.shapes li { padding-top: 12px; border-top: 2px solid var(--rule-2); display: flex; flex-direction: column; gap: 10px; color: var(--stone); }
+.shapes li.on { border-top-color: var(--live); color: var(--paper); }
+.shapes b { font-size: 14px; }
+@media (max-width: 760px) {
+  .shapes { grid-template-columns: 1fr 1fr; column-gap: 16px; row-gap: 10px; }
+  .shapes li { flex-direction: row; align-items: center; padding: 12px 0 4px; }
+  .shapes svg { width: 26px; height: 26px; }
+}
+
+/* light */
+.pair { display: flex; flex-direction: column; gap: 24px; width: 100%; max-width: 640px; }
+.pair figure { display: flex; flex-direction: column; gap: 10px; }
+.pair img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--ink); }
+.pair figcaption { font-size: 12.5px; color: var(--stone); padding-top: 8px; border-top: 2px solid var(--rule-2); }
+.pair figure.on figcaption { color: var(--paper); border-top-color: var(--live); }
+@media (max-width: 900px) { .pair { padding: 0 var(--gut); max-width: none; } .feature .well:has(.pair) { background: none; } }
+
+/* camera */
+.shots { display: grid; grid-template-columns: 24.6% 16.4% 24.6% 34.4%; margin-top: 48px; border-top: 1px solid var(--rule); }
+.shots > div { padding: 16px 16px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.shots .frame { aspect-ratio: auto; height: 200px; overflow: hidden; background: var(--stage); border: 1px solid var(--rule); }
+.shots .frame img { width: 100%; height: 100%; object-fit: cover; }
+.shots b { font-size: 14px; }
+.shots div.on b { color: var(--live); }
+.shots span { font-size: 12.5px; line-height: 1.45; color: var(--stone); }
+.shot-lane { position: relative; height: 64px; margin-top: 12px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: hidden; }
+.shot-lane i { position: absolute; top: 16px; height: 32px; background: var(--lane); }
+.shot-lane i.on { background: var(--bone); }
+.shot-lane .beat { position: absolute; top: 0; bottom: 0; width: 1px; background: #222120; }
+.shot-lane .beat.bar { background: var(--rule-2); }
+@media (max-width: 760px) {
+  .shots { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gut); gap: 14px; margin: 28px calc(var(--gut) * -1) 0; padding: 0 var(--gut); border-top: 0; scrollbar-width: none; }
+  .shots::-webkit-scrollbar { display: none; }
+  .shots > div { flex: none; width: 66vw; padding: 0; scroll-snap-align: start; }
+  .shots .frame { height: auto; aspect-ratio: 16 / 9; }
+  .shot-lane { margin: 18px calc(var(--gut) * -1) 0; height: 40px; }
+  .shot-lane i { top: 10px; height: 20px; }
+}
+
+/* sound */
+.player { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 16px; }
+.player .shot { width: 100%; border: 1px solid var(--rule); }
+.player .bar { display: flex; align-items: center; gap: 16px; border-top: 1px solid var(--rule); padding-top: 16px; }
+.play { width: 48px; height: 48px; flex: none; background: var(--live); color: var(--ink); display: flex; align-items: center; justify-content: center; }
+.play:hover { background: var(--live-hover); }
+.play .pause { display: none; }
+.player.playing .play .pause { display: block; }
+.player.playing .play .go { display: none; }
+.wave { position: relative; flex-grow: 1; height: 48px; }
+.wave canvas { width: 100%; height: 100%; }
+.wave-legend { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--dim); letter-spacing: 0.02em; }
+.wave-legend span.on { color: var(--paper); }
+.credit { font-size: 12px; line-height: 1.5; color: var(--dim); }
+@media (max-width: 900px) {
+  .player { padding: 0 var(--gut); max-width: none; }
+  .player .shot { display: none; }
+  .player .card { background: var(--stage); border: 1px solid var(--rule); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .player .bar { border-top: 0; padding-top: 0; }
+  .feature .well:has(.player) { background: none; }
+}
+
+/* how */
+.steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 56px; border-top: 1px solid var(--rule); }
+.steps li { padding: 24px 28px 0 0; display: flex; flex-direction: column; gap: 14px; border-top: 2px solid var(--rule-2); margin-top: -1px; }
+.steps li:first-child { border-top-color: var(--live); }
+.steps .n { font: 700 34px/1 var(--display); color: var(--dim); }
+.steps li:first-child .n { color: var(--live); }
+.steps b { font-size: 20px; letter-spacing: -0.01em; }
+.steps span { font-size: 15px; line-height: 1.55; color: var(--stone); }
+@media (max-width: 900px) {
+  .steps { grid-template-columns: 1fr; margin-top: 28px; border-top: 0; }
+  .steps li { display: grid; grid-template-columns: 52px 1fr; gap: 6px 0; padding: 18px 0; border-top: 1px solid var(--rule); margin: 0; }
+  .steps li:first-child { border-top: 2px solid var(--live); }
+  .steps .n { font-size: 22px; grid-row: 1 / 3; }
+  .steps b { font-size: 17px; }
+  .steps span { font-size: 14px; }
+}
+
+/* compare */
+.vs { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; line-height: 1.4; margin-top: 40px; }
+.vs th, .vs td { text-align: left; vertical-align: top; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+.vs thead th { vertical-align: bottom; border-bottom: 1px solid var(--rule-2); padding-bottom: 12px; }
+.vs thead th.us { border-bottom: 2px solid var(--live); font: 700 15px/1.2 var(--display); }
+.vs thead small { display: block; font-size: 12px; font-weight: 500; color: var(--dim); margin-top: 2px; }
+.vs tbody th { padding-left: 0; font-weight: 600; color: var(--stone); }
+.vs td.us { font-weight: 600; }
+.vs td:not(.us) { color: var(--stone); }
+.vs-switch { display: none; }
+.fine { margin-top: 20px; font-size: 12px; line-height: 1.5; color: var(--dim); }
+@media (max-width: 760px) {
+  .vs-switch { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--rule-2); height: 44px; margin-top: 28px; }
+  .vs-switch button { font-size: 13.5px; font-weight: 600; color: var(--stone); }
+  .vs-switch button[aria-pressed=true] { background: var(--paper); color: var(--ink); font-weight: 700; }
+  .vs { margin-top: 20px; }
+  .vs, .vs thead, .vs tbody { display: block; }
+  .vs colgroup { display: none; }
+  .vs thead th:first-child { display: none; }
+  .vs tbody tr { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+  .vs tbody th { grid-column: 1 / -1; padding: 0 0 8px; border: 0; font-size: 12.5px; }
+  .vs tbody td { padding: 0; border: 0; font-size: 13.5px; }
+  .vs thead tr { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
+  .vs thead th { padding: 0 0 8px; font-size: 12px; }
+  .vs thead th.us { font-size: 11px; }
+  .vs[data-show=ed] .vis, .vs[data-show=vis] .ed { display: none; }
+}
+
+/* export */
+.sizes { width: 100%; max-width: 680px; border-collapse: collapse; font-size: 14.5px; }
+.sizes th, .sizes td { text-align: left; padding: 12px 16px 12px 0; border-top: 1px solid var(--rule); }
+.sizes th { font-weight: 700; }
+.sizes tr:first-child th { color: var(--live); }
+.sizes td.px { font: 400 13px/1.2 var(--display); white-space: nowrap; text-transform: uppercase; }
+.sizes td.for { color: var(--stone); padding-right: 0; }
+.panel-shot { width: 100%; max-width: 760px; border: 1px solid var(--rule); }
+@media (max-width: 760px) {
+  .sizes tr { display: grid; grid-template-columns: 1fr auto; padding: 12px 0; border-top: 1px solid var(--rule); }
+  .sizes th, .sizes td { border: 0; padding: 0; }
+  .sizes td.for { grid-column: 1 / -1; font-size: 12.5px; padding-top: 3px; }
+  .sizes td.px { font-size: 11.5px; }
+  .feature .well:has(.panel-shot) { display: none; }
+}
+
+/* faq + close */
+.faq-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 64px; }
+.faq { display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; align-content: start; }
+.faq details { border-top: 1px solid var(--rule); padding: 16px 0 18px; }
+.faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 16px; font-size: 15px; font-weight: 700; line-height: 1.4; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: '+'; color: var(--stone); font-weight: 400; font-size: 20px; line-height: 1; }
+.faq details[open] summary::after { content: '–'; }
+.faq p { margin-top: 8px; font-size: 14px; line-height: 1.55; color: var(--stone); }
+.last { border-top: 1px solid var(--rule); }
+.last .wrap { min-height: 300px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 48px; padding-top: 48px; padding-bottom: 48px; }
+.last h2 { font: 700 clamp(30px, 4.45vw, 64px)/1 var(--display); letter-spacing: 0.02em; text-transform: uppercase; }
+.last h2 em { font-style: normal; color: var(--live); }
+.last .go { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+footer { border-top: 1px solid var(--rule); }
+footer .wrap { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 24px; font-size: 12.5px; color: var(--dim); padding-top: 16px; padding-bottom: 16px; }
+footer nav { display: flex; gap: 22px; }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--paper); }
+@media (max-width: 900px) {
+  .faq-grid { grid-template-columns: 1fr; gap: 20px; }
+  .faq { grid-template-columns: 1fr; }
+  .last .wrap { grid-template-columns: 1fr; gap: 28px; padding-top: 40px; padding-bottom: 40px; }
+  .last .go { align-items: stretch; }
+  .last .go .btn { width: 100%; }
+  footer .wrap { flex-direction: column; align-items: flex-start; gap: 14px; padding-top: 24px; padding-bottom: 32px; }
+}
+</style>
+</head>
+<body>
+
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="wordmark" href="#top" aria-label="Pianoverse, back to top">PIANOVERSE</a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#looks">Looks</a>
+      <a href="#camera">Camera</a>
+      <a href="#sound">Sound</a>
+      <a href="#how">How it works</a>
+      <a href="#compare">Compare</a>
+    </nav>
+    <div class="grow"></div>
+    <a class="btn small" data-download href="https://github.com/HetavShah/pianoverse/releases/latest">Download for Windows</a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+    </button>
+  </div>
+  <div class="menu" id="menu">
+    <a href="#looks">Looks</a>
+    <a href="#camera">Camera</a>
+    <a href="#sound">Sound</a>
+    <a href="#how">How it works</a>
+    <a href="#compare">Compare</a>
+    <a class="btn" data-download href="https://github.com/HetavShah/pianoverse/releases/latest">Download for Windows</a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- 01 hero -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="hero-head">
+      <div class="kicker">The video editor made for pianists</div>
+      <h1 id="hero-title">You played it.<br>Now let them see it.</h1>
+      <div class="hero-row">
+        <p><span class="desk-only">Drop in the video you filmed on your phone. Pianoverse finds every note you played and lights it up on your own keys, with sparks, camera moves and a grand piano sound to match.</span><span class="mob-only">Every note you played, lit up on your own keys.</span></p>
+        <div class="hero-cta">
+          <a class="btn" data-download href="https://github.com/HetavShah/pianoverse/releases/latest">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
+            Download for Windows
+          </a>
+          <div class="cap">Free · No login, no sign-up · Windows 10 and 11</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="wrap media">
+    <figure>
+      <div class="compare" id="hero-compare" style="--split: 0.42">
+        <img class="poster" alt="" aria-hidden="true">
+        <canvas aria-hidden="true"></canvas>
+        <video muted loop playsinline preload="auto" aria-hidden="true"></video>
+        <span class="tag l">AS FILMED</span>
+        <span class="tag r">WITH PIANOVERSE</span>
+        <div class="split"></div>
+        <input type="range" min="0" max="1000" value="420" aria-label="Before and after: drag to compare the video as filmed with Pianoverse">
+        <div class="grip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg></div>
+        <button class="sound-toggle" type="button" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="on" d="M17 9a4 4 0 0 1 0 6"/></svg>
+          <span>Sound on</span>
+        </button>
+      </div>
+      <div class="timeline" aria-hidden="true">
+        <div class="tc"><b id="tc">0:20.0</b><span class="label" style="font-size:11px;color:var(--dim)">Drag across the video</span></div>
+        <div class="band" id="hero-band"><canvas></canvas><div class="playhead"></div></div>
+      </div>
+      <figcaption class="sr">The same take, before and after. A real phone video, nothing re-filmed.</figcaption>
+    </figure>
+  </div>
+  <div class="hero-foot">
+    <button class="textlink" type="button" data-sound-toggle>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/></svg>
+      Hear it
+    </button>
+    <span class="cap">Free · Windows PC</span>
+  </div>
+</section>
+
+<!-- 02 problem -->
+<section class="sec" aria-labelledby="problem-title">
+  <div class="wrap">
+    <div style="display:flex;flex-direction:column;gap:20px;max-width:980px">
+      <div class="kicker">The problem</div>
+      <h2 class="h2" id="problem-title">A great take.<br>A forgettable video.</h2>
+      <p class="lede">Weeks of practice, one perfect run, filmed on a phone on a stand. Then you have three choices, and none of them was made for you.</p>
+    </div>
+    <div class="three">
+      <article>
+        <div class="n">01</div>
+        <h3>Post it as filmed</h3>
+        <p>Honest, and it sounds like you. But it looks like every other phone on a stand, the room is lit by a ceiling lamp, and the phone microphone flattens the piano. People scroll on.</p>
+        <div class="verdict">Looks flat. Sounds small.</div>
+      </article>
+      <article>
+        <div class="n">02</div>
+        <h3>Learn a video editor</h3>
+        <p>Premiere, After Effects, particle plugins, keyframes. It can look amazing, after weeks of learning and hours per video, because the editor has no idea which note you played when. Every spark is placed by hand.</p>
+        <div class="verdict">Takes weeks. Then hours, every time.</div>
+      </article>
+      <article>
+        <div class="n">03</div>
+        <h3>Use a MIDI visualizer</h3>
+        <p>Beautiful falling notes, built around the MIDI file. Your footage, your room and your sound come second: many draw a keyboard of their own, and the camera, the light and the audio are still yours to fix elsewhere.</p>
+        <div class="verdict">Great notes. The performance comes second.</div>
+      </article>
+    </div>
+    <div class="turn"><i></i><p>Pianoverse starts from your video, and reads your music.</p></div>
+  </div>
+</section>
+
+<!-- 03 the idea -->
+<section class="sec" aria-labelledby="idea-title">
+  <div class="wrap">
+    <div class="split-head">
+      <div>
+        <div class="kicker">The idea</div>
+        <h2 class="h2" id="idea-title">A video editor sees frames.<br>Pianoverse hears notes.</h2>
+        <p class="lede">Give it the MIDI from your digital piano, or just the video: it listens and finds the notes itself. From then on every effect knows what you played, when, and how hard.</p>
+      </div>
+      <dl class="readouts" aria-label="What Pianoverse found in the take on this page">
+        <dt>Notes found</dt><dd>406</dd>
+        <dt>Range</dt><dd>D2–D6</dd>
+        <dt>Keys followed, frame by frame</dt><dd>61</dd>
+        <dt>Found from</dt><dd>Audio</dd>
+      </dl>
+    </div>
+    <figure class="score" aria-label="The take drawn as a score: notes, camera shots and a particle section, on the same timeline">
+      <div class="names" aria-hidden="true">
+        <div style="height:150px"><b>Notes</b><span>pitch and loudness</span></div>
+        <div style="height:52px"><b>Camera</b><span>cuts on the bar</span></div>
+        <div style="height:52px"><b>Particles</b><span>a heart on the chorus</span></div>
+      </div>
+      <div class="lanes" id="idea-score" style="height:254px"><canvas></canvas>
+        <div class="lane-label" style="top:6px"><b>Notes</b><span>pitch and loudness</span></div>
+              </div>
+      <figcaption class="cap" style="padding:12px 0 0">The twenty seconds after the video above, as Pianoverse sees them. The camera cuts land on bar lines and the heart arrives with the chorus.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 04 looks -->
+<section class="sec" id="looks" aria-labelledby="looks-title">
+  <div class="wrap">
+    <div class="split-head">
+      <div>
+        <div class="kicker">Looks</div>
+        <h2 class="h2" id="looks-title">Eleven looks to start.<br>Yours to finish.</h2>
+      </div>
+      <p class="lede" style="font-size:17px">Pick a look and the whole video changes at once. Then tune any part of it, and save it as your own preset so every video on your channel looks like yours.</p>
+    </div>
+    <div class="looks">
+%%LOOKS%%
+      <div class="own"><b>Your own</b><span class="cap">Change any layer, then save it as a preset.</span></div>
+    </div>
+    <p class="cap swipe-hint">Swipe for all eleven.</p>
+    <ol class="layers" aria-label="The nine layers of a look">
+      <li><span class="n">01</span><b>Colours</b><span>Palettes, gradients, a colour per hand</span></li>
+      <li><span class="n">02</span><b>Notes</b><span>Glass, gem, soft glow, outline, textures</span></li>
+      <li><span class="n">03</span><b>Saber</b><span>The line where notes land: flame, electric</span></li>
+      <li><span class="n">04</span><b>Impact</b><span>The flash and ripple on every key press</span></li>
+      <li class="on"><span class="n">05</span><b>Particles</b><span>Sparks, smoke, stars, shapes</span></li>
+      <li><span class="n">06</span><b>Lighting</b><span>Keys glow, the room falls dark</span></li>
+      <li><span class="n">07</span><b>Background</b><span>Your video, darkened, tinted or replaced</span></li>
+      <li><span class="n">08</span><b>Glow and film</b><span>Bloom, grain, vignette, colour fringe</span></li>
+      <li><span class="n">09</span><b>Titles</b><span>An opening title and an end card</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 05 particles -->
+<section aria-labelledby="sparks-title">
+  <div class="feature media-left">
+    <div class="copy">
+      <div class="kicker">Particles</div>
+      <h2 class="h2" id="sparks-title">Draw with<br>sparks.</h2>
+      <p class="lede">Every note you play throws sparks from its key, and harder notes throw more. Pick a stretch of the music on the timeline and the sparks gather into a shape: a heart for the chorus, a star for the last chord, your channel's logo for the outro.</p>
+    </div>
+    <div class="after" data-moved>
+      <div class="choice" style="gap:12px"><span class="label">Shape</span>
+        <ul class="shapes">
+          <li class="on"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg><b>Heart</b></li>
+          <li><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg><b>Star</b></li>
+          <li><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><b>Music note</b></li>
+          <li><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="8.5" r="1.5"/></svg><b>Your own image</b></li>
+        </ul>
+      </div>
+      <dl class="facts">
+        <div><dt>Kinds</dt><dd>Sparks, smoke, glitter, stars</dd></div>
+        <div><dt>Moves</dt><dd>Fountain, gravity, wind, swirl</dd></div>
+        <div><dt>Follows</dt><dd>How hard each note is played</dd></div>
+      </dl>
+    </div>
+    <div class="well">
+      <figure style="display:flex;flex-direction:column;gap:12px;align-items:center;width:100%">
+        <video class="heart lazy-video" muted loop playsinline preload="none" poster="assets/heart.jpg" aria-label="Sparks rising from the keys and tracing a heart"><source src="assets/heart.mp4" type="video/mp4"></video>
+        <figcaption class="cap">The sparks trace a heart, then fall away.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- 06 light -->
+<section aria-labelledby="light-title">
+  <div class="feature media-right">
+    <div class="copy">
+      <div class="kicker">Light</div>
+      <h2 class="h2" id="light-title">Your room<br>becomes<br>a stage.</h2>
+      <p class="lede">Most piano videos are filmed at home under a ceiling lamp. Pianoverse finds your keyboard, lights the keys you play, and lets the room fall into shadow. The notes and sparks stay bright on top.</p>
+    </div>
+    <div class="after" data-moved>
+      <div class="choice"><span class="label">Start from</span>
+        <ul><li>As filmed</li><li class="on">Moody room</li><li>Warm stage</li><li>Night</li></ul>
+      </div>
+      <dl class="facts">
+        <div><dt>Room</dt><dd>How dark the room falls</dd></div>
+        <div><dt>Warmth</dt><dd>Cooler or warmer light</dd></div>
+        <div><dt>Light reach</dt><dd>How far the glow spreads from the keys</dd></div>
+      </dl>
+    </div>
+    <div class="well">
+      <div class="pair">
+        <figure><img src="assets/light-before.jpg" alt="As filmed: a bedroom, evenly lit" loading="lazy" width="1280" height="720"><figcaption>As filmed</figcaption></figure>
+        <figure class="on"><img src="assets/light-after.jpg" alt="Moody room: the room dark, the played keys lit" loading="lazy" width="1280" height="720"><figcaption>Moody room, with notes</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 camera -->
+<section class="sec" id="camera" aria-labelledby="camera-title">
+  <div class="wrap">
+    <div class="split-head">
+      <div>
+        <div class="kicker">Camera</div>
+        <h2 class="h2" id="camera-title">One phone on a stand.<br>Shot like a concert.</h2>
+        <p class="lede">You filmed one wide shot. Pianoverse turns it into a cut: close in on the loud chords, follow your hands up the keyboard, pull back wide for the ending. Every move lands on a bar line, because it knows where the bars are.</p>
+      </div>
+      <div class="choice"><span class="label">Frame for</span>
+        <ul><li>Vertical 9:16</li><li class="on">Landscape 16:9</li><li>Square</li></ul>
+      </div>
+    </div>
+    <div class="shots">
+      <div><div class="frame"><img src="assets/shot.jpg" alt="Wide shot of the take" loading="lazy"></div><b>Wide</b><span>Bars 1 to 3. Sets the room.</span></div>
+      <div class="on"><div class="frame"><img src="assets/shot.jpg" alt="Close-up on the loud chord" loading="lazy" style="transform:scale(2);transform-origin:62% 62%"></div><b>Close-up · 2.0×</b><span>Bar 4. Punch in on the loud chord.</span></div>
+      <div><div class="frame"><img src="assets/shot.jpg" alt="Following the hands" loading="lazy" style="transform:scale(1.5);transform-origin:70% 85%"></div><b>Follow your hands</b><span>Bars 5 to 7. Glides with the melody.</span></div>
+      <div><div class="frame"><img src="assets/shot.jpg" alt="Wide shot for the ending" loading="lazy"></div><b>Wide</b><span>Bars 8 to 12. Pulls back for the ending.</span></div>
+    </div>
+    <div class="shot-lane" aria-hidden="true" id="shot-lane">
+      <i style="left:0;width:24.4%"></i><i class="on" style="left:25%;width:16.2%"></i><i style="left:41.8%;width:24.4%"></i><i style="left:66.8%;width:33.2%"></i>
+      <span class="playhead" style="left:30%"></span>
+    </div>
+    <p class="cap" style="margin-top:12px">The shots lane. Every cut sits on a bar line. Drag a shot to move it, or let the auto camera place them all.</p>
+    <dl class="facts" style="--cols:4;margin-top:40px">
+      <div><dt>Auto camera</dt><dd>Cuts on the bar, punches in on loud chords</dd></div>
+      <div><dt>Steady</dt><dd>Notes stay on the right keys while the frame moves</dd></div>
+      <div><dt>Your phone moved?</dt><dd>The keyboard is followed frame by frame</dd></div>
+      <div><dt>Your call</dt><dd>Turn auto off and place every shot yourself</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- 08 sound -->
+<section id="sound" aria-labelledby="sound-title">
+  <div class="feature media-right">
+    <div class="copy">
+      <div class="kicker">Sound</div>
+      <h2 class="h2" id="sound-title">Sound as good<br>as it looks.</h2>
+      <p class="lede">A phone microphone makes a grand sound like an upright in a cupboard. Keep your own recording and give it a hall, or let Pianoverse play your notes back on a sampled concert grand. Or blend the two.</p>
+    </div>
+    <div class="after" data-moved>
+      <div class="choice"><span class="label">Sound from</span><ul><li>Your video</li><li class="on">Grand piano</li><li>Both</li></ul></div>
+      <div class="choice"><span class="label">Sustain pedal</span><ul><li class="set">Always down</li><li>As played</li><li>Off</li></ul></div>
+      <div class="choice"><span class="label">Room</span><ul><li>Studio</li><li class="set">Concert hall</li><li>Church</li><li>Cathedral</li><li>Plate</li></ul></div>
+      <dl class="facts">
+        <div><dt>Intro and outro</dt><dd>A soft swell in, the last chord rings out</dd></div>
+        <div><dt>Tone</dt><dd>Warmth, presence and air</dd></div>
+        <div><dt>Loudness</dt><dd>Matched for social media, so it isn't turned down</dd></div>
+      </dl>
+      <p class="credit">Grand piano: Salamander Grand Piano by Alexander Holm, CC-BY 3.0.</p>
+    </div>
+    <div class="well">
+      <div class="player" id="player">
+        <img class="shot" src="assets/sound-panel.jpg" alt="The Sound step in Pianoverse: source, sustain pedal, room and the waveform" loading="lazy" width="1200" height="750">
+        <div class="card">
+          <div class="bar">
+            <button class="play" type="button" aria-label="Play: the phone recording, then the grand piano">
+              <svg class="go" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>
+              <svg class="pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+            </button>
+            <div style="display:flex;flex-direction:column;gap:2px;flex:none">
+              <b style="font-size:14px">Hear it: phone, then grand</b>
+              <span class="cap">Same take, same notes · 0:18</span>
+            </div>
+            <div class="wave desk-wave" aria-hidden="true"><canvas></canvas></div>
+          </div>
+          <div class="wave mob-wave" aria-hidden="true" style="flex:none;height:52px"><canvas></canvas></div>
+          <div class="wave-legend"><span data-part="0">Phone microphone</span><span data-part="1">Grand piano, concert hall</span></div>
+        </div>
+        <audio preload="none" src="assets/sound-demo.mp3"></audio>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 09 how -->
+<section class="sec" id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="split-head">
+      <div>
+        <div class="kicker">How it works</div>
+        <h2 class="h2" id="how-title">One take.<br>One sitting.</h2>
+      </div>
+      <p class="lede" style="font-size:17px">Five steps, left to right, the same every time. No timeline to learn, no keyframes, no plugins. Most of it is choosing what you like.</p>
+    </div>
+    <ol class="steps">
+      <li><span class="n">01</span><b>Import</b><span>Drop in the video from your phone. Add the MIDI file if your piano records one.</span></li>
+      <li><span class="n">02</span><b>Audio</b><span>Pianoverse finds the notes, lines them up with the video and sets up the sound.</span></li>
+      <li><span class="n">03</span><b>Calibrate</b><span>Mark the two ends of your keyboard. It follows the keys from there.</span></li>
+      <li><span class="n">04</span><b>Style</b><span>Pick a look, a light and a camera. Tune anything you like on the timeline.</span></li>
+      <li><span class="n">05</span><b>Export</b><span>Shorts, landscape or square, encoded on your graphics card.</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 10 compare -->
+<section class="sec" id="compare" aria-labelledby="compare-title">
+  <div class="wrap">
+    <div class="split-head">
+      <div>
+        <div class="kicker">Compare</div>
+        <h2 class="h2" id="compare-title">Made for pianists,<br>not for editors.</h2>
+      </div>
+      <p class="lede" style="font-size:16px">The tools you might use today are good at what they were made for. Here is where each one fits.</p>
+    </div>
+    <div class="vs-switch" role="group" aria-label="Compare Pianoverse with">
+      <button type="button" data-show="ed" aria-pressed="false">Video editors</button>
+      <button type="button" data-show="vis" aria-pressed="true">Piano visualizers</button>
+    </div>
+    <table class="vs" data-show="vis">
+      <colgroup><col class="q" style="width:25%"><col style="width:25%"><col style="width:25%"><col style="width:25%"></colgroup>
+      <thead><tr>
+        <th scope="col"><span class="sr">Question</span></th>
+        <th scope="col" class="us">PIANOVERSE</th>
+        <th scope="col" class="ed">General video editors<small>Premiere Pro, After Effects, CapCut</small></th>
+        <th scope="col" class="vis">Piano visualizers<small>SeeMusic, Keysight</small></th>
+      </tr></thead>
+      <tbody>
+        <tr><th scope="row">Starts from your own video</th><td class="us">Yes, your take is the picture</td><td class="ed">Yes</td><td class="vis">SeeMusic: yes, over your footage. Keysight: its own 3D scene</td></tr>
+        <tr><th scope="row">Knows which note you played</th><td class="us">Yes, from MIDI or from the audio</td><td class="ed">No, every effect is placed by hand</td><td class="vis">Yes, from MIDI. SeeMusic can also turn audio into MIDI</td></tr>
+        <tr><th scope="row">Camera moves on the music</th><td class="us">Cuts on the bar, punches in on loud chords</td><td class="ed">By hand, with keyframes</td><td class="vis">Camera moves in their 3D piano scenes</td></tr>
+        <tr><th scope="row">Piano sound</th><td class="us">Sampled grand, sustain pedal, hall reverb, loudness for social</td><td class="ed">General audio tools, no piano</td><td class="vis">Keysight makes no sound of its own</td></tr>
+        <tr><th scope="row">To learn</th><td class="us">Five steps, left to right</td><td class="ed">Weeks, then hours per video</td><td class="vis">Quick to start</td></tr>
+        <tr><th scope="row">Price</th><td class="us">Free</td><td class="ed">Premiere and After Effects: subscription. CapCut: free, Pro paid</td><td class="vis">SeeMusic: free, Pro from $8.99 a month. Keysight: $29.99</td></tr>
+        <tr><th scope="row">Account needed</th><td class="us">None. No login, no sign-up</td><td class="ed">Adobe account for Premiere and After Effects</td><td class="vis">SeeMusic: App Store. Keysight: Steam</td></tr>
+        <tr><th scope="row">Runs on</th><td class="us">Windows 10 and 11</td><td class="ed">Windows and Mac</td><td class="vis">SeeMusic: Mac. Keysight: Windows and Mac</td></tr>
+      </tbody>
+    </table>
+    <p class="fine">Product names belong to their owners. Checked against each product's own store page in October 2026; prices and features change.</p>
+  </div>
+</section>
+
+<!-- 11 export -->
+<section id="export" aria-labelledby="export-title">
+  <div class="feature media-left">
+    <div class="copy">
+      <div class="kicker">Export</div>
+      <h2 class="h2" id="export-title">Ready for<br>every feed.</h2>
+      <p class="lede">Pick where it's going and Pianoverse sets the size, frame rate and sound level. It uses your graphics card to encode, so you're not waiting all evening.</p>
+    </div>
+    <div class="after" data-moved>
+      <table class="sizes">
+        <tr><th scope="row">Shorts and Reels</th><td class="px">1080 × 1920</td><td class="for">YouTube Shorts, Instagram, TikTok</td></tr>
+        <tr><th scope="row">Landscape</th><td class="px">1920 × 1080</td><td class="for">YouTube</td></tr>
+        <tr><th scope="row">Square</th><td class="px">1080 × 1080</td><td class="for">Feeds and posts</td></tr>
+        <tr><th scope="row">4K vertical</th><td class="px">2160 × 3840</td><td class="for">The sharpest phone screens</td></tr>
+        <tr><th scope="row">Transparent</th><td class="px">ProRes 4444</td><td class="for">Effects only, to layer in Premiere or DaVinci</td></tr>
+      </table>
+      <dl class="facts" style="--cols:2">
+        <div><dt>Encoding</dt><dd>NVIDIA, AMD or Intel graphics. Falls back to the processor if the card can't.</dd></div>
+        <div><dt>You need</dt><dd>Windows 10 or 11, 64-bit, and a graphics card that supports DirectX 12. 8 GB of memory or more is best.</dd></div>
+      </dl>
+    </div>
+    <div class="well">
+      <img class="panel-shot" src="assets/export-panel.jpg" alt="The Export step in Pianoverse: sizes, format, encoder and the time estimate" loading="lazy" width="1200" height="663">
+    </div>
+  </div>
+</section>
+
+<!-- 12 questions and close -->
+<section class="sec" id="faq" aria-labelledby="faq-title">
+  <div class="wrap faq-grid">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div class="kicker">Questions</div>
+      <h2 class="h2" id="faq-title" style="font-size:clamp(24px,2.5vw,36px)">Before you<br>download.</h2>
+    </div>
+    <div class="faq">
+      <details open><summary>My piano has no MIDI. Does it still work?</summary><p>Yes. Pianoverse listens to the video and finds the notes itself. MIDI just makes it exact.</p></details>
+      <details open><summary>I filmed on an iPhone. Will it open?</summary><p>Yes, including the HEVC videos iPhones record by default.</p></details>
+      <details open><summary>My phone moved a little while I played.</summary><p>That's fine. The keyboard is followed frame by frame, so the notes stay on the keys.</p></details>
+      <details open><summary>Is there a Mac version?</summary><p>Not yet. Pianoverse is Windows only for now.</p></details>
+      <details open><summary>What does it cost?</summary><p>Nothing. Pianoverse is free, with no login and no sign-up.</p></details>
+      <details open><summary>Can I post the videos anywhere?</summary><p>Yes, they're yours. The grand piano sound is free to use with a credit line.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="last" id="download" aria-labelledby="last-title">
+  <div class="wrap">
+    <h2 id="last-title">Film it.<br>Drop it in. <em>Export.</em></h2>
+    <div class="go">
+      <a class="btn" style="height:56px;padding:0 28px" data-download href="https://github.com/HetavShah/pianoverse/releases/latest">Download for Windows</a>
+      <span class="cap">Free · No login, no sign-up · Windows 10 and 11 · Updates itself<span data-version></span></span>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="wordmark" style="font-size:13px">PIANOVERSE</span>
+    <span>Grand piano: Salamander Grand Piano, Alexander Holm, CC-BY 3.0 · Video by FFmpeg</span>
+    <nav aria-label="Footer"><a href="https://github.com/HetavShah/pianoverse/releases">Changelog</a><a href="https://github.com/HetavShah/pianoverse/issues">Send feedback</a><a href="https://github.com/HetavShah/pianoverse">Source</a></nav>
+  </div>
+</footer>
+
+<script type="application/json" id="notes-data">%%NOTES%%</script>
+<script type="application/json" id="peaks-data">%%PEAKS%%</script>
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const mobile = matchMedia('(max-width: 760px)');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dpr = () => Math.min(2, window.devicePixelRatio || 1);
+  const NOTES = JSON.parse($('#notes-data').textContent); // [start, end, pitch, velocity], seconds after 0:20 of the take
+  const css = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+
+  // ---- menu
+  const nav = $('#nav'), mb = $('.menu-btn');
+  mb.addEventListener('click', () => { const o = nav.classList.toggle('open'); mb.setAttribute('aria-expanded', o); });
+  $$('#menu a').forEach((a) => a.addEventListener('click', () => { nav.classList.remove('open'); mb.setAttribute('aria-expanded', 'false'); }));
+
+  // ---- download: point every button at the newest installer
+  fetch('https://api.github.com/repos/HetavShah/pianoverse/releases/latest').then((r) => r.ok ? r.json() : null).then((rel) => {
+    const exe = rel && rel.assets.find((a) => /setup\.exe$/i.test(a.name));
+    if (!exe) return;
+    $$('[data-download]').forEach((a) => { a.href = exe.browser_download_url; });
+    $$('[data-version]').forEach((s) => { s.textContent = ' · ' + rel.tag_name; });
+  }).catch(() => {});
+
+  // ---- notes on a canvas: the score band
+  function drawNotes(cv, from, to, top, h, opts = {}) {
+    const ctx = cv.getContext('2d'), W = cv.width, k = dpr();
+    const lo = 36, hi = 90; // the sample keyboard starts at C2
+    for (const [s, e, p, v] of NOTES) {
+      if (e < from || s > to) continue;
+      const x = ((s - from) / (to - from)) * W, w = Math.max(3 * k, ((Math.min(e, to) - s) / (to - from)) * W);
+      const y = top + (1 - (p - lo) / (hi - lo)) * (h - 6 * k);
+      ctx.globalAlpha = 0.5 + v * 0.5;
+      ctx.fillStyle = p < 55 ? css('--note-lo') : css('--note-hi');
+      ctx.fillRect(x, y, w, (2.5 + v * 2.5) * k);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function beats(cv, from, to, top, bottom, every = 0.65) {
+    const ctx = cv.getContext('2d'), W = cv.width;
+    for (let i = 0, t = 0; t <= to - from; i++, t = i * every) {
+      ctx.fillStyle = i % 4 === 0 ? css('--rule-2') : css('--rule');
+      ctx.fillRect(Math.round((t / (to - from)) * W), top, 1, bottom - top);
+    }
+  }
+  function sizeCanvas(cv) { const r = cv.getBoundingClientRect(); cv.width = Math.round(r.width * dpr()); cv.height = Math.round(r.height * dpr()); return cv; }
+
+  // ---- hero: one video holds both takes stacked (as filmed on top, Pianoverse below); a canvas shows the split
+  const box = $('#hero-compare'), cv = $('canvas', box), vid = $('video', box), poster = $('img.poster', box), range = $('input', box);
+  const SRC = () => mobile.matches ? { v: 'assets/hero-m.mp4', p: 'assets/hero-m.jpg' } : { v: 'assets/hero.mp4', p: 'assets/hero.jpg' };
+  let split = 0.42, posterImg = null;
+  const setSplit = (x) => { split = Math.min(1, Math.max(0, x)); box.style.setProperty('--split', split); range.value = Math.round(split * 1000); paint(); };
+  range.addEventListener('input', () => setSplit(range.value / 1000));
+  function paint() {
+    const src = vid.readyState >= 2 ? vid : posterImg;
+    if (!src) return;
+    const sw = src.videoWidth || src.naturalWidth, sh = (src.videoHeight || src.naturalHeight) / 2;
+    if (!sw) return;
+    if (cv.width !== sw) { cv.width = sw; cv.height = sh; }
+    const ctx = cv.getContext('2d'), cut = Math.round(sw * split);
+    ctx.drawImage(src, 0, sh, sw, sh, 0, 0, sw, sh);              // Pianoverse
+    if (cut > 0) ctx.drawImage(src, 0, 0, cut, sh, 0, 0, cut, sh); // as filmed
+  }
+  function load() {
+    const s = SRC();
+    posterImg = new Image(); posterImg.onload = () => { poster.remove(); paint(); }; posterImg.src = s.p;
+    poster.src = s.p.replace('.jpg', '-after.jpg');
+    vid.src = s.v; vid.load();
+    if (!still) vid.play().catch(() => {});
+  }
+  load();
+  mobile.addEventListener('change', load);
+  const band = $('#hero-band'), bandCv = $('canvas', band), head = $('.playhead', band), tc = $('#tc');
+  const LOOP = 8;
+  function drawBand() { sizeCanvas(bandCv); const c = bandCv; c.getContext('2d').clearRect(0, 0, c.width, c.height); beats(c, 0, LOOP, 0, c.height); drawNotes(c, 0, LOOP, 8 * dpr(), c.height - 12 * dpr()); }
+  drawBand();
+  (function tick() {
+    if (vid.readyState >= 2 && !vid.paused) paint();
+    const t = vid.currentTime || 0;
+    head.style.transform = `translateX(${(t / LOOP) * band.clientWidth}px)`;
+    tc.textContent = `0:${(20 + t).toFixed(1).padStart(4, '0')}`;
+    requestAnimationFrame(tick);
+  })();
+  new IntersectionObserver(([e]) => { if (still) return; e.isIntersecting ? vid.play().catch(() => {}) : vid.pause(); }).observe(box);
+  const toggles = [$('.sound-toggle', box), ...$$('[data-sound-toggle]')];
+  toggles.forEach((b) => b.addEventListener('click', () => {
+    vid.muted = !vid.muted;
+    if (!vid.muted) { au.pause(); vid.currentTime = 0; vid.play().catch(() => {}); }
+    toggles.forEach((x) => { x.setAttribute('aria-pressed', String(!vid.muted)); const l = $('span', x); if (l) l.textContent = vid.muted ? 'Sound on' : 'Sound off'; });
+  }));
+
+  // ---- the idea: twenty seconds as a score, with the camera and particle lanes
+  const ideaBox = $('#idea-score'), ideaCv = $('canvas', ideaBox);
+  function drawIdea() {
+    const c = sizeCanvas(ideaCv), ctx = c.getContext('2d'), k = dpr(), W = c.width;
+    ctx.clearRect(0, 0, W, c.height);
+    beats(c, 0, 20, 0, c.height, 0.65);
+    drawNotes(c, 0, 20, 14 * k, 130 * k);
+    const block = (y, h, a, b, on, label) => {
+      const x = (a / 20) * W, w = ((b - a) / 20) * W - 2 * k;
+      ctx.fillStyle = on ? css('--bone') : css('--lane'); ctx.fillRect(x, y * k, w, h * k);
+      ctx.fillStyle = on ? css('--ink') : css('--stone'); ctx.font = `${on ? 700 : 600} ${12 * k}px Archivo, sans-serif`; ctx.textBaseline = 'middle';
+      if (!mobile.matches || w > 70 * k) ctx.fillText(label, x + 10 * k, (y + h / 2) * k);
+    };
+    const bar = 2.6; // four beats
+    block(156, 32, 0, bar * 2, false, 'Wide'); block(156, 32, bar * 2, bar * 3, true, 'Close-up · 2.0×');
+    block(156, 32, bar * 3, bar * 5, false, 'Follow your hands'); block(156, 32, bar * 5, 20, false, 'Wide');
+    block(210, 26, bar * 4, bar * 6, true, 'Heart');
+    ctx.fillStyle = css('--live'); ctx.fillRect(Math.round(0.38 * W), 0, 2 * k, c.height);
+  }
+  drawIdea();
+
+  // ---- the shots lane: beat lines
+  const lane = $('#shot-lane');
+  for (let i = 0; i < 48; i++) { const b = document.createElement('span'); b.className = 'beat' + (i % 4 ? '' : ' bar'); b.style.left = (i * 100 / 48) + '%'; lane.prepend(b); }
+
+  // ---- lazy videos: play only while on screen
+  const lazy = new IntersectionObserver((es) => es.forEach((e) => {
+    const v = e.target;
+    if (e.isIntersecting) { if (v.preload === 'none') { v.preload = 'auto'; v.load(); } if (!still) v.play().catch(() => {}); } else v.pause();
+  }), { rootMargin: '200px' });
+  $$('.lazy-video').forEach((v) => lazy.observe(v));
+
+  // ---- sound player
+  const PEAKS = JSON.parse($('#peaks-data').textContent), SWITCH = 8.5;
+  const pl = $('#player'), au = $('audio', pl), btn = $('.play', pl), parts = $$('[data-part]', pl);
+  function drawWave() {
+    $$('.wave canvas', pl).forEach((c) => {
+      if (!c.offsetParent) return;
+      sizeCanvas(c); const ctx = c.getContext('2d'), W = c.width, H = c.height, k = dpr();
+      const n = PEAKS.length, bw = W / n, prog = au.duration ? au.currentTime / au.duration : 0;
+      ctx.clearRect(0, 0, W, H);
+      PEAKS.forEach((p, i) => {
+        const h = Math.max(2 * k, p * H * 0.9), x = i * bw;
+        const grand = (i / n) * 18.05 > SWITCH;
+        ctx.fillStyle = (i / n) < prog ? css('--live') : (grand ? css('--paper') : css('--dim'));
+        ctx.fillRect(x, (H - h) / 2, Math.max(1, bw - 1.5 * k), h);
+      });
+    });
+  }
+  drawWave();
+  btn.addEventListener('click', () => { if (au.paused) { au.play(); } else { au.pause(); } });
+  au.addEventListener('play', () => { pl.classList.add('playing'); btn.setAttribute('aria-label', 'Pause'); if (!vid.muted) toggles[0].click(); });
+  au.addEventListener('pause', () => { pl.classList.remove('playing'); btn.setAttribute('aria-label', 'Play: the phone recording, then the grand piano'); });
+  au.addEventListener('timeupdate', () => { drawWave(); parts.forEach((p, i) => p.classList.toggle('on', !au.paused && (au.currentTime > SWITCH) === (i === 1))); });
+  au.addEventListener('ended', () => { au.currentTime = 0; drawWave(); });
+  $$('.wave', pl).forEach((w) => w.addEventListener('click', (e) => { const r = w.getBoundingClientRect(); if (!au.duration) { au.play(); return; } au.currentTime = ((e.clientX - r.left) / r.width) * au.duration; }));
+
+  // ---- compare: on a phone, one competitor column at a time
+  const vs = $('.vs');
+  $$('.vs-switch button').forEach((b) => b.addEventListener('click', () => {
+    vs.dataset.show = b.dataset.show;
+    $$('.vs-switch button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+
+  // ---- FAQ: open on wide screens, folded on phones
+  const fold = () => $$('.faq details').forEach((d, i) => { d.open = !mobile.matches || i === 0; });
+  fold(); mobile.addEventListener('change', fold);
+
+  let rs; addEventListener('resize', () => { clearTimeout(rs); rs = setTimeout(() => { drawBand(); drawIdea(); drawWave(); }, 120); });
+  document.fonts && document.fonts.ready.then(drawIdea);
+})();
+</script>
+</body>
+</html>

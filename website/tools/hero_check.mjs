@@ -1,0 +1,16 @@
+import { createRequire } from 'module';
+const { chromium } = createRequire(new URL('../../package.json', import.meta.url))('playwright');
+const [OUT, W, H] = process.argv.slice(2);
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--autoplay-policy=no-user-gesture-required'] });
+const p = await b.newPage({ viewport: { width: Number(W), height: Number(H) } });
+const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
+await p.goto('http://localhost:8090/', { waitUntil: 'networkidle' });
+await p.waitForTimeout(2500);
+const st = await p.evaluate(() => { const v = document.querySelector('#hero-compare video'); return { canMp4: v.canPlayType('video/mp4; codecs="avc1.640028"'), ready: v.readyState, t: v.currentTime, paused: v.paused, src: v.currentSrc, cw: document.querySelector('#hero-compare canvas').width }; });
+const box = await p.locator('#hero-compare').boundingBox();
+await p.mouse.click(box.x + box.width * 0.7, box.y + box.height * 0.5);
+await p.waitForTimeout(600);
+const split = await p.evaluate(() => getComputedStyle(document.querySelector('#hero-compare')).getPropertyValue('--split'));
+await p.screenshot({ path: OUT });
+console.log(JSON.stringify(st), 'split', split, errs);
+await b.close();
