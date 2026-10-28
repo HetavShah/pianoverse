@@ -103,7 +103,9 @@ export function pickEncoder(e: Encoders, s: ExportSettings): string {
 // seconds per frame per megapixel, for each encoder (drawing, reading back and encoding together), starting from
 // rough figures for a laptop and then following what the last exports here took
 const SPEED_KEY = 'pv.encoderSpeed';
-const SPEED_START = (enc: string) => (enc === 'libx265' ? 0.25 : enc === 'libx264' ? 0.12 : 0.013);
+// (a laptop with NVIDIA took 6 min 46 s for 1,811 frames of 1080x1920 with NVENC, 7-8 min with x264: drawing and
+// reading back each frame costs as much as encoding it, so a graphics-card encoder saves less than it seems)
+const SPEED_START = (enc: string) => (enc === 'libx265' ? 0.2 : enc === 'libx264' ? 0.12 : 0.105);
 function speeds(): Record<string, number> { try { return JSON.parse(localStorage.getItem(SPEED_KEY) ?? '{}'); } catch { return {}; } }
 /** how many seconds an export of `frames` frames of w x h will take with this encoder */
 export function estimateSeconds(enc: string, frames: number, w: number, h: number, transparent = false): number {
