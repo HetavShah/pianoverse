@@ -40,7 +40,11 @@ export function cameraFrameAt(p: CalibratedProject, t: number, duration: number)
 }
 
 
-export interface Encoders { h264: string[]; hevc: string[]; prores: boolean }
+export interface Encoders {
+  h264: string[]; hevc: string[]; prores: boolean;
+  /** why each graphics-card encoder that failed its test did (FFmpeg's words) */
+  failed?: Record<string, string>;
+}
 
 export interface SinkOpts {
   out: string; width: number; height: number; fps: number; outWidth: number; outHeight: number; fit: string;
@@ -50,7 +54,8 @@ export interface Sink {
   start(o: SinkOpts): Promise<void>;
   frame(rgba: Uint8Array): Promise<void>;
   finish(): Promise<string>;
-  cancel(): Promise<void>;
+  /** keepSound: the soundtrack stays for another try */
+  cancel(keepSound?: boolean): Promise<void>;
   /** hand over the export's soundtrack (a WAV file); returns where the encoder can read it */
   audio?(wav: Uint8Array): Promise<string>;
 }
@@ -60,7 +65,7 @@ export const tauriSink: Sink = {
   async start(opts) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_start', { opts }); },
   async frame(rgba) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_frame', rgba); },
   async finish() { const { invoke } = await import('@tauri-apps/api/core'); return invoke<string>('export_finish'); },
-  async cancel() { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_cancel'); },
+  async cancel(keepSound = false) { const { invoke } = await import('@tauri-apps/api/core'); await invoke('export_cancel', { keepSound }); },
   async audio(wav) { const { invoke } = await import('@tauri-apps/api/core'); return invoke<string>('export_audio', wav); },
 };
 
@@ -69,12 +74,14 @@ export const testSink = (): Sink | null => (window as unknown as { __pvExportSin
 
 export async function detectEncoders(): Promise<Encoders> {
   const forTests = (window as unknown as { __pvEncoders?: Encoders }).__pvEncoders;
-  if (!inTauri() && !forTests) return { h264: ['libx264'], hevc: ['libx265'], prores: true };
+  if (!inTauri() && !forTests) return { h264: ['libx264'], hevc: ['libx265'], prores: true, failed: {} };
   const e = forTests ?? await (await import('@tauri-apps/api/core')).invoke<Encoders>('export_encoders');
   // an encoder that got stuck in an export on this computer isn't offered again
   const bad = badEncoders();
   const keep = (l: string[], cpu: string) => { const k = l.filter((x) => !bad.includes(x)); return k.length ? k : [cpu]; };
-  return { ...e, h264: keep(e.h264, 'libx264'), hevc: keep(e.hevc, 'libx265') };
+  const failed = { ...(e.failed ?? {}) };
+  for (const x of bad) failed[x] ??= 'It stopped responding during an export on this computer.';
+  return { ...e, h264: keep(e.h264, 'libx264'), hevc: keep(e.hevc, 'libx265'), failed };
 }
 
 const BAD_KEY = 'pv.badEncoders';
@@ -84,6 +91,23 @@ function badEncoders(): string[] {
 function markBadEncoder(enc: string) {
   try { localStorage.setItem(BAD_KEY, JSON.stringify([...new Set([...badEncoders(), enc])])); } catch { /* not kept */ }
 }
+/**
+ * Why the graphics card that draws the preview isn't the one encoding, in plain words (null when it is, or no
+ * reason is known). gpu: the drawing card's name ("nvidia", "NVIDIA GeForce RTX 3050 Laptop GPU", …).
+ */
+export function encoderNote(e: Encoders | null, gpu: string, codec: 'h264' | 'hevc'): string | null {
+  if (!e?.failed) return null;
+  const vendor = /nvidia/i.test(gpu) ? 'nvenc' : /amd|radeon/i.test(gpu) ? 'amf' : null;
+  if (!vendor) return null;
+  const name = `${codec}_${vendor}`;
+  const why = e.failed[name];
+  if (!why || (codec === 'hevc' ? e.hevc : e.h264)[0] === name) return null;
+  const card = vendor === 'nvenc' ? 'NVIDIA NVENC' : 'AMD AMF';
+  if (/driver does not support|minimum required|nvenc API version|driver version/i.test(why)) return `${card} can't be used: your graphics driver is too old for it. Updating the driver should make exports faster. (${why})`;
+  if (/no capable devices|no nvenc capable|not supported|cannot load nvcuda|OpenEncodeSession.*failed/i.test(why)) return `${card} can't be used: this graphics card has no video encoder, or Windows isn't giving Pianoverse access to it. (${why})`;
+  return `${card} can't be used. (${why})`;
+}
+
 const isHardware = (enc: string) => /_(nvenc|amf|qsv)$/.test(enc);
 
 // The graphics card that encodes isn't always the one that draws (a laptop with Intel and NVIDIA), so the label names
@@ -233,7 +257,7 @@ export async function runExport(args: {
       }, 1000);
       try {
       for (let i = 0; i < frames; i++) {
-        if (args.cancelled()) { await pending?.catch(() => {}); await sink.cancel(); throw new Error('cancelled'); }
+        if (args.cancelled()) { await within(pending ?? Promise.resolve(), 5, 'The encoder').catch(() => {}); await within(sink.cancel(), 10, 'Stopping the encoder').catch(() => {}); throw new Error('cancelled'); }
         const t = from - lead + i / fps;
         // the video frame on screen at time t (frames repeat when exporting at a higher frame rate; during a
         // ring-out the last one holds while the effects play on)
@@ -247,7 +271,8 @@ export async function runExport(args: {
         const img = await within(r.capture(videoFrame(v), t), 30, 'The graphics card');
         doing('the encoder');
         if (pending) await pending;
-        pending = sink.frame(img.data);
+        // the encoder side gives up on its own after 20 s; this is the last line of defence
+        pending = within(sink.frame(img.data), 60, 'The encoder');
         done = i + 1;
         doing('');
         if (i % 6 === 0 || i === frames - 1) {
@@ -259,14 +284,15 @@ export async function runExport(args: {
       }
       doing('the encoder');
       if (pending) await pending;
+      doing('the encoder to finish');
+      saved.push(await within(sink.finish(), 180, 'The encoder'));
       doing('');
       } finally { clearInterval(watch); }
-      saved.push(await sink.finish());
       break;
       } catch (e) {
         const m = String((e as Error)?.message ?? e);
         if (m === 'cancelled' || !isHardware(enc)) throw e;
-        await sink.cancel().catch(() => {});
+        await within(sink.cancel(true), 10, 'Stopping the encoder').catch(() => {});
         markBadEncoder(enc);
         const was = encoderLabel(enc);
         enc = s.codec === 'hevc' ? 'libx265' : 'libx264';

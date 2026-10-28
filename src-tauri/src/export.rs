@@ -166,6 +166,8 @@ pub struct Encoders {
     pub h264: Vec<String>,
     pub hevc: Vec<String>,
     pub prores: bool,
+    /// why each graphics-card encoder that failed did (FFmpeg's last words), e.g. an NVIDIA driver too old
+    pub failed: std::collections::BTreeMap<String, String>,
 }
 
 /// Try each encoder the way an export uses it: a portrait 1080x1920 picture, the export's quality settings, a
@@ -175,33 +177,50 @@ pub struct Encoders {
 pub async fn export_encoders(app: AppHandle) -> Result<Encoders, String> {
     let exe = ensure_ffmpeg(&app).await?;
     tauri::async_runtime::spawn_blocking(move || {
+        let failed = Mutex::new(std::collections::BTreeMap::<String, String>::new());
         let works = |enc: &str| -> bool {
             let mut cmd = Command::new(&exe);
             cmd.args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=1080x1920:r=30:d=1", "-frames:v", "30", "-pix_fmt", "yuv420p"])
                 .args(encoder_args(enc, "high"))
                 .args(["-f", "null", "-"]);
-            cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+            cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
             hide_window(&mut cmd);
             let Ok(mut child) = cmd.spawn() else { return false };
+            // FFmpeg's reason, read as it comes (so it can't block on a full pipe)
+            let stderr = child.stderr.take();
+            let reader = std::thread::spawn(move || {
+                let mut text = String::new();
+                if let Some(mut e) = stderr { let _ = std::io::Read::read_to_string(&mut e, &mut text); }
+                text
+            });
             let start = std::time::Instant::now();
-            loop {
+            let ok = loop {
                 match child.try_wait() {
-                    Ok(Some(st)) => return st.success(),
+                    Ok(Some(st)) => break st.success(),
                     Ok(None) if start.elapsed() > std::time::Duration::from_secs(12) => {
                         let _ = child.kill();
                         let _ = child.wait();
+                        if let Ok(mut f) = failed.lock() { f.insert(enc.to_string(), "It didn't finish a test encode within 12 seconds.".into()); }
                         return false;
                     }
                     Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
-                    Err(_) => return false,
+                    Err(_) => break false,
                 }
+            };
+            let text = reader.join().unwrap_or_default();
+            if !ok && !enc.starts_with("lib") && enc != "prores_ks" {
+                let why: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+                let why = why.iter().rev().take(3).rev().cloned().collect::<Vec<_>>().join(" ");
+                if let Ok(mut f) = failed.lock() { f.insert(enc.to_string(), if why.is_empty() { "It failed a test encode.".into() } else { why }); }
             }
+            ok
         };
         let pick = |list: &[&str]| -> Vec<String> { list.iter().filter(|e| works(e)).map(|e| e.to_string()).collect() };
         let h264 = pick(&["h264_nvenc", "h264_amf", "h264_qsv", "libx264"]);
         let hevc = pick(&["hevc_nvenc", "hevc_amf", "hevc_qsv", "libx265"]);
         let prores = works("prores_ks");
-        Encoders { h264, hevc, prores }
+        let failed = failed.into_inner().unwrap_or_default();
+        Encoders { h264, hevc, prores, failed }
     })
     .await
     .map_err(|e| e.to_string())
@@ -211,16 +230,24 @@ pub async fn export_encoders(app: AppHandle) -> Result<Encoders, String> {
 #[tauri::command]
 pub async fn export_start(app: AppHandle, state: State<'_, ExportState>, opts: ExportOpts) -> Result<(), String> {
     let exe = ensure_ffmpeg(&app).await?;
-    if let Some(mut old) = state.0.lock().map_err(|e| e.to_string())?.take() {
+    let old = state.0.lock().map_err(|e| e.to_string())?.take();
+    if let Some(mut old) = old {
+        drop(old.frames_tx.take());
         let _ = old.child.kill();
-        let _ = std::fs::remove_file(&old.part);
+        std::thread::spawn(move || {
+            let _ = old.child.wait();
+            if let Some(w) = old.writer.take() { let _ = w.join(); }
+            let _ = std::fs::remove_file(&old.part);
+        });
     }
     let out = PathBuf::from(&opts.out);
     if let Some(dir) = out.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("Could not create the folder {}: {e}", dir.display()))?;
     }
     let ext = out.extension().and_then(|e| e.to_str()).unwrap_or("mp4").to_string();
-    let part = out.with_extension(format!("part.{ext}"));
+    // a file of its own for each attempt: a stuck encoder from an earlier try may still hold the last one open
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    let part = out.with_extension(format!("part{}.{ext}", stamp % 1_000_000));
     let codec = opts.audio.as_ref().and_then(|p| audio_codec(&exe, p));
     let args = build_args(&opts, codec.as_deref(), &part.to_string_lossy());
     let mut cmd = Command::new(&exe);
@@ -330,16 +357,24 @@ pub async fn export_finish(state: State<'_, ExportState>) -> Result<String, Stri
     Ok(job.out.to_string_lossy().into_owned())
 }
 
+/// Stop the export. Returns at once: FFmpeg is killed, and waited for on a thread of its own (an encoder stuck in a
+/// graphics driver can take a long time to die, and nothing may wait on it). keep_sound: the rendered soundtrack
+/// stays for another try (the export starting again on another encoder).
 #[tauri::command]
-pub fn export_cancel(state: State<'_, ExportState>) -> Result<(), String> {
-    if let Some(mut job) = state.0.lock().map_err(|e| e.to_string())?.take() {
+pub async fn export_cancel(state: State<'_, ExportState>, keep_sound: Option<bool>) -> Result<(), String> {
+    let job = state.0.lock().map_err(|e| e.to_string())?.take();
+    if let Some(mut job) = job {
         drop(job.frames_tx.take());
-        // killing FFmpeg also frees a writer thread stuck in a write
         let _ = job.child.kill();
-        let _ = job.child.wait();
-        if let Some(w) = job.writer.take() { let _ = w.join(); }
-        let _ = std::fs::remove_file(&job.part);
-        remove_temp(&job.temp_audio);
+        if !keep_sound.unwrap_or(false) {
+            remove_temp(&job.temp_audio);
+        }
+        std::thread::spawn(move || {
+            // killing FFmpeg also frees a writer thread stuck in a write
+            let _ = job.child.wait();
+            if let Some(w) = job.writer.take() { let _ = w.join(); }
+            let _ = std::fs::remove_file(&job.part);
+        });
     }
     Ok(())
 }

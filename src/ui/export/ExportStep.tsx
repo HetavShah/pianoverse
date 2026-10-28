@@ -6,7 +6,7 @@ import { sourceRect, trimRange } from '../../engine/project';
 import Icon from '../components/icons';
 import { inTauri } from '../services/media';
 import {
-  detectEncoders, Encoders, encoderLabel, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
+  detectEncoders, Encoders, encoderLabel, encoderNote, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
   sizesFor, cameraOn, cameraFrameAt, tauriSink, testSink, videoFrame,
 } from './exportRun';
 
@@ -240,6 +240,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
           <dt>Encoder</dt><dd className={hw ? '' : 'dim'} title={hw ? 'On the graphics card' : encoder ? 'No graphics-card encoder found, so the processor does it' : undefined}>{encoder ? encoderLabel(encoder) : encErr ? 'Not available' : 'Checking…'}</dd>
         </dl>
         {encErr && <small className="danger-text">{encErr}</small>}
+        {encoderNote(enc, ws.renderer?.adapterName ?? '', s.codec === 'hevc' ? 'hevc' : 'h264') && <small className="ex-note">{encoderNote(enc, ws.renderer?.adapterName ?? '', s.codec === 'hevc' ? 'hevc' : 'h264')}</small>}
 
         {run.kind === 'running' && (
           <div className="ex-progress">
