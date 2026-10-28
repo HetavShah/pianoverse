@@ -239,11 +239,15 @@ export async function runExport(args: {
       // a graphics-card encoder that gets stuck or stops: the pass starts again on the processor
       for (;;) {
       try {
-      await sink.start({
-        out, width, height, fps, outWidth: outW, outHeight: outH, fit: s.fit,
-        codec: phase === 'effects' ? 'prores' : s.codec, encoder: enc, quality: s.quality,
-        audio: phase === 'effects' ? null : audio, audioCopy: s.audioCopy && !shaped, start: shaped ? 0 : from, duration: frames / fps,
-      });
+      // starting the encoder has a limit too, and says so while it takes a moment
+      const starting = setTimeout(() => args.onProgress({ phase, done: 0, total: frames, elapsed: 0, eta: 0, note, waiting: 'the encoder to start' }), 3000);
+      try {
+        await within(sink.start({
+          out, width, height, fps, outWidth: outW, outHeight: outH, fit: s.fit,
+          codec: phase === 'effects' ? 'prores' : s.codec, encoder: enc, quality: s.quality,
+          audio: phase === 'effects' ? null : audio, audioCopy: s.audioCopy && !shaped, start: shaped ? 0 : from, duration: frames / fps,
+        }), 30, 'Starting the encoder');
+      } finally { clearTimeout(starting); }
       const t0 = performance.now();
       let pending: Promise<void> | null = null;
       let lastSrc = -1;

@@ -182,13 +182,28 @@ fn tail(log: &Arc<Mutex<Vec<String>>>) -> String {
     log.lock().map(|l| l.join("\n")).unwrap_or_default()
 }
 
-/// The audio codec of a file ("aac", "opus", …), read from FFmpeg's description of it.
+/// The audio codec of a file ("aac", "opus", …), read from FFmpeg's description of it (given up on after 10 s).
 fn audio_codec(exe: &PathBuf, path: &str) -> Option<String> {
     let mut cmd = Command::new(exe);
-    cmd.args(["-hide_banner", "-i", path]).stdout(Stdio::null()).stderr(Stdio::piped());
+    cmd.args(["-hide_banner", "-i", path]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
     hide_window(&mut cmd);
-    let out = cmd.output().ok()?;
-    let text = String::from_utf8_lossy(&out.stderr);
+    let mut child = cmd.spawn().ok()?;
+    let stderr = child.stderr.take();
+    let reader = std::thread::spawn(move || {
+        let mut text = String::new();
+        if let Some(mut e) = stderr { let _ = std::io::Read::read_to_string(&mut e, &mut text); }
+        text
+    });
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if start.elapsed() > std::time::Duration::from_secs(10) => { let _ = child.kill(); let _ = child.wait(); break; }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(20)),
+            Err(_) => return None,
+        }
+    }
+    let text = reader.join().ok()?;
     let line = text.lines().find(|l| l.contains("Audio: "))?;
     let rest = &line[line.find("Audio: ")? + 7..];
     Some(rest.split(|c: char| c == ' ' || c == ',' || c == '(').next()?.to_string())
@@ -297,10 +312,15 @@ pub async fn export_start(app: AppHandle, state: State<'_, ExportState>, opts: E
     // a file of its own for each attempt: a stuck encoder from an earlier try may still hold the last one open
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
     let part = out.with_extension(format!("part{}.{ext}", stamp % 1_000_000));
-    let codec = opts.audio.as_ref().and_then(|p| audio_codec(&exe, p));
+    // off the async workers: it runs FFmpeg once
+    let codec = {
+        let (exe, audio) = (exe.clone(), opts.audio.clone());
+        tauri::async_runtime::spawn_blocking(move || audio.as_ref().and_then(|p| audio_codec(&exe, p))).await.map_err(|e| e.to_string())?
+    };
     let args = build_args(&opts, codec.as_deref(), &part.to_string_lossy());
     let mut cmd = Command::new(&exe);
     cmd.args(&args).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped());
+    // (the export's own FFmpeg reads frames from stdin)
     hide_window(&mut cmd);
     let mut child = cmd.spawn().map_err(|e| format!("Could not start the encoder: {e}"))?;
     let temp_audio = opts.audio.as_ref().map(PathBuf::from).filter(|p| p.file_name().is_some_and(|n| n == SOUND_FILE));
