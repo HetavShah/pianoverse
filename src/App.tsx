@@ -32,6 +32,7 @@ import { useSound } from './ui/app/useSound';
 import { exposeForTests } from './ui/app/testHooks';
 import { trimRange } from './engine/project';
 import { installSlidingInk } from './ui/components/slidingInk';
+import { warmEncoders } from './ui/export/exportRun';
 
 export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -45,6 +46,8 @@ export default function App() {
   const library = useLibrary();
   // the orange underline that slides to the chosen step or choice, everywhere in the app
   useEffect(() => installSlidingInk(), []);
+  // the export's encoder test, in the background a few seconds after start (so Export doesn't wait for it)
+  useEffect(() => { const t = window.setTimeout(() => { warmEncoders().catch(() => {}); }, 4000); return () => window.clearTimeout(t); }, []);
 
   // undo history: every edit goes through setProject
   const history = useHistory(project, setProjectState);

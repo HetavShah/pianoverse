@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod export;
+mod decode;
 mod media;
 mod piano;
 mod projects;
@@ -51,6 +52,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(export::ExportState::default())
+        .manage(decode::DecodeState::default())
         .invoke_handler(tauri::generate_handler![
             write_text_file,
             launch_files,
@@ -74,6 +76,9 @@ fn main() {
             export::show_in_folder,
             export::export_last_log,
             export::export_note,
+            decode::decode_open,
+            decode::decode_next,
+            decode::decode_close,
             textures::import_texture,
             textures::list_textures,
             textures::delete_texture,

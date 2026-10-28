@@ -263,7 +263,7 @@ fn audio_codec(exe: &PathBuf, path: &str) -> Option<String> {
     Some(rest.split(|c: char| c == ' ' || c == ',' || c == '(').next()?.to_string())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Encoders {
     /// encoders that actually worked in a test encode, best first
@@ -277,8 +277,21 @@ pub struct Encoders {
 /// Try each encoder the way an export uses it: a portrait 1080x1920 picture, the export's quality settings, a
 /// second of frames, one encoder at a time, and given up on after a few seconds (a graphics-card encoder can be
 /// listed and even start, yet hang). Graphics cards are listed even when they lack an encoder, hence the test.
+/// the encoder test's result, made once per run of the app (in the background soon after it starts)
+static TESTED: std::sync::OnceLock<tauri::async_runtime::Mutex<Option<Encoders>>> = std::sync::OnceLock::new();
+
 #[tauri::command]
-pub async fn export_encoders(app: AppHandle) -> Result<Encoders, String> {
+pub async fn export_encoders(app: AppHandle, refresh: Option<bool>) -> Result<Encoders, String> {
+    // one test at a time; later calls get its result
+    let lock = TESTED.get_or_init(|| tauri::async_runtime::Mutex::new(None));
+    let mut done = lock.lock().await;
+    if let (Some(e), false) = (done.as_ref(), refresh.unwrap_or(false)) { return Ok(e.clone()); }
+    let result = test_encoders(app).await?;
+    *done = Some(result.clone());
+    Ok(result)
+}
+
+async fn test_encoders(app: AppHandle) -> Result<Encoders, String> {
     let exe = ensure_ffmpeg(&app).await?;
     tauri::async_runtime::spawn_blocking(move || {
         let failed = Mutex::new(std::collections::BTreeMap::<String, String>::new());

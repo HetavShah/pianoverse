@@ -6,7 +6,7 @@ import { sourceRect, trimRange } from '../../engine/project';
 import Icon from '../components/icons';
 import { inTauri } from '../services/media';
 import {
-  detectEncoders, Encoders, encoderLabel, encoderNote, estimateSeconds, lastExportLog, pickEncoder, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
+  detectEncoders, Encoders, rememberedEncoders, encoderLabel, encoderNote, estimateSeconds, lastExportLog, pickEncoder, estimate, ExportProgress, ExportSettings, framePng, outSize, runExport,
   sizesFor, cameraOn, cameraFrameAt, tauriSink, testSink, videoFrame,
 } from './exportRun';
 
@@ -19,7 +19,7 @@ type Run = { kind: 'idle' } | { kind: 'running'; p: ExportProgress | null } | { 
 
 export default function ExportStep({ ws }: { ws: WS }) {
   const { project } = ws;
-  const [enc, setEnc] = useState<Encoders | null>(null);
+  const [enc, setEnc] = useState<Encoders | null>(() => rememberedEncoders());
   const [encErr, setEncErr] = useState('');
   const [run, setRun] = useState<Run>({ kind: 'idle' });
   const [thumb, setThumb] = useState('');
@@ -98,6 +98,8 @@ export default function ExportStep({ ws }: { ws: WS }) {
     if (!sink) { setRun({ kind: 'error', message: 'Exporting needs the Pianoverse desktop app.' }); return; }
     cancel.current = false;
     setRun({ kind: 'running', p: null });
+    // this run's encoder test (usually done in the background already; otherwise a few seconds)
+    const encs = await detectEncoders().then((e) => { setEnc(e); return e; }).catch(() => enc);
     // the workspace is locked from here to the end (steps, Projects, undo, shortcuts, opening files)
     ws.setExporting({ done: 0, total: 0 });
     await thumbJob.current;
@@ -108,7 +110,7 @@ export default function ExportStep({ ws }: { ws: WS }) {
       // a held Web Lock keeps the page from being frozen while the window is in the background
       const hold = <T,>(job: () => Promise<T>): Promise<T> => (navigator.locks ? navigator.locks.request('pianoverse-export', job) as Promise<T> : job());
       const files = await hold(() => runExport({
-        renderer: r, video: v, project, duration, settings: s, encoders: enc, sink, range: part,
+        renderer: r, video: v, project, duration, settings: s, encoders: encs, sink, range: part,
         onProgress: (p) => { if (p.note) note = p.note; setRun({ kind: 'running', p }); if (p.preview) setThumb(p.preview); ws.setExporting({ done: p.done, total: p.total }); },
         cancelled: () => cancel.current,
       }));

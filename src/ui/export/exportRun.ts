@@ -5,6 +5,7 @@ import { loadTitleFonts, resolveTitles } from '../../engine/titles';
 import type { CalibratedProject } from '../../engine/calibration';
 import { aspectInfo, cameraAt, CameraFrame, followPath, FollowPath } from '../../engine/camera';
 import { inTauri } from '../services/media';
+import type { FrameSource } from '../../engine/render';
 import { sourceRect, trimRange } from '../../engine/project';
 import { ExportSettings, SIZES } from '../../engine/exportSettings';
 import { resolveSound, soundActive, soundLead, soundTail } from '../../engine/audio/sound';
@@ -82,14 +83,37 @@ export async function lastExportLog(): Promise<string | null> {
 
 export const testSink = (): Sink | null => (window as unknown as { __pvExportSink?: Sink }).__pvExportSink ?? null;
 
-export async function detectEncoders(): Promise<Encoders> {
-  const forTests = (window as unknown as { __pvEncoders?: Encoders }).__pvEncoders;
-  if (!inTauri() && !forTests) return { h264: ['libx264'], hevc: ['libx265'], prores: true, failed: {} };
-  const e = forTests ?? await (await import('@tauri-apps/api/core')).invoke<Encoders>('export_encoders');
-  // (an earlier version kept a list of encoders that once failed, and never offered them again: forgotten now, the
-  // best encoder is tried every time and a failure only changes that one export)
-  try { localStorage.removeItem('pv.badEncoders'); } catch { /* nothing kept */ }
-  return { ...e, failed: e.failed ?? {} };
+// The encoder test runs once per run of the app, in the background a few seconds after it starts (warmEncoders);
+// the Export screen shows the last result straight away (remembered from the last run) and the fresh one when ready.
+const ENC_KEY = 'pv.encoders';
+let tested: Promise<Encoders> | null = null;
+
+export function detectEncoders(): Promise<Encoders> {
+  if (!tested) {
+    tested = (async () => {
+      const forTests = (window as unknown as { __pvEncoders?: Encoders }).__pvEncoders;
+      if (!inTauri() && !forTests) return { h264: ['libx264'], hevc: ['libx265'], prores: true, failed: {} };
+      const e = forTests ?? await (await import('@tauri-apps/api/core')).invoke<Encoders>('export_encoders');
+      // (an earlier version kept a list of encoders that once failed, and never offered them again: forgotten now,
+      // the best encoder is tried every time and a failure only changes that one export)
+      try { localStorage.removeItem('pv.badEncoders'); localStorage.setItem(ENC_KEY, JSON.stringify(e)); } catch { /* not kept */ }
+      return { ...e, failed: e.failed ?? {} };
+    })();
+    tested.catch(() => { tested = null; });
+  }
+  return tested;
+}
+
+/** the last test's result, from the last run of the app (shown until this run's test is done) */
+export function rememberedEncoders(): Encoders | null {
+  try { const e = JSON.parse(localStorage.getItem(ENC_KEY) ?? 'null'); return e?.h264?.length ? e : null; } catch { return null; }
+}
+
+/** start the encoder test in the background, if FFmpeg is already there (it is never downloaded for this) */
+export async function warmEncoders() {
+  if (!inTauri()) return;
+  const { invoke } = await import('@tauri-apps/api/core');
+  if (await invoke<boolean>('converter_ready').catch(() => false)) detectEncoders().catch(() => {});
 }
 
 /** the encoder an export uses: the one picked, if this computer has it, otherwise the best one that works */
@@ -197,6 +221,38 @@ const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>((res) => {
   setTimeout(done, 4000);
 });
 
+/**
+ * The video's frames read straight through by FFmpeg (desktop app; src-tauri/src/decode.rs), instead of jumping the
+ * video player to every frame: frame(si) gives source frame si, frames being asked for in order.
+ */
+interface DecodedVideo { frame(si: number): Promise<HTMLCanvasElement>; close(): void }
+
+async function openDecoded(p: CalibratedProject, v: HTMLVideoElement, first: number, srcFps: number): Promise<DecodedVideo | null> {
+  const path = p.video.editPath ?? p.video.path;
+  if (!inTauri() || !path || !v.videoWidth) return null;
+  const { invoke } = await import('@tauri-apps/api/core');
+  const w = v.videoWidth, h = v.videoHeight;
+  await invoke('decode_open', { path, start: first / srcFps, fps: srcFps, width: w, height: h });
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d')!;
+  let cur = first - 1, ended = false, latest: ArrayBuffer | null = null, drawn = -2;
+  return {
+    async frame(si) {
+      while (cur < si && !ended) {
+        try { latest = await invoke<ArrayBuffer>('decode_next'); cur++; } catch (e) {
+          if (/^end/.test(String((e as Error)?.message ?? e)) && latest) { ended = true; break; }
+          throw e;
+        }
+      }
+      if (!latest) throw new Error('The video reader gave no frame');
+      if (drawn !== cur) { g.putImageData(new ImageData(new Uint8ClampedArray(latest), w, h), 0, 0); drawn = cur; }
+      return c;
+    },
+    close() { invoke('decode_close').catch(() => {}); },
+  };
+}
+
 export interface ExportProgress {
   phase: 'sound' | 'video' | 'effects'; done: number; total: number; elapsed: number; eta: number; preview?: string;
   /** something that changed on the way (the encoder) */
@@ -299,6 +355,13 @@ export async function runExport(args: {
           args.onProgress({ phase, done, total: frames, elapsed: el, eta: 0, note, waiting: step });
         }
       }, 1000);
+      // the video's frames straight from FFmpeg when it can (much faster than jumping the player to each one)
+      const firstSrc = Math.max(0, Math.floor(from * srcFps + 1e-6));
+      let decoded: DecodedVideo | null = await openDecoded(p, v, firstSrc, srcFps).catch((e) => {
+        sink.note?.(`the video reader couldn't start (${String((e as Error)?.message ?? e).slice(0, 200)}); jumping the video player to each frame`).catch(() => {});
+        return null;
+      });
+      sink.note?.(decoded ? 'reading the video straight through with FFmpeg' : 'jumping the video player to each frame').catch(() => {});
       try {
       for (let i = 0; i < frames; i++) {
         if (args.cancelled()) { await within(pending ?? Promise.resolve(), 5, 'The encoder').catch(() => {}); await within(sink.cancel(), 10, 'Stopping the encoder').catch(() => {}); throw new Error('cancelled'); }
@@ -306,15 +369,26 @@ export async function runExport(args: {
         // the video frame on screen at time t (frames repeat when exporting at a higher frame rate; during a
         // ring-out the last one holds while the effects play on)
         const si = Math.min(Math.floor(Math.max(from, Math.min(t, to - 0.5 / srcFps)) * srcFps + 1e-6), Math.max(0, Math.floor(args.duration * srcFps) - 1));
-        if (si !== lastSrc) { doing('the video'); await seekTo(v, (si + 0.5) / srcFps); lastSrc = si; }
+        let frameImg: FrameSource;
+        if (decoded) {
+          doing('the video');
+          try { frameImg = await within(decoded.frame(si), 40, 'Reading the video'); } catch (e) {
+            // the reader failed: on with the video player for the rest
+            sink.note?.(`the video reader stopped (${String((e as Error)?.message ?? e).slice(0, 200)}); jumping the video player to each frame instead`).catch(() => {});
+            decoded.close(); decoded = null; lastSrc = -1;
+          }
+        }
+        if (!decoded) {
+          if (si !== lastSrc) { doing('the video'); await seekTo(v, (si + 0.5) / srcFps); lastSrc = si; }
+          doing('the video frame');
+          frameImg = videoFrame(v);
+        }
         // the swell fades in from black and the ring-out fades to black (unless a title card is showing)
         const dark = fadeTail && t > to ? smoothFade((t - to) / tail) : fadeLead && t < from ? 1 - smoothFade((t - (from - lead)) / lead) : 0;
         if (cam) { const c = cameraFrameAt(p, Math.max(from, Math.min(t, to)), args.duration); r.setView(c.view, [Math.max(c.fade[0], dark), dark > c.fade[0] ? 0 : c.fade[1]]); }
         else if (tail > 0 || lead > 0) r.setView(null, [dark, 0]);
-        doing('the video frame');
-        const frameImg = videoFrame(v);
         doing('the graphics card');
-        const img = await within(r.capture(frameImg, t), 30, 'The graphics card');
+        const img = await within(r.capture(frameImg!, t), 30, 'The graphics card');
         doing('the encoder');
         if (pending) await pending;
         // the encoder side gives up on its own after 20 s; this is the last line of defence
@@ -336,7 +410,7 @@ export async function runExport(args: {
       saved.push(await within(sink.finish(), 180, 'The encoder'));
       doing('');
       if (phase === 'video') learnSpeed(enc, frames, outW, outH, (performance.now() - t0) / 1000);
-      } finally { clearInterval(watch); }
+      } finally { clearInterval(watch); decoded?.close(); }
       break;
       } catch (e) {
         const m = String((e as Error)?.message ?? e);
